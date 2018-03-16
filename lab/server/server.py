@@ -117,6 +117,7 @@ def main():
         'web_settings': {
             'cookie_secret': cookie_secret
         },
+        'server_name': cfg['server_name'],
         'visa_backends': cfg['visa_backends'],
     }
 
