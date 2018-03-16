@@ -3,10 +3,12 @@ from setuptools import find_packages, setup
 # This reads the __version__ variable from lab/_version.py
 exec(open('lab/_version.py').read())
 
-# Read in requirements.txt
-with open('requirements.txt', 'r') as f_requirements:
-    requirements = f_requirements.readlines()
-requirements = [r.strip() for r in requirements]
+requirements = [
+    'numpy', 'scipy', 'matplotlib', 'jupyter', 'ipywidgets', 'requests',
+    'tornado', 'mongoengine', 'scikit-rf', 'pyvisa>=1.8', 'pyvisa-py']
+
+# Readme file as long_description:
+long_description = open('README.md').read()
 
 setup(
     name="QuLab",
@@ -17,7 +19,7 @@ setup(
     license = "MIT",
     keywords="experiment laboratory",
     description="contral instruments and manage data",
-    long_description="""""",
+    long_description=long_description,
     packages = find_packages(),
     include_package_data = True,
     install_requires=requirements,
