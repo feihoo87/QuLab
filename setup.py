@@ -8,7 +8,7 @@ requirements = [
     'tornado', 'mongoengine', 'scikit-rf', 'pyvisa>=1.8', 'pyvisa-py']
 
 # Readme file as long_description:
-long_description = open('README.md').read()
+long_description = open('README.md','rb').read().decode('utf-8')
 
 setup(
     name="QuLab",
