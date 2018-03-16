@@ -263,7 +263,7 @@ class Application(
         pass
 
     @classmethod
-    def save(cls, moduleName=None, version=None):
+    def save(cls, version=None, moduleName=None):
         _schema.saveApplication(cls.__name__, cls.__source__,
                                 get_current_user(), cls.__doc__, moduleName,
                                 version)
