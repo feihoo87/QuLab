@@ -9,7 +9,7 @@ QuLab 需要在 Jupyter Notebook 中使用。
 
 ## 安装
 
-```!bash
+```bash
 python -m pip install QuLab
 ```
 
@@ -17,7 +17,7 @@ python -m pip install QuLab
 
 创建配置文件 `config.yaml`，若使用 Windows 系统，将其置于`%ProgramData%\QuLab\`路径下。
 
-```!yaml
+```yaml
 ca_cert: &ca_cert /path/to/CACert/ca.pem
 
 db:
@@ -51,7 +51,7 @@ ssl:
 
 ### 创建初始用户
 
-```!python
+```python
 from lab import _bootstrap
 from lab.db._schema import User
 
