@@ -1,0 +1,11 @@
+numpy
+scipy
+matplotlib
+jupyter
+ipywidgets
+requests
+tornado
+mongoengine
+scikit-rf
+pyvisa>=1.8
+pyvisa-py
