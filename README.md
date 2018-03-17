@@ -53,6 +53,15 @@ ssl:
 
 ```python
 from lab import _bootstrap
+from lab.admin import register
+_bootstrap._connect_db()
+register()
+```
+
+或者直接操作数据库
+
+```python
+from lab import _bootstrap
 from lab.db._schema import User
 
 _bootstrap._connect_db()
@@ -64,3 +73,7 @@ user = User(
 user.password = 'password'
 user.save()
 ```
+
+## License
+
+[MIT](https://opensource.org/licenses/MIT)
