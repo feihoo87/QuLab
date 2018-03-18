@@ -18,7 +18,7 @@ def getRegisterInfo():
 
 def register():
     username, password, email, fullname = getRegisterInfo()
-    user = User(name=username, email=email, fullname=fullname)
+    user = _schema.User(name=username, email=email, fullname=fullname)
     user.password = password
     user.save()
     print('Success.')
