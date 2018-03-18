@@ -13,8 +13,6 @@ QuLab 需要在 Jupyter Notebook 中使用。
 python -m pip install QuLab
 ```
 
-## 配置
-
 创建配置文件 `config.yaml`，若使用 Windows 系统，将其置于`%ProgramData%\QuLab\`路径下。
 
 ```yaml
@@ -74,6 +72,13 @@ user.password = 'password'
 user.save()
 ```
 
+### 登陆系统
+
+```python
+import lab
+lab.login()
+```
+
 ### 创建并运行简单 App
 
 定义 App
@@ -116,6 +121,21 @@ app = lab.make_app('TestApp').set_sweeps([
 lab.make_figure_for_app(app)
 app.run()
 ```
+
+### 查询
+
+查看已有的 App
+```python
+lab.listApps()
+```
+
+查询数据
+```python
+results = lab.query()
+results.display()
+print('%d results found.' % results.count())
+```
+
 ## License
 
 [MIT](https://opensource.org/licenses/MIT)
