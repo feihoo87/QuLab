@@ -136,6 +136,17 @@ results.display()
 print('%d results found.' % results.count())
 ```
 
+获取原始数据
+
+```python
+res = lab.query(app='TestApp')
+x,y = res[0].data
+
+import matplotlib.pyplot as plt
+plt.plot(x, y)
+plt.show()
+```
+
 ## License
 
 [MIT](https://opensource.org/licenses/MIT)
