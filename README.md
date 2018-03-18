@@ -74,6 +74,48 @@ user.password = 'password'
 user.save()
 ```
 
+### 创建并运行简单 App
+
+定义 App
+
+```python
+import numpy as np
+import asyncio
+import lab
+
+class TestApp(lab.Application):
+    '''一个简单的 App'''
+    async def work(self):
+        async for x in self.sweep['x']:
+            yield x, np.random.randn()
+
+    async def set_x(self, x):
+        await asyncio.sleep(0.5)
+        # print('x =', x)
+
+    @staticmethod
+    def plot(fig, data):
+        x, y = data
+        ax = fig.add_subplot(111)
+        ax.plot(x, y)
+        ax.set_xlabel('x (a.u.)')
+        ax.set_ylabel('y (a.u.)')
+```
+将其提交到数据库
+```python
+TestApp.save()
+```
+一旦将App提交到数据库，以后就不必重复将代码复制过来运行了。直接配置并运行即可。
+```python
+import lab
+import numpy as np
+
+app = lab.make_app('TestApp').set_sweeps([
+    ('x', np.linspace(0, 1, 11))
+])
+lab.make_figure_for_app(app)
+app.run()
+```
 ## License
 
 [MIT](https://opensource.org/licenses/MIT)
