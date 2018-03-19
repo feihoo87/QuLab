@@ -158,6 +158,80 @@ lab.make_figure_for_app(app)
 app.run()
 ```
 
+### 涉及到仪器操作
+
+添加仪器设置
+```python
+# 第一台网分
+lab.admin.setInstrument('PNA-I', 'localhost', 'TCPIP::10.122.7.250', 'Agilent_PNA')
+# 第二台网分
+lab.admin.setInstrument('PNA-II', 'localhost', 'TCPIP::10.122.7.251', 'Agilent_PNA')
+```
+
+定义 App
+```python
+import numpy as np
+import skrf as rf
+from lab import Application
+
+
+class GetPNAS21(Application):
+    '''从网分上读取 S21
+
+    require:
+        rc : PNA
+        settings: repeat(optional)
+
+    return: Frequency, Re(S21), Im(S21)
+    '''
+    async def work(self):
+        if self.params.get('power', None) is None:
+            self.params['power'] = [self.rc['PNA'].getValue('Power'), 'dBm']
+        x = self.rc['PNA'].get_Frequency()
+        for i in range(self.settings.get('repeat', 1)):
+            self.processToChange(100.0 / self.settings.get('repeat', 1))
+            y = np.array(self.rc['PNA'].get_S())
+            yield x, np.real(y), np.imag(y)
+            self.increaseProcess()
+
+    def pre_save(self, x, re, im):
+        if self.status['result']['rows'] > 1:
+            x = x[0]
+            re = np.mean(re, axis=0)
+            im = np.mean(im, axis=0)
+        return x, re, im
+
+    @staticmethod
+    def plot(fig, obj):
+        x, re, im = obj
+        s = re + 1j * im
+        ax = fig.add_subplot(111)
+        ax.plot(x / 1e9, rf.mag_2_db(np.abs(s)))
+        ax.set_xlabel('Frequency / GHz')
+        ax.set_ylabel('S21 / dB')
+```
+保存
+```python
+GetPNAS21.save()
+```
+运行
+```python
+import lab
+
+app = lab.make_app('GetPNAS21').with_rc({
+    'PNA': 'PNA-II'     # PNA-II 必须是已经添加到数据库里的设备名
+}).with_settings({
+    'repeat': 10
+}).with_params(
+    power = [-27, 'dBm'],
+    att = [-30, 'dB']
+).with_tags('5 bits sample', 'Cavity 1')
+
+lab.make_figure_for_app(app)
+
+app.run()
+```
+
 ### 查询
 
 查看已有的 App
