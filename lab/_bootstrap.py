@@ -146,5 +146,5 @@ def listInstruments():
     ret = _schema.Instrument.objects()
     ui.list_instruments(ret)
 
-def setInstruemt(name, host, address, driver):
+def setInstrument(name, host, address, driver):
     _schema.setInstrument(name, host, address, driver)
