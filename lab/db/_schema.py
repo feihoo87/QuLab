@@ -435,6 +435,8 @@ class Instrument(Document):
 
 def setInstrument(name, host, address, driver):
     driver = Driver.objects(name=driver).order_by('-version').first()
+    if driver is None:
+        raise Exception('Driver %r not exists, upload it first.' % driver)
     ins = Instrument.objects(name=name).first()
     if ins is None:
         ins = Instrument(name=name, host=host, address=address, driver=driver)
