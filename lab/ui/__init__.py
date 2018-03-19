@@ -35,7 +35,8 @@ def listApps(apps):
     ]
     for app in apps:
         table.append('%s|%s.%d|%s|%s|%s' % (app.name, app.version_tag, app.version,
-                                         app.author.fullname, app.discription, app.created_time.strftime('%Y-%m-%d %H:%M:%S')))
+                                         app.author.fullname, app.discription,
+                                         app.created_time.strftime('%Y-%m-%d %H:%M:%S')))
     display(Markdown('\n'.join(table)))
 
 
@@ -47,13 +48,16 @@ def list_drivers(drivers):
     for driver in drivers:
         module = driver.module
         if module is None:
-            table.append('%s|%s| Error! Module for driver not set |N/A' % (driver.name, driver.version))
+            table.append('%s|%s| Error! Module for driver not set |N/A' % (
+                driver.name, driver.version))
             continue
-        table.append('%s|%s|%s|%s' % (driver.name, driver.version, module.fullname, module.created_time))
+        table.append('%s|%s|%s|%s' % (driver.name, driver.version,
+            module.fullname, module.created_time.strftime('%Y-%m-%d %H:%M:%S')))
         if not module.is_package:
             continue
         for sub_module in module.modules:
-            table.append('%s|%s|%s|%s' % ('', '', sub_module.fullname, sub_module.created_time))
+            table.append('%s|%s|%s|%s' % ('', '', sub_module.fullname,
+                sub_module.created_time.strftime('%Y-%m-%d %H:%M:%S')))
     display(Markdown('\n'.join(table)))
 
 
@@ -64,5 +68,6 @@ def list_instruments(instruments):
     ]
     for inst in instruments:
         table.append('|%s|%s|%s|%s|' %
-                     (inst.name, inst.host, inst.address, inst.driver.name if inst.driver is not None else 'None'))
+                     (inst.name, inst.host, inst.address,
+                      inst.driver.name if inst.driver is not None else 'None'))
     display(Markdown('\n'.join(table)))
