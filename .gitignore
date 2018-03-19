@@ -99,3 +99,7 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+my_apps/
+README.rst
+Test.ipynb

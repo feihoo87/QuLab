@@ -264,6 +264,9 @@ class DriverManager(object):
             ins.close()
 
     def __getitem__(self, key):
+        return self.get(key)
+
+    def get(self, key):
         return self.__instr.get(key, None)
 
     def _open_resource(self, addr, driver_data, **kw):

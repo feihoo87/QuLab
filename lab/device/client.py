@@ -126,10 +126,19 @@ class InstrumentManager:
         self.verify = verify
         #self._drvmgr = DriverManager(visa_backends=visa_backends)
         self._drvmgr_py = DriverManager(visa_backends='@py')
-        self._drvmgr_ni = DriverManager(visa_backends='@ni')
+        try:
+            self._drvmgr_ni = DriverManager(visa_backends='@ni')
+        except:
+            self._drvmgr_ni = None
         self._sessions = {}
         self._lab = None
         self._hosts = {'localhost'}.union(set(hosts))
+
+    def get_local_resource(self, name):
+        ins = self._drvmgr_py.get(name)
+        if ins is None:
+            ins = self._drvmgr_ni.get(name)
+        return ins
 
     def get_session(self, server, port=DEFAULT_PORT):
         if not ((server, port) in self._sessions.keys()):
