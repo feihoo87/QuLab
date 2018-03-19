@@ -7,9 +7,8 @@ import tokenize
 
 from mongoengine.connection import connect, disconnect
 
-from . import ui
+from . import _importer, ui
 from .config import config
-from . import _importer
 from .db import _schema
 
 __run_mode = 'release'
@@ -138,3 +137,11 @@ def open_resource(name, host=None, timeout=10):
 def listApps():
     ret = _schema.listApplication()
     ui.listApps(ret.values())
+
+def listDrivers():
+    ret = _schema.Driver.objects()
+    ui.list_drivers(ret)
+
+def listInstruments():
+    ret = _schema.Instrument.objects()
+    ui.list_instruments(ret)

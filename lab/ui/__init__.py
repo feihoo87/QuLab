@@ -41,13 +41,14 @@ def listApps(apps):
 
 def list_drivers(drivers):
     table = [
-        ' name | files | time ',
-        '----|:----|----',
+        ' name | version | modules | time ',
+        '----|----|----|----',
     ]
     for driver in drivers:
-        table.append('%s|%s|%s' % (driver.name, '', ''))
-        for f in driver.files:
-            table.append('%s|%s|%s' % ('', f.name, f.modified_time))
+        module = driver.module
+        table.append('%s|%s|%s|%s' % (driver.name, driver.version, module.fullname, module.created_time))
+        for sub_module in module.modules:
+            table.append('%s|%s|%s|%s' % ('', '', sub_module.fullname, sub_module.created_time))
     display(Markdown('\n'.join(table)))
 
 
