@@ -46,6 +46,9 @@ def list_drivers(drivers):
     ]
     for driver in drivers:
         module = driver.module
+        if module is None:
+            table.append('%s|%s| Error! Module for driver not set |N/A' % driver.name, driver.version)
+            continue
         table.append('%s|%s|%s|%s' % (driver.name, driver.version, module.fullname, module.created_time))
         if not module.is_package:
             continue
