@@ -47,6 +47,8 @@ def list_drivers(drivers):
     for driver in drivers:
         module = driver.module
         table.append('%s|%s|%s|%s' % (driver.name, driver.version, module.fullname, module.created_time))
+        if not module.is_package:
+            continue
         for sub_module in module.modules:
             table.append('%s|%s|%s|%s' % ('', '', sub_module.fullname, sub_module.created_time))
     display(Markdown('\n'.join(table)))
@@ -59,5 +61,5 @@ def list_instruments(instruments):
     ]
     for inst in instruments:
         table.append('|%s|%s|%s|%s|' %
-                     (inst.name, inst.host, inst.address, inst.driver.name))
+                     (inst.name, inst.host, inst.address, inst.driver.name if inst.driver is not None else 'None'))
     display(Markdown('\n'.join(table)))
