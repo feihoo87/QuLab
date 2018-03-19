@@ -54,22 +54,6 @@ from lab.admin import register
 register()
 ```
 
-或者直接操作数据库
-
-```python
-from lab import _bootstrap
-from lab.db._schema import User
-
-_bootstrap._connect_db()
-
-user = User(
-    name='admin',
-    email='admin@example.com',
-    fullname = 'Fullname')
-user.password = 'password'
-user.save()
-```
-
 ### 登陆系统
 
 ```python
@@ -115,6 +99,60 @@ import numpy as np
 
 app = lab.make_app('TestApp').set_sweeps([
     ('x', np.linspace(0, 1, 11))
+])
+lab.make_figure_for_app(app)
+app.run()
+```
+
+### 创建复杂一点的 App
+
+```python
+import numpy as np
+import asyncio
+import lab
+
+class ComplexApp(lab.Application):
+    '''一个复杂点的 App'''
+    async def work(self):
+        async for x in self.sweep['y']:
+            # 一定要注意设置 parent
+            app = lab.make_app('TestApp', parent=self)
+            x, z = await app.done()
+            yield x, y, z
+
+    async def set_y(self, y):
+        await asyncio.sleep(0.5)
+        # print('x =', x)
+
+    def pre_save(self, x, y, z):
+        if self.status['result']['rows'] > 1:
+            x = x[0]
+        return x, y, z
+
+    @staticmethod
+    def plot(fig, data):
+        x, y, z = data
+        ax = fig.add_subplot(111)
+        try:
+            ax.imshow(z, extend=(min(x), max(x), min(y), max(y)))
+        except:
+            pass
+        ax.set_xlabel('x (a.u.)')
+        ax.set_ylabel('y (a.u.)')
+```
+保存
+```python
+ComplexApp.save()
+```
+运行
+
+```python
+import lab
+import numpy as np
+
+app = lab.make_app('ComplexApp').set_sweeps([
+    ('x', np.linspace(0, 1, 11)),
+    ('y', np.linspace(3,5,11))
 ])
 lab.make_figure_for_app(app)
 app.run()
