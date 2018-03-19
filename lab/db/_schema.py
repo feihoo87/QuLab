@@ -301,9 +301,9 @@ def savePackageFile(path, fullname=None, author=None):
             subpath = os.path.join(path, file)
             name, _ = os.path.splitext(file)
             if os.path.isdir(subpath):
-                submods.append(
-                    savePackageFile(subpath, '%s.%s' % (fullname, name),
-                                    author))
+                submod = savePackageFile(subpath, '%s.%s' % (fullname, name), author)
+                if submod is not None:
+                    submods.append(submod)
             elif os.path.isfile(subpath):
                 if file == '__init__.py':
                     with tokenize.open(subpath) as f:
