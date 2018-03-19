@@ -7,7 +7,7 @@ requirements = [
     'numpy>=1.13.3', 'scipy>=1.0.0', 'matplotlib>=2.1.0', 'jupyter>=1.0.0',
     'ipywidgets>=7.0.5', 'requests>=2.18.4', 'tornado>=4.5.2',
     'mongoengine>=0.15.0', 'blinker>=1.4', 'scikit-rf>=0.14.5', 'pyvisa>=1.8',
-    'pyvisa-py>=0.2']
+    'pyvisa-py>=0.2', 'PyYAML>=3.12']
 
 # Readme file as long_description:
 long_description = open('README.md','rb').read().decode('utf-8')

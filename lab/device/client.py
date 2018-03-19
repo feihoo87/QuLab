@@ -157,7 +157,11 @@ class InstrumentManager:
 
     def open_resource(self, instrument, host=None, timeout=10):
         if isinstance(instrument, str):
-            instrument = _schema.getInstrumentByName(instrument)
+            inst = _schema.getInstrumentByName(instrument)
+            if inst is None:
+                raise Exception('Instrument %r not found in database.' % instrument)
+            else:
+                instrument = inst
         if instrument.host == 'localhost' and host is None:
             return self.open_local_resource(instrument, timeout)
         else:
