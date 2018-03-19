@@ -138,13 +138,12 @@ def listApps():
     ret = _schema.listApplication()
     ui.listApps(ret.values())
 
+
 def listDrivers():
     ret = _schema.Driver.objects()
     ui.list_drivers(ret)
 
+
 def listInstruments():
     ret = _schema.Instrument.objects()
     ui.list_instruments(ret)
-
-def setInstrument(name, host, address, driver):
-    _schema.setInstrument(name, host, address, driver)

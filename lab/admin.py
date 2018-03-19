@@ -16,6 +16,7 @@ def getRegisterInfo():
     return username, password, email, fullname
 
 
+@_bootstrap.require_db_connection
 def register():
     username, password, email, fullname = getRegisterInfo()
     user = _schema.User(name=username, email=email, fullname=fullname)
@@ -27,3 +28,8 @@ def register():
 @_bootstrap.authenticated
 def uploadDriver(path):
     _schema.uploadDriver(path, _bootstrap.get_current_user())
+
+
+@_bootstrap.authenticated
+def setInstrument(name, host, address, driver):
+    _schema.setInstrument(name, host, address, driver)

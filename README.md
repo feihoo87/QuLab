@@ -50,9 +50,7 @@ ssl:
 ### 创建初始用户
 
 ```python
-from lab import _bootstrap
 from lab.admin import register
-_bootstrap._connect_db()
 register()
 ```
 
