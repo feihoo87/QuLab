@@ -1,16 +1,30 @@
+from codecs import open
+from os import path
+
 from setuptools import find_packages, setup
+
+here = path.abspath(path.dirname(__file__))
+
+# Get the long description from the README file
+with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
+    long_description = f.read()
 
 # This reads the __version__ variable from lab/_version.py
 exec(open('lab/_version.py').read())
 
 requirements = [
-    'numpy>=1.13.3', 'scipy>=1.0.0', 'matplotlib>=2.1.0', 'jupyter>=1.0.0',
-    'ipywidgets>=7.0.5', 'requests>=2.18.4', 'tornado>=4.5.2',
-    'mongoengine>=0.15.0', 'blinker>=1.4', 'scikit-rf>=0.14.5', 'pyvisa>=1.8',
-    'pyvisa-py>=0.2', 'PyYAML>=3.12']
-
-# Readme file as long_description:
-long_description = open('README.md','rb').read().decode('utf-8')
+    'numpy>=1.13.3',
+    'scipy>=1.0.0',
+    'matplotlib>=2.1.0',
+    'jupyter>=1.0.0',
+    'requests>=2.18.4',
+    'tornado>=4.5.2',
+    'mongoengine>=0.15.0',
+    'blinker>=1.4',
+    'pyvisa>=1.8',
+    'pyvisa-py>=0.2',
+    'PyYAML>=3.12'
+]
 
 setup(
     name="QuLab",
@@ -40,4 +54,8 @@ setup(
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 3.6',
     ],
+    project_urls={  # Optional
+        'Bug Reports': 'https://github.com/feihoo87/QuLab/issues',
+        'Source': 'https://github.com/feihoo87/QuLab/',
+    },
 )
