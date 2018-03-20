@@ -168,6 +168,12 @@ lab.admin.setInstrument('PNA-I', 'localhost', 'TCPIP::10.122.7.250', 'Agilent_PN
 lab.admin.setInstrument('PNA-II', 'localhost', 'TCPIP::10.122.7.251', 'Agilent_PNA')
 ```
 
+查看已存在的仪器
+
+```python
+lab.listInstruments()
+```
+
 定义 App
 ```python
 import numpy as np
