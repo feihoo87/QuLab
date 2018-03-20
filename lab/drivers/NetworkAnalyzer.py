@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 import numpy as np
+from lab.device import BaseDriver, QInteger, QOption, QReal, QVector
 
-from lab.device import BaseDriver
-from lab.device import QReal, QOption, QInteger
 
 class Driver(BaseDriver):
-    surport_models = ['R&S ZNB','R&S ZNBT']
+    surport_models = ['E8363C', 'R&S ZNB', 'R&S ZNBT']
 
     quants = [
-        QReal('Power', value=-20, unit='dBm', set_cmd='SOUR:POW %(value)e', get_cmd='SOUR:POW?'),
+        QReal('Power', value=-20, unit='dBm', set_cmd='SOUR:POW1 %(value)e', get_cmd='SOUR:POW1?'),
         QOption('Sweep', value='ON',
           set_cmd='INIT:CONT %(option)s', options=[('OFF', 'OFF'), ('ON', 'ON')]),
         QInteger('Number of points', value=201, unit='',
@@ -82,7 +81,11 @@ class Driver(BaseDriver):
 
     def pna_select(self, ch=1):
         '''Select the measurement'''
-        msg = self.query('CALC%d:PAR:CAT?' % ch).strip("'")#.lstrip('"').rstrip('"')
+        if self.model == 'E8363C':
+            quote = '" '
+        elif self.model in ['R&S ZNB', 'R&S ZNBT']:
+            quote = "' "
+        msg = self.query('CALC%d:PAR:CAT?' % ch).strip(quote)
         measname = msg.split(',')[0]
         self.write('CALC%d:PAR:SEL "%s"' % (ch, measname))
 
@@ -91,15 +94,11 @@ class Driver(BaseDriver):
 
         #Select the measurement
         self.pna_select(ch)
-
-        #Get the num of sweep points
-        #points = self.query_ascii_values('SENS%d:SWE:POIN?' % ch)[0]
-        #Get the start and stop frequency
-        #freq_start = self.query_ascii_values('SENS%d:FREQ:STAR?' % ch)[0]
-        #freq_stop = self.query_ascii_values('SENS%d:FREQ:STOP?' % ch)[0]
-        #Creat the frequency vector
-        #return np.linspace(freq_start, freq_stop, points)
-        return np.asarray(self.query_ascii_values('CALC:DATA:STIM?'))
+        if self.model == 'E8363C':
+            cmd = 'CALC:X?'
+        elif self.model in ['R&S ZNB', 'R&S ZNBT']:
+            cmd = 'CALC:DATA:STIM?'
+        return np.asarray(self.query_ascii_values(cmd))
 
     def set_segments(self, segments=[], form='Start Stop'):
         if form == 'Start Stop':
