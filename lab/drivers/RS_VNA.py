@@ -82,7 +82,7 @@ class Driver(BaseDriver):
 
     def pna_select(self, ch=1):
         '''Select the measurement'''
-        msg = self.query('CALC%d:PAR:CAT?' % ch).strip().lstrip('"').rstrip('"')
+        msg = self.query('CALC%d:PAR:CAT?' % ch).strip("'")#.lstrip('"').rstrip('"')
         measname = msg.split(',')[0]
         self.write('CALC%d:PAR:SEL "%s"' % (ch, measname))
 
