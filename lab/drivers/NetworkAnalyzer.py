@@ -8,6 +8,9 @@ class Driver(BaseDriver):
 
     quants = [
         QReal('Power', value=-20, unit='dBm', set_cmd='SOUR:POW1 %(value)e', get_cmd='SOUR:POW1?'),
+        QVector('Frequency', unit='Hz'),
+        QVector('Trace'),
+        QVector('S'),
         QOption('Sweep', value='ON',
           set_cmd='INIT:CONT %(option)s', options=[('OFF', 'OFF'), ('ON', 'ON')]),
         QInteger('Number of points', value=201, unit='',
@@ -34,16 +37,25 @@ class Driver(BaseDriver):
             self.setValue('Power:Stop', value)
         else:
             super(Driver, self).performSetValue(quant, value, **kw)
+    '''
 
     def performGetValue(self, quant, **kw):
-        if quant.name == 'Power':
-            return self.getValue('Power:Center')
+        get_vector_methods = {
+            'Frequency': self.get_Frequency,
+            'Trace': self.get_Trace,
+            'S': self.get_S,
+        }
+        if quant.name in get_vector_methods.keys():
+            return get_vector_methods[quant.name](ch = kw.get('ch', 1))
         else:
             return super(Driver, self).performGetValue(quant, **kw)
-    '''
 
     def get_Trace(self, ch=1):
         '''Get trace'''
+        return self.get_S(ch, formated=True)
+
+    def get_S(self, ch=1, formated=False):
+        '''Get the complex value of S paramenter or formated data'''
         #Select the measurement
         self.pna_select(ch)
 
@@ -55,29 +67,14 @@ class Driver(BaseDriver):
         #Get the data
         self.write('FORMAT:BORD NORM')
         self.write('FORMAT ASCII')
-        data = self.query_ascii_values("CALC%d:DATA? FDATA" % ch)
+        if formated:
+            data = np.asarray(self.query_ascii_values("CALC%d:DATA? FDATA" % ch))
+        else:
+            data = np.asarray(self.query_ascii_values("CALC%d:DATA? SDATA" % ch))
+            data = data[::2]+1j*data[1::2]
         #Start the sweep
         self.setValue('Sweep', 'ON')
-        return np.array(data)
-
-    def get_S(self, ch=1):
-        '''Get the complex value of S paramenter'''
-        #Select the measurement
-        self.pna_select(ch)
-
-        #Stop the sweep
-        self.setValue('Sweep', 'OFF')
-        #Begin a measurement
-        self.write('INIT:IMM')
-        self.write('*WAI')
-        #Get the data
-        self.write('FORMAT:BORD NORM')
-        self.write('FORMAT ASCII')
-        data = self.query_ascii_values("CALC%d:DATA? SDATA" % ch)
-        data = np.asarray(data)
-        #Start the sweep
-        self.setValue('Sweep', 'ON')
-        return data[::2]+1j*data[1::2]
+        return data
 
     def pna_select(self, ch=1):
         '''Select the measurement'''
