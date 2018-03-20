@@ -1,8 +1,11 @@
+all: README.rst
+
 publish: README.rst setup.py
 	python3 setup.py sdist
 	twine upload dist/*
 
 clear:
+	rm README.rst
 	rm -rf dist
 	rm -rf QuLab.egg-info
 
