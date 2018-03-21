@@ -9,8 +9,8 @@ import numpy as np
 from IPython.display import (HTML, Image, Markdown, clear_output, display,
                              set_matplotlib_formats)
 
-from .._plot import make_image
 from . import _schema
+from .._plot import make_image
 from ._schema import Record
 
 
@@ -135,8 +135,8 @@ def query(q=None, app=None, show_hidden=False, **kwds):
         if app is not None:
             if isinstance(app, str):
                 return query_by_app_name(app, show_hidden, version=kwds.pop('version', None))
-            elif hasattr(app, '__AppData__'):
-                kwds['app'] = app.__AppData__
+            elif hasattr(app, '__DBDocument__'):
+                kwds['app'] = app.__DBDocument__
             elif isinstance(app, _schema.Application):
                 kwds['app'] = app
         if not show_hidden:

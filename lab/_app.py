@@ -12,49 +12,14 @@ import numpy as np
 
 from ._bootstrap import get_current_user, open_resource, save_inputCells
 from ._plot import draw
+from .base import HasSource
 from .db import _schema
 from .ui import ApplicationUI, display_source_code
 
 
-class MetaApplication(type):
-    '''MetaApplication
-
-    Get the source code of Application so we can record it into database.
-    '''
-
-    def __new__(cls, name, bases, nmspc):
-        #nmspc['__source__'] = None
-        #nmspc['__AppData__'] = None
-        return super(MetaApplication, cls).__new__(cls, name, bases, nmspc)
-
-    def __init__(cls, name, bases, nmspc):
-        super(MetaApplication, cls).__init__(name, bases, nmspc)
-        if cls.__module__ != 'builtins':
-            try:
-                cls.__source__ = cls._getSourceCode()
-            except:
-                cls.__source__ = ''
-
-    def _getSourceCode(cls):
-        '''getSourceCode
-        '''
-        module = sys.modules[cls.__module__]
-        if module.__name__ == '__main__' and hasattr(module, 'In'):
-            code = module.In[-1]
-        elif cls.__AppData__ is not None:
-            code = cls.__AppData__.module.source.text
-        elif hasattr(module, '__file__'):
-            with tokenize.open(module.__file__) as f:
-                code = f.read()
-        else:
-            code = ''
-        return code
-
-
-class Application(
-        metaclass=type('Meta', (abc.ABCMeta, MetaApplication), dict())):
+class Application(HasSource, abc.ABC):
     __source__ = ''
-    __AppData__ = None
+    __DBDocument__ = None
 
     def __init__(self, parent=None):
         self.parent = parent
@@ -90,8 +55,8 @@ class Application(
         # self.ui.reset()
 
     def record_title(self):
-        version = '%s.%d' % (self.__AppData__.version_tag,
-                             self.__AppData__.version)
+        version = '%s.%d' % (self.__DBDocument__.version_tag,
+                             self.__DBDocument__.version)
         return 'Record by %s (%s)' % (self.__class__.__name__, version)
 
     def reset_status(self):
@@ -196,7 +161,7 @@ class Application(
             params=self.params,
             rc=rc,
             hidden=False if self.parent is None else True,
-            app=self.__AppData__,
+            app=self.__DBDocument__,
         )
         #self.status['current_record'] = record
         if self.parent is not None:
@@ -407,7 +372,7 @@ def getAppClass(name='', version=None, id=None, **kwds):
         return None
     mod = importlib.import_module(appdata.module.fullname)
     app_cls = getattr(mod, name)
-    app_cls.__AppData__ = appdata
+    app_cls.__DBDocument__ = appdata
     app_cls.__source__ = appdata.source
     return app_cls
 
