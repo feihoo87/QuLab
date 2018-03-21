@@ -170,9 +170,9 @@ app.run()
 添加仪器设置
 ```python
 # 第一台网分
-lab.admin.setInstrument('PNA-I', 'localhost', 'TCPIP::10.122.7.250', 'Agilent_PNA')
+lab.admin.setInstrument('PNA-I', 'localhost', 'TCPIP::10.122.7.250', 'NetworkAnalyzer')
 # 第二台网分
-lab.admin.setInstrument('PNA-II', 'localhost', 'TCPIP::10.122.7.251', 'Agilent_PNA')
+lab.admin.setInstrument('PNA-II', 'localhost', 'TCPIP::10.122.7.251', 'NetworkAnalyzer')
 ```
 
 查看已存在的仪器
