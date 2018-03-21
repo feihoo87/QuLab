@@ -132,7 +132,7 @@ class ComplexApp(lab.Application):
         # print('x =', x)
 
     def pre_save(self, x, y, z):
-        if self.status['result']['rows'] > 1:
+        if self.data.rows > 1:
             x = x[0]
         return x, y, z
 
