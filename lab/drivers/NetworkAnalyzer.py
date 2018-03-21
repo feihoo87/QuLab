@@ -4,7 +4,7 @@ from lab.device import BaseDriver, QInteger, QOption, QReal, QVector
 
 
 class Driver(BaseDriver):
-    surport_models = ['E8363C', 'ZNB', 'ZNBT']
+    surport_models = ['E8363C', 'ZNB20-2Port']
 
     quants = [
         QReal('Power', value=-20, unit='dBm', set_cmd='SOUR:POW %(value)e', get_cmd='SOUR:POW?'),
@@ -80,7 +80,7 @@ class Driver(BaseDriver):
         '''Select the measurement'''
         if self.model == 'E8363C':
             quote = '" '
-        elif self.model in ['ZNB', 'ZNBT']:
+        elif self.model in ['ZNB20-2Port']:
             quote = "' "
         msg = self.query('CALC%d:PAR:CAT?' % ch).strip(quote)
         measname = msg.split(',')[0]
@@ -93,7 +93,7 @@ class Driver(BaseDriver):
         self.pna_select(ch)
         if self.model == 'E8363C':
             cmd = 'CALC:X?'
-        elif self.model in ['ZNB', 'ZNBT']:
+        elif self.model in ['ZNB20-2Port']:
             cmd = 'CALC:DATA:STIM?'
         return np.asarray(self.query_ascii_values(cmd))
 
