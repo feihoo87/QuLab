@@ -24,6 +24,7 @@ class Application(HasSource, abc.ABC):
     def __init__(self, parent=None):
         self.parent = parent
         self.rc = RcMap()
+        self.data = DataCollector(self)
         self.settings = {}
         self.params = {}
         self.tags = []
@@ -52,9 +53,10 @@ class Application(HasSource, abc.ABC):
 
     def reset(self):
         self.reset_status()
+        self.data.clear()
         # self.ui.reset()
 
-    def record_title(self):
+    def title(self):
         version = '%s.%d' % (self.__DBDocument__.version_tag,
                              self.__DBDocument__.version)
         return 'Record by %s (%s)' % (self.__class__.__name__, version)
@@ -66,7 +68,6 @@ class Application(HasSource, abc.ABC):
             last_step_process=0,
             sub_process_num=1,
             process_changed_by_children=False,
-            result=None,
             process=0.0,
             done=False,
         )
@@ -129,59 +130,6 @@ class Application(HasSource, abc.ABC):
         self.sweep = SweepSet(self, s)
         return self
 
-    def collect(self, data):
-        '''对于存在循环的实验，将每一轮生成的数据收集起来'''
-        if not isinstance(data, tuple):
-            data = (data, )
-        if self.status['result'] is None:
-            self.status['result'] = dict(
-                rows=1, cols=len(data), data=[[v] for v in data])
-        else:
-            for i, v in enumerate(data):
-                self.status['result']['data'][i].append(v)
-            self.status['result']['rows'] += 1
-
-    def result(self):
-        '''将收集到的数据按 work 生成时的顺序返回'''
-        if self.status['result']['rows'] == 1:
-            data = tuple([v[0] for v in self.status['result']['data']])
-        else:
-            data = tuple([np.array(v) for v in self.status['result']['data']])
-        if self.status['result']['cols'] == 1:
-            return self.pre_save(data[0])
-        else:
-            return self.pre_save(*data)
-
-    def newRecord(self):
-        rc = dict([(name, str(v)) for name, v in self.rc.items()])
-        record = _schema.Record(
-            title=self.record_title(),
-            user=get_current_user(),
-            tags=self.tags,
-            params=self.params,
-            rc=rc,
-            hidden=False if self.parent is None else True,
-            app=self.__DBDocument__,
-        )
-        #self.status['current_record'] = record
-        if self.parent is not None:
-            self.parent.addSubRecord(record)
-        return record
-
-    def addSubRecord(self, record):
-        if self.status['current_record'] is not None:
-            if record.id is None:
-                record.save(signal_kwargs=dict(finished=True))
-            self.status['current_record'].children.append(record)
-            self.status['current_record'].save(
-                signal_kwargs=dict(finished=True))
-
-    def saveRecord(self, data):
-        if self.status['current_record'] is None:
-            self.status['current_record'] = self.newRecord()
-        self.status['current_record'].data = data
-        self.status['current_record'].save(signal_kwargs=dict(finished=True))
-
     def setDone(self):
         self.status['done'] = True
         #value = 100 - self.ui.get_process()
@@ -202,13 +150,13 @@ class Application(HasSource, abc.ABC):
     async def done(self):
         self.reset()
         async for data in self.work():
-            self.collect(data)
-            result = self.result()
+            self.data.collect(data)
+            result = self.data.result()
             if self.level <= self.level_limit:
-                self.saveRecord(result)
+                self.data.save()
             draw(self.__class__.plot, result, self)
         self.setDone()
-        return self.result()
+        return self.data.result()
 
     async def work(self):
         '''单个返回值不要用 tuple，否则会被解包，下面这些都允许
@@ -236,6 +184,81 @@ class Application(HasSource, abc.ABC):
     @classmethod
     def show(cls):
         display_source_code(cls.__source__)
+
+
+class DataCollector:
+    '''Collect data when app runs'''
+    def __init__(self, app):
+        self.app = app
+        self.clear()
+
+    def clear(self):
+        self.__data = None
+        self.__rows = 0
+        self.__cols = 0
+        self.__record = None
+
+    @property
+    def cols(self):
+        return self.__cols
+
+    @property
+    def rows(self):
+        return self.__rows
+
+    def collect(self, data):
+        '''对于存在循环的实验，将每一轮生成的数据收集起来'''
+        if not isinstance(data, tuple):
+            data = (data, )
+        if self.__data is None:
+            self.__data = [[v] for v in data]
+            self.__cols = len(data)
+            self.__rows = 1
+        else:
+            for i, v in enumerate(data):
+                self.__data[i].append(v)
+            self.__rows += 1
+
+    def result(self):
+        '''将收集到的数据按 work 生成时的顺序返回'''
+        if self.__rows == 1:
+            data = tuple([v[0] for v in self.__data)
+        else:
+            data = tuple([np.array(v) for v in self.__data)
+        if self.__rows == 1:
+            return self.app.pre_save(data[0])
+        else:
+            return self.app.pre_save(*data)
+
+    def save(self):
+        if self.__record is None:
+            self.__record = self.newRecord()
+        self.__record.data = data
+        self.__record.save(signal_kwargs=dict(finished=True))
+
+    def newRecord(self):
+        rc = dict([(name, str(v)) for name, v in self.app.rc.items()])
+        record = _schema.Record(
+            title=self.app.title(),
+            user=get_current_user(),
+            tags=self.app.tags,
+            params=self.app.params,
+            rc=rc,
+            hidden=False if self.app.parent is None else True,
+            app=self.app.__DBDocument__,
+        )
+        #self.status['current_record'] = record
+        if self.app.parent is not None:
+            self.app.parent.data.addSubRecord(record)
+        return record
+
+    def addSubRecord(self, record):
+        if self.__record is not None:
+            if record.id is None:
+                record.save(signal_kwargs=dict(finished=True))
+            self.__record.children.append(record)
+            self.__record.save(
+                signal_kwargs=dict(finished=True))
 
 
 class Sweep:
