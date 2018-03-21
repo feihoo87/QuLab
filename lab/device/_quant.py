@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import numpy as np
+
 from ..util import get_unit_prefix
+
 
 class Quantity(object):
     def __init__(self, name, value=None, type=None, unit=None, get_cmd='', set_cmd=''):
@@ -121,5 +124,5 @@ class QVector(Quantity):
                 res = self.driver.query_binary_values(cmd)
             else:
                 res = self.driver.query_ascii_values(cmd)
-            self.value = res
+            self.value = np.asarray(res)
         return self.value

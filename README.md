@@ -12,6 +12,13 @@ QuLab 需要在 Jupyter Notebook 中使用。
 ```bash
 python -m pip install QuLab
 ```
+或者
+```bash
+git clone https://github.com/feihoo87/QuLab.git
+cd QuLab
+make
+python -m pip install .
+```
 
 创建配置文件 `config.yaml`，若使用 Windows 系统，将其置于`%ProgramData%\QuLab\`路径下。
 
@@ -166,6 +173,12 @@ app.run()
 lab.admin.setInstrument('PNA-I', 'localhost', 'TCPIP::10.122.7.250', 'Agilent_PNA')
 # 第二台网分
 lab.admin.setInstrument('PNA-II', 'localhost', 'TCPIP::10.122.7.251', 'Agilent_PNA')
+```
+
+查看已存在的仪器
+
+```python
+lab.listInstruments()
 ```
 
 定义 App
