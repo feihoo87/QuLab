@@ -28,7 +28,7 @@ class Application(HasSource, abc.ABC):
         self.settings = {}
         self.params = {}
         self.tags = []
-        self.sweep = None
+        self.sweep = SweepSet(self)
         self.status = None
         self.ui = None
         self.reset_status()
@@ -41,7 +41,6 @@ class Application(HasSource, abc.ABC):
             self.params.update(parent.params)
             self.params.update(parent.status['current_params'])
             self.tags.extend(parent.tags)
-            self.set_sweeps(parent.sweep.sweeps.values())
             self.level = parent.level + 1
             self.level_limit = parent.level_limit
             #parent.status['sub_process_num'] += 1
@@ -114,20 +113,6 @@ class Application(HasSource, abc.ABC):
 
     def with_settings(self, settings={}):
         self.settings.update(settings)
-        return self
-
-    def set_sweeps(self, sweeps=[]):
-        s = []
-        for sweep in sweeps:
-            if isinstance(sweep, tuple):
-                s.append(Sweep(*sweep))
-            elif isinstance(sweep, dict):
-                s.append(Sweep(**sweep))
-            elif isinstance(sweep, Sweep):
-                s.append(sweep)
-            else:
-                raise TypeError('Unsupport type %r for sweep.' % type(sweep))
-        self.sweep = SweepSet(self, s)
         return self
 
     def setDone(self):
@@ -339,15 +324,27 @@ class SweepIter:
 
 
 class SweepSet:
-    def __init__(self, app, sweeps):
+    def __init__(self, app):
         self.app = app
-        self.sweeps = {}
-        for sweep in sweeps:
-            sweep.app = app
-            self.sweeps[sweep.name] = sweep
+        self._sweep = {}
+        if app.parent is not None:
+            self._sweep.update(app.parent.sweep._sweep)
 
     def __getitem__(self, name):
-        return self.sweeps[name]
+        return self._sweep[name]
+
+    def __call__(self, sweeps=[]):
+        for args in sweeps:
+            if isinstance(args, tuple):
+                sweep = Sweep(*args)
+            elif isinstance(args, dict):
+                sweep = Sweep(**args)
+            elif isinstance(args, Sweep):
+                sweep = args
+            else:
+                raise TypeError('Unsupport type %r for sweep.' % type(args))
+            self._sweep[sweep.name] = sweep
+        return self.app
 
 
 class RcMap:

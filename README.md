@@ -104,7 +104,7 @@ TestApp.save()
 import lab
 import numpy as np
 
-app = lab.make_app('TestApp').set_sweeps([
+app = lab.make_app('TestApp').sweep([
     ('x', np.linspace(0, 1, 11))
 ])
 lab.make_figure_for_app(app)
@@ -121,7 +121,7 @@ import lab
 class ComplexApp(lab.Application):
     '''一个复杂点的 App'''
     async def work(self):
-        async for x in self.sweep['y']:
+        async for y in self.sweep['y']:
             # 一定要注意设置 parent
             app = lab.make_app('TestApp', parent=self)
             x, z = await app.done()
@@ -157,7 +157,7 @@ ComplexApp.save()
 import lab
 import numpy as np
 
-app = lab.make_app('ComplexApp').set_sweeps([
+app = lab.make_app('ComplexApp').sweep([
     ('x', np.linspace(0, 1, 11)),
     ('y', np.linspace(3,5,11))
 ])
