@@ -16,10 +16,10 @@ class MetaHasSource(type):
     '''
 
     def __new__(cls, name, bases, nmspc):
-        return super(MetaApplication, cls).__new__(cls, name, bases, nmspc)
+        return super(MetaHasSource, cls).__new__(cls, name, bases, nmspc)
 
     def __init__(cls, name, bases, nmspc):
-        super(MetaApplication, cls).__init__(name, bases, nmspc)
+        super(MetaHasSource, cls).__init__(name, bases, nmspc)
         if cls.__module__ != 'builtins':
             try:
                 cls.__source__ = cls._getSourceCode()
