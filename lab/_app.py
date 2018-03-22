@@ -207,9 +207,9 @@ class DataCollector:
     def result(self):
         '''将收集到的数据按 work 生成时的顺序返回'''
         if self.__rows == 1:
-            data = tuple([v[0] for v in self.__data)
+            data = tuple([v[0] for v in self.__data])
         else:
-            data = tuple([np.array(v) for v in self.__data)
+            data = tuple([np.array(v) for v in self.__data])
         if self.__rows == 1:
             return self.app.pre_save(data[0])
         else:
