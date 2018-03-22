@@ -17,7 +17,7 @@ from .db import _schema
 from .ui import ApplicationUI, display_source_code
 
 
-class Application(HasSource, abc.ABC):
+class Application(HasSource):
     __source__ = ''
     __DBDocument__ = None
 
@@ -123,13 +123,17 @@ class Application(HasSource, abc.ABC):
     def run(self):
         self.ui = ApplicationUI(self)
         self.ui.display()
-        with ThreadPoolExecutor() as executor:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.set_default_executor(executor)
-            tasks = [asyncio.ensure_future(self.done())]
-            loop.run_until_complete(asyncio.wait(tasks))
-            loop.close()
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(self.done(), loop)
+        else:
+            with ThreadPoolExecutor() as executor:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.set_default_executor(executor)
+                tasks = [asyncio.ensure_future(self.done())]
+                loop.run_until_complete(asyncio.wait(tasks))
+                loop.close()
         save_inputCells()
 
     async def done(self):
@@ -210,7 +214,7 @@ class DataCollector:
             data = tuple([v[0] for v in self.__data])
         else:
             data = tuple([np.array(v) for v in self.__data])
-        if self.__rows == 1:
+        if self.__cols == 1:
             return self.app.pre_save(data[0])
         else:
             return self.app.pre_save(*data)
@@ -218,7 +222,7 @@ class DataCollector:
     def save(self):
         if self.__record is None:
             self.__record = self.newRecord()
-        self.__record.data = data
+        self.__record.data = self.result()
         self.__record.save(signal_kwargs=dict(finished=True))
 
     def newRecord(self):
@@ -285,7 +289,7 @@ class SweepIter:
     def __init__(self, sweep):
         self.iter = sweep._generator.__iter__() if isinstance(
             sweep._generator, Iterable) else sweep._generator
-        self.app = sweep.app
+        self.app = sweep.parent.app
         self.setter = sweep.setter
         self.name = sweep.name
         self.unit = sweep.unit
@@ -328,7 +332,7 @@ class SweepSet:
         self.app = app
         self._sweep = {}
         if app.parent is not None:
-            self._sweep.update(app.parent.sweep._sweep)
+            self.__call__(app.parent.sweep._sweep.values())
 
     def __getitem__(self, name):
         return self._sweep[name]
@@ -343,6 +347,7 @@ class SweepSet:
                 sweep = args
             else:
                 raise TypeError('Unsupport type %r for sweep.' % type(args))
+            sweep.parent = self
             self._sweep[sweep.name] = sweep
         return self.app
 
