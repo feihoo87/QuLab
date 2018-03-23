@@ -2,21 +2,21 @@ import base64
 import io
 
 import ipywidgets as widgets
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from IPython.display import (HTML, Image, Markdown, clear_output, display,
                              set_matplotlib_formats)
+from matplotlib.backends import backend_svg
 
 
 class NotebookFigure():
-    def __init__(self, num=None, figsize=None, dpi=None, facecolor=None, edgecolor=None, frameon=True, clear=True):
+    def __init__(self, figsize=None, dpi=None, facecolor=None, edgecolor=None, frameon=True):
         self.image = widgets.Image()
-        self.kwds = dict(num=num, figsize=figsize, dpi=dpi, facecolor=facecolor,
-                         edgecolor=edgecolor, frameon=frameon, clear=clear)
-        self.displayed = False
+        self.kwds = dict(figsize=figsize, dpi=dpi, facecolor=facecolor,
+                         edgecolor=edgecolor, frameon=frameon)
 
     def display(self):
         display(self.image)
-        self.displayed = True
 
 
 __figs = {}
@@ -30,7 +30,8 @@ def make_image(func, data, fig_format='svg', **kwds):
 
     fig = __figs.get(tuple(kwds.items()), None)
     if fig is None:
-        fig = plt.figure(**kwds)
+        fig = mpl.figure.Figure(**kwds)
+        canvas = backend_svg.FigureCanvasSVG(fig)
         __figs[tuple(kwds.items())] = fig
     else:
         fig.clear()
@@ -41,6 +42,7 @@ def make_image(func, data, fig_format='svg', **kwds):
     height = int(fig.get_dpi()*fig.get_figheight())
     width = int(fig.get_dpi()*fig.get_figwidth())
     return img, width, height
+
 
 def image_to_uri(img, content_type):
     uri = 'data:{0};base64,{1}'.format(
