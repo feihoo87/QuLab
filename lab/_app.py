@@ -65,7 +65,7 @@ class Application(HasSource):
             current_record=None,
             current_params={},
             last_step_process=0,
-            sub_process_num=1,
+            sub_process_num=0,
             process_changed_by_children=False,
             process=0.0,
             done=False,
@@ -118,6 +118,15 @@ class Application(HasSource):
     def is_done(self):
         return self.status['done']
 
+    def _set_start(self):
+        if self.parent is not None:
+            self.parent.status['sub_process_num'] += 1
+
+    def _set_done(self):
+        if self.parent is not None:
+            self.parent.status['sub_process_num'] -= 1
+        self.status['done'] = True
+
     def run(self):
         self.ui = ApplicationUI(self)
         self.ui.display()
@@ -136,13 +145,14 @@ class Application(HasSource):
 
     async def done(self):
         self.reset()
+        self._set_start()
         async for data in self.work():
             self.data.collect(data)
             result = self.data.result()
             if self.level <= self.level_limit:
                 self.data.save()
             draw(self.__class__.plot, result, self)
-        self.status['done'] = True
+        self._set_done()
         return self.data.result()
 
     async def work(self):
@@ -342,7 +352,8 @@ class SweepSet:
             elif isinstance(args, dict):
                 sweep = Sweep(**args)
             elif isinstance(args, Sweep):
-                sweep = args
+                sweep = Sweep(args.name, args.generator, args.unit, args.setter,
+                              args.start, args.total)
             else:
                 raise TypeError('Unsupport type %r for sweep.' % type(args))
             sweep.parent = self
