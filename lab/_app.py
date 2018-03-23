@@ -115,17 +115,15 @@ class Application(HasSource):
         self.settings.update(settings)
         return self
 
-    def setDone(self):
-        self.status['done'] = True
-        #value = 100 - self.ui.get_process()
-        # self.increase_process(value)
+    def is_done(self):
+        return self.status['done']
 
     def run(self):
         self.ui = ApplicationUI(self)
         self.ui.display()
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            future = asyncio.run_coroutine_threadsafe(self.done(), loop)
+            future = asyncio.ensure_future(self.done())
         else:
             with ThreadPoolExecutor() as executor:
                 loop = asyncio.new_event_loop()
@@ -144,7 +142,7 @@ class Application(HasSource):
             if self.level <= self.level_limit:
                 self.data.save()
             draw(self.__class__.plot, result, self)
-        self.setDone()
+        self.status['done'] = True
         return self.data.result()
 
     async def work(self):
