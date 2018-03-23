@@ -9,14 +9,15 @@ from IPython.display import (HTML, Image, Markdown, clear_output, display,
 
 class NotebookFigure():
     def __init__(self, num=None, figsize=None, dpi=None, facecolor=None, edgecolor=None, frameon=True, clear=True):
-        self.out = widgets.Output()
-        self.out.layout.height = '300px'
+        #self.out = widgets.Output()
+        self.image = widgets.Image()
+        #self.out.layout.height = '300px'
         self.kwds = dict(num=num, figsize=figsize, dpi=dpi, facecolor=facecolor,
                          edgecolor=edgecolor, frameon=frameon, clear=clear)
         self.displayed = False
 
     def display(self):
-        display(self.out)
+        display(self.image)
         self.displayed = True
 
 
@@ -38,10 +39,16 @@ def make_image(func, data, fig_format='svg', **kwds):
     func(fig, data)
     buff = io.BytesIO()
     fig.savefig(buff, format=fig_format)
-    img = 'data:{0};base64,{1}'.format(
+    img = buff.getvalue()
+    height = int(fig.get_dpi()*fig.get_figheight())
+    width = int(fig.get_dpi()*fig.get_figwidth())
+    return img, width, height
+
+def image_to_uri(img, content_type):
+    uri = 'data:{0};base64,{1}'.format(
         content_type,
-        base64.b64encode(buff.getvalue()).decode('utf-8'))
-    return img, int(fig.get_dpi()*fig.get_figheight())
+        base64.b64encode(img).decode('utf-8'))
+    return uri
 
 
 __app_figs = {}
@@ -54,12 +61,15 @@ def draw(method, data, app):
         figure = __app_figs[app.__class__.__name__]
     else:
         return
-    img, height = make_image(method, data, fig_format='svg', **figure.kwds)
-    with figure.out:
-        figure.out.layout.height = '%dpx' % (height+12)
-        clear_output()
-        display(
-            HTML(u'<img style="height: %dpx" src="%s" alt="Red dot"/>' % (height, img)))
+    img, width, height = make_image(method, data, fig_format='svg', **figure.kwds)
+    figure.image.width = width
+    figure.image.height = height
+    figure.image.format = 'svg+xml'
+    figure.image.value = img
+    #with figure.out:
+    #    figure.out.layout.height = '%dpx' % (height+12)
+    #    clear_output()
+    #    display(widgets.Image(value=img, format='svg+xml', width=width, height=height))
 
 
 def make_figure_for_app(app, *args, **kwds):

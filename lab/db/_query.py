@@ -5,25 +5,24 @@ import sys
 from abc import ABCMeta, abstractmethod
 from collections import Awaitable, Iterable, OrderedDict
 
+import ipywidgets as widgets
 import numpy as np
 from IPython.display import (HTML, Image, Markdown, clear_output, display,
                              set_matplotlib_formats)
 
 from . import _schema
-from .._plot import make_image
+from .._plot import image_to_uri, make_image
 from ._schema import Record
 
 
 class QuerySetUI():
     def __init__(self, querySet):
         self.querySet = querySet
+        self.widget = widgets.HTML()
 
     def display(self, start=0, stop=10, figsize=None):
-        html = self.html(start, stop, figsize)
-        display(HTML(html))
-
-    def html(self, start, stop, figsize):
-        tag_style = '''<style>
+        display(self.widget)
+        style = '''<style>
         .tag-blue {background: #2d8cf0; color: #fff; border: 0;}
         .tag-red {background: #f02d2d; color: #fff; border: 0;}
         .tag-border {height: 24px; line-height: 24px; border: 1px solid #e9eaec!important;
@@ -35,6 +34,19 @@ class QuerySetUI():
         .tag:hover {opacity: .85;}
         </style>'''
 
+        table_head = '''<table class="output_html rendered_html"><thead>
+        <tr><th>Index</th><th>Time</th><th>Title</th><th>User</th>
+        <th>Tags</th><th>Parameters</th><th>Image</th></tr></thead><tbody>'''
+
+        table_close = '''</tbody><caption>%d records in total.</caption>
+        </table>''' % self.querySet.count()
+
+        tableHTML = [style, table_head, table_close]
+        for index, record in enumerate(self.querySet.query_set[start:stop]):
+            tableHTML.insert(-1, self.tableRow(index+start, record, figsize))
+            self.widget.value = ''.join(tableHTML)
+
+    def tableRow(self, i, record, figsize):
         def tags_html(tags):
             html = ''
             for tag in tags:
@@ -52,40 +64,26 @@ class QuerySetUI():
                                                                           v[1])
             return html
 
-        html = tag_style + '''<table>
-        <tr><th>Index</th>
-        <th>Time</th>
-        <th>Title</th>
-        <th>User</th>
-        <th>Tags</th>
-        <th>Parameters</th>
-        <th>Image</th></tr>'''
-        i = start
-        for record in self.querySet.query_set[start:stop]:
-            html += '''<tr><td>%(index)d</td>
-                <td>%(time)s</td>
-                <td>%(title)s</td>
-                <td>%(user)s</td>
-                <td>%(tags)s</td>
-                <td>%(params)s</td>
-                <td>%(image)s</td></tr>''' % {
-                'index': i,
-                'time': record.finished_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'title': record.title,
-                'tags': tags_html(record.tags),
-                'params': params_html(record.params),
-                'user': record.user.fullname,
-                'image': self.plot(record, figsize)
-            }
-            i += 1
-
-        html += '</table>'
-        return html
+        return '''<tr><td>%(index)d</td>
+            <td>%(time)s</td>
+            <td>%(title)s</td>
+            <td>%(user)s</td>
+            <td>%(tags)s</td>
+            <td>%(params)s</td>
+            <td>%(image)s</td></tr>''' % {
+            'index': i,
+            'time': record.finished_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'title': record.title,
+            'tags': tags_html(record.tags),
+            'params': params_html(record.params),
+            'user': record.user.fullname,
+            'image': self.plot(record, figsize)
+        }
 
     def plot(self, record, figsize):
         try:
-            img = self.querySet.make_image(
-                record, fig_format='svg', figsize=figsize)
+            img = image_to_uri(self.querySet.make_image(
+                record, fig_format='svg', figsize=figsize), 'image/svg+xml')
         except:
             img = ''
         imgHTML = u'<img style="height: 30px" src="{}" alt="No Image"/>'.format(
@@ -124,7 +122,7 @@ class QuerySet():
             return
         mod = importlib.import_module(record.app.module.fullname)
         app_cls = getattr(mod, record.app.name)
-        img, height = make_image(app_cls.plot, record.data, **kwds)
+        img, width, height = make_image(app_cls.plot, record.data, **kwds)
         return img
 
 
