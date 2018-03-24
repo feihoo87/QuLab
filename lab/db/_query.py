@@ -11,7 +11,7 @@ from IPython.display import (HTML, Image, Markdown, clear_output, display,
                              set_matplotlib_formats)
 
 from . import _schema
-from .._plot import image_to_uri, make_image
+from .._plot import image_to_uri, make_image_in_process
 from ._schema import Record
 
 
@@ -19,9 +19,27 @@ class QuerySetUI():
     def __init__(self, querySet):
         self.querySet = querySet
         self.widget = widgets.HTML()
+        self.tableHTML = []
+        self._tasks = []
 
     def display(self, start=0, stop=10, figsize=None):
         display(self.widget)
+
+        self.tableHTML = ['' for i in range(stop-start)]
+
+        def callback(future, pos):
+            row = future.result()
+            self.tableHTML[pos] = row
+            self.update()
+
+        for index, record in enumerate(self.querySet.query_set[start:stop]):
+            #tableHTML[index+2] = self.tableRow(index+start, record, figsize)
+            task = asyncio.ensure_future(self.tableRow(index+start, record, figsize))
+            task.add_done_callback(functools.partial(callback, pos=index))
+            self._tasks.append(task)
+            #self.widget.value = ''.join(tableHTML)
+
+    def update(self):
         style = '''<style>
         .tag-blue {background: #2d8cf0; color: #fff; border: 0;}
         .tag-red {background: #f02d2d; color: #fff; border: 0;}
@@ -41,12 +59,11 @@ class QuerySetUI():
         table_close = '''</tbody><caption>%d records in total.</caption>
         </table>''' % self.querySet.count()
 
-        tableHTML = [style, table_head, table_close]
-        for index, record in enumerate(self.querySet.query_set[start:stop]):
-            tableHTML.insert(-1, self.tableRow(index+start, record, figsize))
-            self.widget.value = ''.join(tableHTML)
+        tableHTML = list((style, table_head, *self.tableHTML, table_close))
 
-    def tableRow(self, i, record, figsize):
+        self.widget.value = ''.join(tableHTML)
+
+    async def tableRow(self, i, record, figsize):
         def tags_html(tags):
             html = ''
             for tag in tags:
@@ -77,17 +94,22 @@ class QuerySetUI():
             'tags': tags_html(record.tags),
             'params': params_html(record.params),
             'user': record.user.fullname,
-            'image': self.plot(record, figsize)
+            'image': await self.plot(record, figsize)
         }
 
-    def plot(self, record, figsize):
+    async def plot(self, record, figsize):
         try:
-            img = image_to_uri(self.querySet.make_image(
-                record, fig_format='svg', figsize=figsize), 'image/svg+xml')
-        except:
-            img = ''
+            if record.app is None:
+                return
+            mod = importlib.import_module(record.app.module.fullname)
+            app_cls = getattr(mod, record.app.name)
+            img, width, height = await make_image_in_process(app_cls.plot, record.data, figsize=figsize)
+            img_uri = image_to_uri(img, 'image/svg+xml')
+        except Exception as e:
+            print(e)
+            img_uri = ''
         imgHTML = u'<img style="height: 30px" src="{}" alt="No Image"/>'.format(
-            img)
+            img_uri)
         return imgHTML
 
 
@@ -116,14 +138,6 @@ class QuerySet():
 
     def display(self, start=0, stop=10, figsize=None):
         self.ui.display(start, stop, figsize)
-
-    def make_image(self, record, **kwds):
-        if record.app is None:
-            return
-        mod = importlib.import_module(record.app.module.fullname)
-        app_cls = getattr(mod, record.app.name)
-        img, width, height = make_image(app_cls.plot, record.data, **kwds)
-        return img
 
 
 def query(q=None, app=None, show_hidden=False, **kwds):

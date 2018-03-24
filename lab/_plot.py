@@ -1,4 +1,6 @@
+import asyncio
 import base64
+import functools
 import io
 
 import ipywidgets as widgets
@@ -11,7 +13,7 @@ from matplotlib.backends import backend_svg
 
 class NotebookFigure():
     def __init__(self, figsize=None, dpi=None, facecolor=None, edgecolor=None, frameon=True):
-        self.image = widgets.Image()
+        self.image = widgets.Image(format = 'svg+xml')
         self.kwds = dict(figsize=figsize, dpi=dpi, facecolor=facecolor,
                          edgecolor=edgecolor, frameon=frameon)
 
@@ -20,7 +22,6 @@ class NotebookFigure():
 
 
 __figs = {}
-
 
 def make_image(func, data, fig_format='svg', **kwds):
     content_type = {
@@ -51,6 +52,13 @@ def image_to_uri(img, content_type):
     return uri
 
 
+async def make_image_in_process(func, data, **kwds):
+    from ._bootstrap import p_executor
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(p_executor,
+        functools.partial(make_image, func, data, **kwds))
+
+
 __app_figs = {}
 
 
@@ -67,11 +75,15 @@ def draw(method, data, app):
             return
     else:
         return
-    img, width, height = make_image(method, data, fig_format='svg', **figure.kwds)
-    figure.image.width = width
-    figure.image.height = height
-    figure.image.format = 'svg+xml'
-    figure.image.value = img
+
+    def callback(future, figure):
+        img, width, height = future.result()
+        figure.image.width = width
+        figure.image.height = height
+        figure.image.value = img
+
+    task = asyncio.ensure_future(make_image_in_process(method, data, **figure.kwds))
+    task.add_done_callback(functools.partial(callback, figure=figure))
 
 
 def make_figure_for_app(app, *args, **kwds):
