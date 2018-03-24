@@ -11,3 +11,6 @@ clear:
 
 README.rst: README.md
 	pandoc -f markdown -t rst README.md -o README.rst
+
+install:
+	python3 -m pip install --user .
