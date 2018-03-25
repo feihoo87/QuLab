@@ -68,8 +68,8 @@ def list_drivers(drivers):
             continue
         for sub_module in module.modules:
             tr = ['<td style="text-align:left">%s</td>' % item for item in (
-                '', '', module.fullname,
-                module.created_time.strftime('%Y-%m-%d %H:%M:%S'))]
+                '', '', sub_module.fullname,
+                sub_module.created_time.strftime('%Y-%m-%d %H:%M:%S'))]
             table.append(''.join(['<tr>', *tr, '</tr>']))
 
     table.append('</tbody></table>')

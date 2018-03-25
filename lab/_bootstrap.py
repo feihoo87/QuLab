@@ -137,8 +137,8 @@ def open_resource(name, host=None, timeout=10):
     return __inst_mgr.open_resource(name, host=host, timeout=timeout)
 
 
-def listApps():
-    ret = _schema.listApplication()
+def listApps(package=''):
+    ret = _schema.listApplication(package=package)
     ui.listApps(ret.values())
 
 

@@ -371,11 +371,13 @@ class Application(Document):
             self.version_tag, self.version, self.author.fullname,
             self.created_time.strftime('%Y-%m-%d %H:%M:%S'))
 
+
 def __get_App_name_and_package(name, package):
     path = package.split('.') if package != '' else []
     path.extend(name.split('.'))
     name, package = path[-1], '.'.join(path[:-1])
     return name, package
+
 
 def getApplication(name='', package='', version=None, id=None, many=False, **kwds):
     name, package = __get_App_name_and_package(name, package)
@@ -437,14 +439,18 @@ def saveApplication(name,
         appdata.save()
 
 
-def listApplication():
+def listApplication(package=''):
     ret = {}
-    for app in Application.objects().order_by('-version.num'):
+    query = {}
+    if package != '':
+        query['package__istartswith']=package
+
+    for app in Application.objects(**query).order_by('package'):
         if app.package != '':
             name = '%s.%s' % (app.package, app.name)
         else:
             name = app.name
-        if name not in ret.keys():
+        if name not in ret.keys() or ret[name].version.num < app.version.num:
             ret[name] = app
     return ret
 
