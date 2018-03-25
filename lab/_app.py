@@ -56,9 +56,7 @@ class Application(HasSource):
         # self.ui.reset()
 
     def title(self):
-        version = '%s.%d' % (self.__DBDocument__.version_tag,
-                             self.__DBDocument__.version)
-        return 'Record by %s (%s)' % (self.__class__.__name__, version)
+        return 'Record by %s (v%s)' % (self.__class__.__name__, self.__DBDocument__.version.text)
 
     def reset_status(self):
         self.status = dict(
@@ -173,9 +171,9 @@ class Application(HasSource):
         pass
 
     @classmethod
-    def save(cls, version=None, moduleName=None):
+    def save(cls, version=None, package=''):
         _schema.saveApplication(cls.__name__, cls.__source__,
-                                get_current_user(), cls.__doc__, moduleName,
+                                get_current_user(), package, cls.__doc__,
                                 version)
 
     @classmethod
@@ -400,17 +398,17 @@ class RcMap:
         return self.get(name)
 
 
-def getAppClass(name='', version=None, id=None, **kwds):
-    appdata = _schema.getApplication(name, version, id, **kwds)
+def getAppClass(name='', package='', version=None, id=None, **kwds):
+    appdata = _schema.getApplication(name, package, version, id, **kwds)
     if appdata is None:
         return None
     mod = importlib.import_module(appdata.module.fullname)
-    app_cls = getattr(mod, name)
+    app_cls = getattr(mod, appdata.name)
     app_cls.__DBDocument__ = appdata
     app_cls.__source__ = appdata.source
     return app_cls
 
 
-def make_app(name, version=None, parent=None):
-    app_cls = getAppClass(name, version)
+def make_app(name, package='', version=None, parent=None):
+    app_cls = getAppClass(name, package, version)
     return app_cls(parent=parent)

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
+
 from lab.device import BaseDriver, QInteger, QOption, QReal, QVector
 
 
@@ -27,6 +28,14 @@ class Driver(BaseDriver):
                    ('Smith', 'SMIT'),
                    ('SWR', 'SWR'),
                    ('Group Delay', 'GDEL')])
+        QOption('SweepType', value='',
+          set_cmd='SENS:SWE:TYPE %(option)s', get_cmd='SENS:SWE:TYPE?',
+          options=[('Linear', 'LIN'),
+                   ('Log', 'LOG'),
+                   ('Power', 'POW'),
+                   ('CW', 'CW'),
+                   ('Segment', 'SEGM'),
+                   ('Phase', 'PHAS')])
     ]
 
     '''
@@ -98,13 +107,16 @@ class Driver(BaseDriver):
         return np.asarray(self.query_ascii_values(cmd))
 
     def set_segments(self, segments=[], form='Start Stop'):
+        self.write('SENS:SEGM:DEL:ALL')
         if form == 'Start Stop':
-            cmd = ','.join(['SENS:SEGM:LIST SSTOP'].extend([
-                '1,%(num)d,%(start)g,%(stop)g,%(IFBW)%g,0,%(power)%g' % segment for segment in segments
-            ]))
+            cmd = ['SENS:SEGM:LIST SSTOP,%d' % len(segments)]
+            for kw in segments:
+                data = '1,%(num)d,%(start)g,%(stop)g,%(IFBW)g,0,%(power)g' % kw
+                cmd.append(data)
         else:
-            cmd = ','.join(['SENS:SEGM:LIST CSPAN'].extend([
-                '1,%(num)d,%(center)g,%(span)g,%(IFBW)%g,0,%(power)%g' % segment for segment in segments
-            ]))
+            cmd = ['SENS:SEGM:LIST CSPAN,%d' % len(segments)]
+            for kw in segments:
+                data = '1,%(num)d,%(center)g,%(span)g,%(IFBW)g,0,%(power)g' % kw
+                cmd.append(data)
         self.write('FORMAT ASCII')
-        self.write(cmd)
+        self.write(','.join(cmd))
