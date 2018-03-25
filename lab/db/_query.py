@@ -26,6 +26,7 @@ class QuerySetUI():
         display(self.widget)
 
         self.tableHTML = ['' for i in range(stop-start)]
+        self.update()
 
         def callback(future, pos):
             row = future.result()
