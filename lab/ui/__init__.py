@@ -34,8 +34,9 @@ def listApps(apps):
         '----|----|----|----|----',
     ]
     for app in apps:
+        discription = app.discription.split('\n')[0] if app.discription is not None else ''
         table.append('%s|v%s|%s|%s|%s' % (app.name, app.version.text,
-                                         app.author.fullname, app.discription,
+                                         app.author.fullname, discription,
                                          app.created_time.strftime('%Y-%m-%d %H:%M:%S')))
     display(Markdown('\n'.join(table)))
 

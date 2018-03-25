@@ -56,9 +56,7 @@ class Application(HasSource):
         # self.ui.reset()
 
     def title(self):
-        version = '%s.%d' % (self.__DBDocument__.version_tag,
-                             self.__DBDocument__.version)
-        return 'Record by %s (%s)' % (self.__class__.__name__, version)
+        return 'Record by %s (v%s)' % (self.__class__.__name__, self.__DBDocument__.version.text)
 
     def reset_status(self):
         self.status = dict(
@@ -401,14 +399,11 @@ class RcMap:
 
 
 def getAppClass(name='', package='', version=None, id=None, **kwds):
-    path = package.split('.').extend(name.split('.'))
-    name = path[-1]
-    package = '.'.join(path[:-1])
     appdata = _schema.getApplication(name, package, version, id, **kwds)
     if appdata is None:
         return None
     mod = importlib.import_module(appdata.module.fullname)
-    app_cls = getattr(mod, name)
+    app_cls = getattr(mod, appdata.name)
     app_cls.__DBDocument__ = appdata
     app_cls.__source__ = appdata.source
     return app_cls

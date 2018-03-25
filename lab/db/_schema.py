@@ -371,10 +371,16 @@ class Application(Document):
             self.version_tag, self.version, self.author.fullname,
             self.created_time.strftime('%Y-%m-%d %H:%M:%S'))
 
+def __get_App_name_and_package(name, package):
+    path = package.split('.') if package != '' else []
+    path.extend(name.split('.'))
+    name, package = path[-1], '.'.join(path[:-1])
+    return name, package
+
 def getApplication(name='', package='', version=None, id=None, **kwds):
-    path = package.split('.').extend(name.split('.'))
-    kwds['name'] = path[-1]
-    kwds['package'] = '.'.join(path[:-1])
+    name, package = __get_App_name_and_package(name, package)
+    kwds['name'] = name
+    kwds['package'] = package
     if id is not None:
         kwds = {'id': id}
     elif isinstance(version, str):
@@ -395,12 +401,11 @@ def getApplication(name='', package='', version=None, id=None, **kwds):
 def saveApplication(name,
                     source,
                     author,
-                    package=''
+                    package='',
                     discription='',
                     version=None):
     codeSnippet = makeUniqueCodeSnippet(source, author)
-    path = package.split('.').extend(name.split('.'))
-    name, package = path[-1], '.'.join(path[:-1])
+    name, package = __get_App_name_and_package(name, package)
 
     fullname = 'lab.apps.codeID%s' % codeSnippet.id
 
@@ -417,8 +422,10 @@ def saveApplication(name,
             discription=discription,
             module=module)
         if lastapp is not None:
-            appdata.version=lastapp.version
-            appdata.version += 1
+            appdata.version.major = lastapp.version.major
+            appdata.version.minor = lastapp.version.minor
+            appdata.version.micro = lastapp.version.micro + 1
+            appdata.version.num = lastapp.version.num + 1
         appdata.save()
 
     if version is not None and version != appdata.version.text:
@@ -429,7 +436,7 @@ def saveApplication(name,
 
 def listApplication():
     ret = {}
-    for app in Application.objects().order_by('-version'):
+    for app in Application.objects().order_by('-version.num'):
         if app.name not in ret.keys():
             ret[app.name] = app
     return ret
