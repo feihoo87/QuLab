@@ -135,7 +135,8 @@ class PerformMethodHandler(BaseHandler):
         result = {'succeed': False, 'data': 'self'}
         log.info('instr_mgr[%r].%s(%s, %s)', inst, method, args, kw)
         try:
-            res = getattr(self.instr_mgr[inst], method)(*args, **kw)
+            ins = self.instr_mgr.get_local_resource(inst)
+            res = getattr(ins, method)(*args, **kw)
             result = {'succeed': True, 'data': 'self' if res is ins else res}
         finally:
             self.send_data(result)
