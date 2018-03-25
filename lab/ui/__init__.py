@@ -30,12 +30,12 @@ def display_source_code(source_code, language='python'):
 
 def listApps(apps):
     table = [
-        ' name | version | author | discription | time ',
-        '----|----|----|----|----',
+        ' package | name | version | author | discription | time ',
+        '----|----|----|----|----|----',
     ]
     for app in apps:
         discription = app.discription.split('\n')[0] if app.discription is not None else ''
-        table.append('%s|v%s|%s|%s|%s' % (app.name, app.version.text,
+        table.append('%s|%s|v%s|%s|%s|%s' % (app.package, app.name, app.version.text,
                                          app.author.fullname, discription,
                                          app.created_time.strftime('%Y-%m-%d %H:%M:%S')))
     display(Markdown('\n'.join(table)))

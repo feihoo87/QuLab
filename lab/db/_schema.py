@@ -377,7 +377,7 @@ def __get_App_name_and_package(name, package):
     name, package = path[-1], '.'.join(path[:-1])
     return name, package
 
-def getApplication(name='', package='', version=None, id=None, **kwds):
+def getApplication(name='', package='', version=None, id=None, many=False, **kwds):
     name, package = __get_App_name_and_package(name, package)
     kwds['name'] = name
     kwds['package'] = package
@@ -395,7 +395,10 @@ def getApplication(name='', package='', version=None, id=None, **kwds):
             warnings.warn('illegal argument: version=%r' % version, UserWarning)
     elif isinstance(version, int):
         kwds['version.num'] = version
-    return Application.objects(**kwds).order_by('-version.num').first()
+    if many:
+        return Application.objects(**kwds).order_by('-version.num')
+    else:
+        return Application.objects(**kwds).order_by('-version.num').first()
 
 
 def saveApplication(name,
@@ -437,8 +440,12 @@ def saveApplication(name,
 def listApplication():
     ret = {}
     for app in Application.objects().order_by('-version.num'):
-        if app.name not in ret.keys():
-            ret[app.name] = app
+        if app.package != '':
+            name = '%s.%s' % (app.package, app.name)
+        else:
+            name = app.name
+        if name not in ret.keys():
+            ret[name] = app
     return ret
 
 

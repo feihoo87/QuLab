@@ -158,15 +158,7 @@ def query(q=None, app=None, show_hidden=False, **kwds):
 
 def query_by_app_name(app_name, show_hidden=False, version=None):
     rec_q = {'app__in': []}
-    app_q = {'name': app_name}
-    if isinstance(version, int):
-        app_q['version'] = version
-    elif isinstance(version, str):
-        if len(version.split('.')) == 3:
-            app_q['version'] = int(version.split('.')[2])
-        else:
-            app_q['version_tag__istartswith'] = version
-    for app in _schema.Application.objects(**app_q):
+    for app in _schema.getApplication(name=app_name, version=version, many=True):
         rec_q['app__in'].append(app)
     if not show_hidden:
         rec_q['hidden'] = False
