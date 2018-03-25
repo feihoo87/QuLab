@@ -34,6 +34,6 @@ class Driver(BaseDriver):
         QReal('GH Amplitude', unit='V', set_cmd='LAMP 4,%(value).2f', get_cmd='LAMP?4'),
         QReal('GH Offset', unit='V', set_cmd='LOFF 4,%(value).2f', get_cmd='LOFF?4'),
         QReal('GH Delay', unit='s', set_cmd='DLAY 8,0,%(value).6E', get_cmd='DELY?8'),
-        QReal('GH Length', unit='s', set_cmd='DLAY 9,8,%(value).6E', get_cmd='DELY?9'),
+        QReal('GH Length', unit='s', set_cmd='DLAY 9,8,%(value).6E', get_cmd='DELY?9')
 
     ]
