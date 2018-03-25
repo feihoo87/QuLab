@@ -54,6 +54,8 @@ def image_to_uri(img, content_type):
 
 async def make_image_in_process(func, data, **kwds):
     from ._bootstrap import p_executor
+    if p_executor is None:
+        return make_image(func, data, **kwds)
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(p_executor,
         functools.partial(make_image, func, data, **kwds))

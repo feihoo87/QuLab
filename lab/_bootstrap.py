@@ -2,6 +2,7 @@
 import datetime
 import functools
 import os
+import platform
 import sys
 import tokenize
 from concurrent.futures import ProcessPoolExecutor
@@ -15,7 +16,11 @@ from .db import _schema
 __run_mode = 'release'
 __connected = False
 
-p_executor = ProcessPoolExecutor()
+
+if platform.system() != 'Windows':
+    p_executor = ProcessPoolExecutor()
+else:
+    p_executor = None
 
 
 def _connect_db():
