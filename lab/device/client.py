@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import requests
 
+from .. import db
 from .._bootstrap import get_current_user
-from ..db import _schema
 from ._driver import DriverManager, parse_resource_name
 from .protocol import DEFAULT_PORT, Transport
 
@@ -17,6 +17,8 @@ class CallableAttr:
 
 
 class InstrumentClient:
+    """Client for instrument server."""
+
     def __init__(self, inst_name, session, timeout=10):
         self.inst_name = inst_name
         self.session = session
@@ -122,6 +124,8 @@ class Session:
 
 
 class InstrumentManager:
+    """Manage local instruments and clients of remote instruments."""
+
     def __init__(self, verify, hosts=[], visa_backends='@ni'):
         self.verify = verify
         #self._drvmgr = DriverManager(visa_backends=visa_backends)
@@ -166,7 +170,7 @@ class InstrumentManager:
 
     def open_resource(self, instrument, host=None, timeout=10):
         if isinstance(instrument, str):
-            inst = _schema.getInstrumentByName(instrument)
+            inst = db.query.getInstrumentByName(instrument)
             if inst is None:
                 raise Exception('Instrument %r not found in database.' % instrument)
             else:

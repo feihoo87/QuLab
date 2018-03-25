@@ -35,6 +35,7 @@ class Quantity(object):
     def _formatSetCmd(self, value, **kw):
         return self.set_cmd % dict(value=value, **kw)
 
+
 class QReal(Quantity):
     def __init__(self, name, value=None, unit=None, get_cmd='', set_cmd=''):
         super(QReal, self).__init__(name, value, 'Real', unit, get_cmd=get_cmd, set_cmd=set_cmd)
@@ -52,6 +53,7 @@ class QReal(Quantity):
             self.value = res[0]
         return self.value
 
+
 class QInteger(QReal):
     def __init__(self, name, value=None, unit=None, get_cmd='', set_cmd=''):
         Quantity.__init__(self, name, value, 'Integer', unit, get_cmd=get_cmd, set_cmd=set_cmd)
@@ -59,6 +61,7 @@ class QInteger(QReal):
     def getValue(self, **kw):
         super(QInteger, self).getValue(**kw)
         return int(self.value)
+
 
 class QString(Quantity):
     def __init__(self, name, value=None, get_cmd='', set_cmd=''):
@@ -70,6 +73,7 @@ class QString(Quantity):
             res = self.driver.query(cmd)
             self.value = res.strip()
         return self.value
+
 
 class QOption(QString):
     def __init__(self, name, value=None, options=[], get_cmd='', set_cmd=''):
@@ -106,12 +110,14 @@ class QOption(QString):
             return None
         return dict(self.options)[value]
 
-class QBool(Quantity):
+
+class QBool(QInteger):
     def __init__(self, name, value=None, get_cmd='', set_cmd=''):
-        super(QBool, self).__init__(name, value, 'Bool', get_cmd=get_cmd, set_cmd=set_cmd)
+        Quantity.__init__(self, name, value, 'Bool', get_cmd=get_cmd, set_cmd=set_cmd)
 
     def getValue(self, **kw):
         return bool(super(QBool, self).getValue(**kw))
+
 
 class QVector(Quantity):
     def __init__(self, name, value=None, unit=None, get_cmd='', set_cmd=''):

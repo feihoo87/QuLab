@@ -5,7 +5,7 @@ from lab.device import BaseDriver, QInteger, QOption, QReal, QVector
 
 
 class Driver(BaseDriver):
-    surport_models = ['E8363C', 'ZNB20-2Port']
+    support_models = ['E8363C', 'ZNB20-2Port']
 
     quants = [
         QReal('Power', value=-20, unit='dBm', set_cmd='SOUR:POW %(value)e', get_cmd='SOUR:POW?'),
@@ -27,7 +27,7 @@ class Driver(BaseDriver):
                    ('Polar', 'POL'),
                    ('Smith', 'SMIT'),
                    ('SWR', 'SWR'),
-                   ('Group Delay', 'GDEL')])
+                   ('Group Delay', 'GDEL')]),
         QOption('SweepType', value='',
           set_cmd='SENS:SWE:TYPE %(option)s', get_cmd='SENS:SWE:TYPE?',
           options=[('Linear', 'LIN'),

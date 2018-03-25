@@ -8,7 +8,7 @@ import string
 
 import visa
 
-from ..db import _schema
+from .. import db
 from .util import IEEE_488_2_BinBlock
 
 log = logging.getLogger(__name__)
@@ -16,9 +16,16 @@ log.addHandler(logging.NullHandler())
 
 
 class BaseDriver:
+    """Base class for Driver"""
+
     error_command = 'SYST:ERR?'
-    surport_models = []
+    """The SCPI command to query errors."""
+
+    support_models = []
+    """"""
+
     quants = []
+    """"""
 
     def __init__(self, ins=None, addr=None, model=None, timeout=3, **kw):
         self.addr = addr
@@ -281,7 +288,7 @@ class DriverManager(object):
 
     def open(self, instrument, **kw):
         if isinstance(instrument, str):
-            instrument = _schema.getInstrumentByName(instrument)
+            instrument = db.query.getInstrumentByName(instrument)
         self.__instr[instrument.name] = self._open_resource(
             instrument.address, instrument.driver, **kw)
         return self.__instr[instrument.name]

@@ -10,14 +10,17 @@ from threading import Thread
 
 import numpy as np
 
+from . import db
 from ._bootstrap import get_current_user, open_resource, save_inputCells
 from ._plot import draw
+from ._rcmap import RcMap
 from .base import HasSource
-from .db import _schema
 from .ui import ApplicationUI, display_source_code
 
 
 class Application(HasSource):
+    """Base class for apps."""
+
     __source__ = ''
     __DBDocument__ = None
 
@@ -36,6 +39,7 @@ class Application(HasSource):
         self.level_limit = 3
         self.run_event = asyncio.Event()
         self.interrupt_event = asyncio.Event()
+        self.__title = None
 
         if parent is not None:
             self.rc.parent = parent.rc
@@ -60,7 +64,14 @@ class Application(HasSource):
         # self.ui.reset()
 
     def title(self):
-        return 'Record by %s (v%s)' % (self.__class__.__name__, self.__DBDocument__.version.text)
+        if self.__title is not None:
+            return self.__title
+        return 'Record by %s (v%s)' % (self.__DBDocument__.fullname,
+                self.__DBDocument__.version.text)
+
+    def with_title(self, title=''):
+        self.__title = title
+        return self
 
     def reset_status(self):
         self.status = dict(
@@ -179,14 +190,16 @@ class Application(HasSource):
         return self.data.result()
 
     async def work(self):
-        '''单个返回值不要用 tuple，否则会被解包，下面这些都允许
+        """Overwrite this method to define your work.
+
+        单个返回值不要用 tuple，否则会被解包，下面这些都允许
         yield 0
         yield 0, 1, 2
         yield np.array([1,2,3])
         yield [1,2,3]
         yield 1, (1,2)
         yield 0.5, np.array([1,2,3])
-        '''
+        """
 
     def pre_save(self, *args):
         return args
@@ -197,13 +210,10 @@ class Application(HasSource):
 
     @classmethod
     def save(cls, version=None, package=''):
-        _schema.saveApplication(cls.__name__, cls.__source__,
+        """Save Application into database."""
+        db.update.saveApplication(cls.__name__, cls.__source__,
                                 get_current_user(), package, cls.__doc__,
                                 version)
-
-    @classmethod
-    def show(cls):
-        display_source_code(cls.__source__)
 
 
 class DataCollector:
@@ -258,7 +268,7 @@ class DataCollector:
 
     def newRecord(self):
         rc = dict([(name, str(v)) for name, v in self.app.rc.items()])
-        record = _schema.Record(
+        record = db.update.newRecord(
             title=self.app.title(),
             user=get_current_user(),
             tags=self.app.tags,
@@ -384,47 +394,8 @@ class SweepSet:
         return self.app
 
 
-class RcMap:
-    def __init__(self, rc={}, parent=None):
-        self.rc = {}
-        self.parent = parent
-        self.rc.update(rc)
-
-    def update(self, rc={}):
-        self.rc.update(rc)
-
-    def items(self):
-        return [(name, self.__getitem__(name)) for name in self.keys()]
-
-    def keys(self):
-        keys = set(self.rc.keys())
-        if self.parent is not None:
-            keys = keys.union(self.parent.keys())
-        return list(keys)
-
-    def get(self, name, default=None):
-        if name in self.keys():
-            return self.get_resource(name)
-        elif default is None:
-            raise KeyError('key %r not found in RcMap.' % name)
-        else:
-            return default
-
-    def get_resource(self, name):
-        name = self.rc.get(name, name)
-        if not isinstance(name, str):
-            return name
-        elif self.parent is not None:
-            return self.parent.get_resource(name)
-        else:
-            return open_resource(name)
-
-    def __getitem__(self, name):
-        return self.get(name)
-
-
 def getAppClass(name='', package='', version=None, id=None, **kwds):
-    appdata = _schema.getApplication(name, package, version, id, **kwds)
+    appdata = db.query.getApplication(name, package, version, id, **kwds)
     if appdata is None:
         return None
     mod = importlib.import_module(appdata.module.fullname)
