@@ -173,9 +173,9 @@ class Application(HasSource):
         pass
 
     @classmethod
-    def save(cls, version=None, moduleName=None):
+    def save(cls, version=None, package=''):
         _schema.saveApplication(cls.__name__, cls.__source__,
-                                get_current_user(), cls.__doc__, moduleName,
+                                get_current_user(), package, cls.__doc__,
                                 version)
 
     @classmethod
@@ -400,8 +400,11 @@ class RcMap:
         return self.get(name)
 
 
-def getAppClass(name='', version=None, id=None, **kwds):
-    appdata = _schema.getApplication(name, version, id, **kwds)
+def getAppClass(name='', package='', version=None, id=None, **kwds):
+    path = package.split('.').extend(name.split('.'))
+    name = path[-1]
+    package = '.'.join(path[:-1])
+    appdata = _schema.getApplication(name, package, version, id, **kwds)
     if appdata is None:
         return None
     mod = importlib.import_module(appdata.module.fullname)
@@ -411,6 +414,6 @@ def getAppClass(name='', version=None, id=None, **kwds):
     return app_cls
 
 
-def make_app(name, version=None, parent=None):
-    app_cls = getAppClass(name, version)
+def make_app(name, package='', version=None, parent=None):
+    app_cls = getAppClass(name, package, version)
     return app_cls(parent=parent)

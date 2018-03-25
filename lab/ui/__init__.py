@@ -34,7 +34,7 @@ def listApps(apps):
         '----|----|----|----|----',
     ]
     for app in apps:
-        table.append('%s|%s.%d|%s|%s|%s' % (app.name, app.version_tag, app.version,
+        table.append('%s|v%s|%s|%s|%s' % (app.name, app.version.text,
                                          app.author.fullname, app.discription,
                                          app.created_time.strftime('%Y-%m-%d %H:%M:%S')))
     display(Markdown('\n'.join(table)))
