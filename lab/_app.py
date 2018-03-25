@@ -34,6 +34,8 @@ class Application(HasSource):
         self.reset_status()
         self.level = 1
         self.level_limit = 3
+        self.run_event = asyncio.Event()
+        self.interrupt_event = asyncio.Event()
 
         if parent is not None:
             self.rc.parent = parent.rc
@@ -43,6 +45,8 @@ class Application(HasSource):
             self.tags.extend(parent.tags)
             self.level = parent.level + 1
             self.level_limit = parent.level_limit
+            self.run_event = parent.run_event
+            self.interrupt_event = parent.interrupt_event
             #parent.status['sub_process_num'] += 1
 
     def __del__(self):
@@ -119,15 +123,19 @@ class Application(HasSource):
     def _set_start(self):
         if self.parent is not None:
             self.parent.status['sub_process_num'] += 1
+        self.run_event.set()
 
     def _set_done(self):
         if self.parent is not None:
             self.parent.status['sub_process_num'] -= 1
         self.status['done'] = True
+        if self.ui is not None:
+            self.ui.set_done()
 
     def run(self):
-        self.ui = ApplicationUI(self)
-        self.ui.display()
+        if self.ui is None:
+            self.ui = ApplicationUI(self)
+            self.ui.display()
         loop = asyncio.get_event_loop()
         if loop.is_running():
             future = asyncio.ensure_future(self.done())
@@ -141,15 +149,32 @@ class Application(HasSource):
                 loop.close()
         save_inputCells()
 
+    def pause(self):
+        self.run_event.clear()
+
+    def continue_(self):
+        self.run_event.set()
+
+    def interrupt(self):
+        self.interrupt_event.set()
+
+    def restart(self):
+        self.interrupt_event.clear()
+        self.run()
+
     async def done(self):
         self.reset()
         self._set_start()
+        await self.run_event.wait()
         async for data in self.work():
             self.data.collect(data)
             result = self.data.result()
             if self.level <= self.level_limit:
                 self.data.save()
             draw(self.__class__.plot, result, self)
+            if self.interrupt_event.is_set():
+                break
+            await self.run_event.wait()
         self._set_done()
         return self.data.result()
 
