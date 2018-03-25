@@ -4,6 +4,7 @@ import functools
 import os
 import sys
 import tokenize
+from concurrent.futures import ProcessPoolExecutor
 
 from mongoengine.connection import connect, disconnect
 
@@ -13,6 +14,8 @@ from .db import _schema
 
 __run_mode = 'release'
 __connected = False
+
+p_executor = ProcessPoolExecutor()
 
 
 def _connect_db():
