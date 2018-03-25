@@ -29,37 +29,51 @@ def display_source_code(source_code, language='python'):
 
 
 def listApps(apps):
+    th = ['package', 'name', 'version', 'author', 'discription', 'time']
     table = [
-        ' package | name | version | author | discription | time ',
-        '----|----|----|----|----|----',
+        '<table><thead><tr>',
+        *['<th style="text-align:left">%s</th>' % item for item in th],
+        '</tr></thead><tbody>'
     ]
     for app in apps:
         discription = app.discription.split('\n')[0] if app.discription is not None else ''
-        table.append('%s|%s|v%s|%s|%s|%s' % (app.package, app.name, app.version.text,
-                                         app.author.fullname, discription,
-                                         app.created_time.strftime('%Y-%m-%d %H:%M:%S')))
-    display(Markdown('\n'.join(table)))
+        tr = ['<td style="text-align:left">%s</td>' % item for item in (
+            app.package, app.name, app.version.text, app.author.fullname,
+            discription, app.created_time.strftime('%Y-%m-%d %H:%M:%S'))]
+        table.append(''.join(['<tr>', *tr, '</tr>']))
+
+    table.append('</tbody></table>')
+    display(HTML(''.join(table)))
 
 
 def list_drivers(drivers):
+    th = ['name', 'version', 'modules', 'time']
     table = [
-        ' name | version | modules | time ',
-        '----|----|----|----',
+        '<table><thead><tr>',
+        *['<th style="text-align:left">%s</th>' % item for item in th],
+        '</tr></thead><tbody>'
     ]
     for driver in drivers:
         module = driver.module
         if module is None:
-            table.append('%s|%s| Error! Module for driver not set |N/A' % (
-                driver.name, driver.version))
+            tr = ['<td style="text-align:left">%s</td>' % item for item in (
+                driver.name, driver.version, 'Error! Module for driver not set', 'N/A')]
+            table.append(''.join(['<tr>', *tr, '</tr>']))
             continue
-        table.append('%s|%s|%s|%s' % (driver.name, driver.version,
-            module.fullname, module.created_time.strftime('%Y-%m-%d %H:%M:%S')))
+        tr = ['<td style="text-align:left">%s</td>' % item for item in (
+            driver.name, driver.version, module.fullname,
+            module.created_time.strftime('%Y-%m-%d %H:%M:%S'))]
+        table.append(''.join(['<tr>', *tr, '</tr>']))
         if not module.is_package:
             continue
         for sub_module in module.modules:
-            table.append('%s|%s|%s|%s' % ('', '', sub_module.fullname,
-                sub_module.created_time.strftime('%Y-%m-%d %H:%M:%S')))
-    display(Markdown('\n'.join(table)))
+            tr = ['<td style="text-align:left">%s</td>' % item for item in (
+                '', '', sub_module.fullname,
+                sub_module.created_time.strftime('%Y-%m-%d %H:%M:%S'))]
+            table.append(''.join(['<tr>', *tr, '</tr>']))
+
+    table.append('</tbody></table>')
+    display(HTML(''.join(table)))
 
 
 def list_instruments(instruments):
