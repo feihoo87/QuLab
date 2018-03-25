@@ -32,12 +32,24 @@ class QuerySetUI():
             self.tableHTML[pos] = row
             self.update()
 
+        loop = asyncio.get_event_loop()
+        _new_loop = False
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            _new_loop = True
+
         for index, record in enumerate(self.querySet.query_set[start:stop]):
             #tableHTML[index+2] = self.tableRow(index+start, record, figsize)
             task = asyncio.ensure_future(self.tableRow(index+start, record, figsize))
             task.add_done_callback(functools.partial(callback, pos=index))
             self._tasks.append(task)
             #self.widget.value = ''.join(tableHTML)
+
+        if not loop.is_running():
+            loop.run_until_complete(asyncio.gather(*self._tasks))
+        if _new_loop:
+            loop.close()
 
     def update(self):
         style = '''<style>
