@@ -17,6 +17,8 @@ class CallableAttr:
 
 
 class InstrumentClient:
+    """Client for instrument server."""
+
     def __init__(self, inst_name, session, timeout=10):
         self.inst_name = inst_name
         self.session = session
@@ -122,6 +124,8 @@ class Session:
 
 
 class InstrumentManager:
+    """Manage local instruments and clients of remote instruments."""
+    
     def __init__(self, verify, hosts=[], visa_backends='@ni'):
         self.verify = verify
         #self._drvmgr = DriverManager(visa_backends=visa_backends)

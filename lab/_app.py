@@ -18,6 +18,8 @@ from .ui import ApplicationUI, display_source_code
 
 
 class Application(HasSource):
+    """Base class for apps."""
+
     __source__ = ''
     __DBDocument__ = None
 
@@ -187,14 +189,16 @@ class Application(HasSource):
         return self.data.result()
 
     async def work(self):
-        '''单个返回值不要用 tuple，否则会被解包，下面这些都允许
+        """Overwrite this method to define your work.
+
+        单个返回值不要用 tuple，否则会被解包，下面这些都允许
         yield 0
         yield 0, 1, 2
         yield np.array([1,2,3])
         yield [1,2,3]
         yield 1, (1,2)
         yield 0.5, np.array([1,2,3])
-        '''
+        """
 
     def pre_save(self, *args):
         return args
@@ -205,12 +209,14 @@ class Application(HasSource):
 
     @classmethod
     def save(cls, version=None, package=''):
+        """Save Application into database."""
         _schema.saveApplication(cls.__name__, cls.__source__,
                                 get_current_user(), package, cls.__doc__,
                                 version)
 
     @classmethod
     def show(cls):
+        """Show source code of class."""
         display_source_code(cls.__source__)
 
 
