@@ -36,6 +36,7 @@ class Application(HasSource):
         self.level_limit = 3
         self.run_event = asyncio.Event()
         self.interrupt_event = asyncio.Event()
+        self.__title = None
 
         if parent is not None:
             self.rc.parent = parent.rc
@@ -60,8 +61,14 @@ class Application(HasSource):
         # self.ui.reset()
 
     def title(self):
+        if self.__title is not None:
+            return self.__title
         return 'Record by %s (v%s)' % (self.__DBDocument__.fullname,
                 self.__DBDocument__.version.text)
+
+    def with_title(self, title=''):
+        self.__title = title
+        return self
 
     def reset_status(self):
         self.status = dict(
