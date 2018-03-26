@@ -17,7 +17,7 @@ log.addHandler(logging.NullHandler())
 
 class BaseDriver:
     error_command = 'SYST:ERR?'
-    surport_models = []
+    support_models = []
     quants = []
 
     def __init__(self, ins=None, addr=None, model=None, timeout=3, **kw):

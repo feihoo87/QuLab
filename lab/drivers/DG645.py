@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-import numpy as np
 import time
 
-from lab.device import BaseDriver
-from lab.device import QReal, QOption, QInteger, QString, QVector
+import numpy as np
+
+from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
+
 
 class Driver(BaseDriver):
     error_command = ''
-    surport_models = ['DG645']
+    support_models = ['DG645']
 
     quants = [
         QReal('Trigger Rate', unit='Hz', set_cmd='TRAT %(value).6E', get_cmd='TRAT?'),

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-from lab.device import BaseDriver
-from lab.device import QReal, QOption, QInteger, QString, QVector
+from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
+
 
 class Driver(BaseDriver):
-    surport_models = ['E8257D', 'SMF100A', 'SMB100A']
+    support_models = ['E8257D', 'SMF100A', 'SMB100A']
 
     quants = [
         QReal('Frequency', unit='Hz',
