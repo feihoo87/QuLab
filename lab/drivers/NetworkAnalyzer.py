@@ -27,7 +27,7 @@ class Driver(BaseDriver):
                    ('Polar', 'POL'),
                    ('Smith', 'SMIT'),
                    ('SWR', 'SWR'),
-                   ('Group Delay', 'GDEL')])
+                   ('Group Delay', 'GDEL')]),
         QOption('SweepType', value='',
           set_cmd='SENS:SWE:TYPE %(option)s', get_cmd='SENS:SWE:TYPE?',
           options=[('Linear', 'LIN'),
