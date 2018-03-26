@@ -34,6 +34,9 @@ class Application(HasSource):
         self.reset_status()
         self.level = 1
         self.level_limit = 3
+        self.run_event = asyncio.Event()
+        self.interrupt_event = asyncio.Event()
+        self.__title = None
 
         if parent is not None:
             self.rc.parent = parent.rc
@@ -43,6 +46,8 @@ class Application(HasSource):
             self.tags.extend(parent.tags)
             self.level = parent.level + 1
             self.level_limit = parent.level_limit
+            self.run_event = parent.run_event
+            self.interrupt_event = parent.interrupt_event
             #parent.status['sub_process_num'] += 1
 
     def __del__(self):
@@ -56,9 +61,14 @@ class Application(HasSource):
         # self.ui.reset()
 
     def title(self):
-        version = '%s.%d' % (self.__DBDocument__.version_tag,
-                             self.__DBDocument__.version)
-        return 'Record by %s (%s)' % (self.__class__.__name__, version)
+        if self.__title is not None:
+            return self.__title
+        return 'Record by %s (v%s)' % (self.__DBDocument__.fullname,
+                self.__DBDocument__.version.text)
+
+    def with_title(self, title=''):
+        self.__title = title
+        return self
 
     def reset_status(self):
         self.status = dict(
@@ -121,15 +131,19 @@ class Application(HasSource):
     def _set_start(self):
         if self.parent is not None:
             self.parent.status['sub_process_num'] += 1
+        self.run_event.set()
 
     def _set_done(self):
         if self.parent is not None:
             self.parent.status['sub_process_num'] -= 1
         self.status['done'] = True
+        if self.ui is not None:
+            self.ui.set_done()
 
     def run(self):
-        self.ui = ApplicationUI(self)
-        self.ui.display()
+        if self.ui is None:
+            self.ui = ApplicationUI(self)
+            self.ui.display()
         loop = asyncio.get_event_loop()
         if loop.is_running():
             future = asyncio.ensure_future(self.done())
@@ -143,15 +157,32 @@ class Application(HasSource):
                 loop.close()
         save_inputCells()
 
+    def pause(self):
+        self.run_event.clear()
+
+    def continue_(self):
+        self.run_event.set()
+
+    def interrupt(self):
+        self.interrupt_event.set()
+
+    def restart(self):
+        self.interrupt_event.clear()
+        self.run()
+
     async def done(self):
         self.reset()
         self._set_start()
+        await self.run_event.wait()
         async for data in self.work():
             self.data.collect(data)
             result = self.data.result()
             if self.level <= self.level_limit:
                 self.data.save()
             draw(self.__class__.plot, result, self)
+            if self.interrupt_event.is_set():
+                break
+            await self.run_event.wait()
         self._set_done()
         return self.data.result()
 
@@ -173,9 +204,9 @@ class Application(HasSource):
         pass
 
     @classmethod
-    def save(cls, version=None, moduleName=None):
+    def save(cls, version=None, package=''):
         _schema.saveApplication(cls.__name__, cls.__source__,
-                                get_current_user(), cls.__doc__, moduleName,
+                                get_current_user(), package, cls.__doc__,
                                 version)
 
     @classmethod
@@ -400,17 +431,17 @@ class RcMap:
         return self.get(name)
 
 
-def getAppClass(name='', version=None, id=None, **kwds):
-    appdata = _schema.getApplication(name, version, id, **kwds)
+def getAppClass(name='', package='', version=None, id=None, **kwds):
+    appdata = _schema.getApplication(name, package, version, id, **kwds)
     if appdata is None:
         return None
     mod = importlib.import_module(appdata.module.fullname)
-    app_cls = getattr(mod, name)
+    app_cls = getattr(mod, appdata.name)
     app_cls.__DBDocument__ = appdata
     app_cls.__source__ = appdata.source
     return app_cls
 
 
-def make_app(name, version=None, parent=None):
-    app_cls = getAppClass(name, version)
+def make_app(name, package='', version=None, parent=None):
+    app_cls = getAppClass(name, package, version)
     return app_cls(parent=parent)

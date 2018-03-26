@@ -6,10 +6,12 @@ import lzma
 import os
 import pickle
 import tokenize
+import warnings
 
 import gridfs
 from mongoengine import (BooleanField, ComplexDateTimeField, DictField,
-                         Document, DynamicDocument, EmailField, FileField,
+                         Document, DynamicDocument, DynamicField, EmailField,
+                         EmbeddedDocument, EmbeddedDocumentField, FileField,
                          ImageField, IntField, ListField, ReferenceField,
                          StringField, signals)
 from mongoengine.connection import get_db
@@ -326,11 +328,33 @@ class Notebook(Document):
     inputCells = ListField(ReferenceField('CodeSnippet'))
 
 
+class Version(EmbeddedDocument):
+    major = IntField(default=0)
+    minor = IntField(default=0)
+    micro = IntField(default=1)
+    num = IntField(default=1)
+
+    @property
+    def text(self):
+        return '%d.%d.%d' % (self.major, self.minor, self.micro)
+
+    @text.setter
+    def text(self, tag):
+        nums = [int(s) for s in tag.split('.')]
+        self.major = nums[0]
+        self.minor = nums[1] if len(nums) > 1 else 0
+        self.micro = nums[2] if len(nums) > 2 else 0
+
+    def __iadd__(self, num):
+        self.num += num
+        self.micro += num
+
+
 class Application(Document):
     name = StringField(max_length=50)
+    package = StringField(default='')
     author = ReferenceField('User')
-    version = IntField(default=0)
-    version_tag = StringField(max_length=50)
+    version = EmbeddedDocumentField(Version, default=Version())
     created_time = ComplexDateTimeField(default=now)
     discription = StringField()
     module = ReferenceField('Module')
@@ -342,64 +366,99 @@ class Application(Document):
         else:
             return ''
 
+    @property
+    def fullname(self):
+        if self.package == '':
+            return self.name
+        else:
+            return '%s.%s' % (self.package, self.name)
+
     def __str__(self):
         return 'App %s %s.%d by (%s, %s)' % (self.name,
             self.version_tag, self.version, self.author.fullname,
             self.created_time.strftime('%Y-%m-%d %H:%M:%S'))
 
 
-def getApplication(name='', version=None, id=None, **kwds):
+def __get_App_name_and_package(name, package):
+    path = package.split('.') if package != '' else []
+    path.extend(name.split('.'))
+    name, package = path[-1], '.'.join(path[:-1])
+    return name, package
+
+
+def getApplication(name='', package='', version=None, id=None, many=False, **kwds):
+    name, package = __get_App_name_and_package(name, package)
     kwds['name'] = name
+    kwds['package'] = package
     if id is not None:
         kwds = {'id': id}
     elif isinstance(version, str):
-        if len(version.split('.')) == 3:
-            kwds['version'] = int(version.split('.')[2])
-        else:
-            kwds['version_tag__istartswith'] = version
+        try:
+            nums = [int(s) for version in tag.split('.')]
+            kwds['version.major'] = nums[0]
+            if len(nums) > 1:
+                kwds['version.minor'] = nums[0]
+            if len(nums) > 2:
+                kwds['version.micro'] = nums[2]
+        except:
+            warnings.warn('illegal argument: version=%r' % version, UserWarning)
     elif isinstance(version, int):
-        kwds['version'] = version
-    return Application.objects(**kwds).order_by('-version').first()
+        kwds['version.num'] = version
+    if many:
+        return Application.objects(**kwds).order_by('-version.num')
+    else:
+        return Application.objects(**kwds).order_by('-version.num').first()
 
 
 def saveApplication(name,
                     source,
                     author,
+                    package='',
                     discription='',
-                    moduleName=None,
                     version=None):
     codeSnippet = makeUniqueCodeSnippet(source, author)
+    name, package = __get_App_name_and_package(name, package)
 
-    if moduleName is None:
-        fullname = 'lab.apps.codeID%s' % codeSnippet.id
-    else:
-        fullname = moduleName
+    fullname = 'lab.apps.codeID%s' % codeSnippet.id
 
     module = makeUniqueModule(fullname, author, codeSnippet)
     if module.id is None:
         module.save()
-    appdata = Application.objects(name=name, module=module).first()
+    appdata = Application.objects(name=name, package=package, module=module).first()
     if appdata is None:
-        lastapp = Application.objects(name=name).order_by('-version').first()
+        lastapp = Application.objects(name=name).order_by('-version.num').first()
         appdata = Application(
             name=name,
+            package=package,
             author=author,
             discription=discription,
-            version=lastapp.version + 1 if lastapp is not None else 1,
-            version_tag=lastapp.version_tag if lastapp is not None else 'v0.0',
             module=module)
+        if lastapp is not None:
+            appdata.version.major = lastapp.version.major
+            appdata.version.minor = lastapp.version.minor
+            appdata.version.micro = lastapp.version.micro + 1
+            appdata.version.num = lastapp.version.num + 1
         appdata.save()
 
-    if version is not None:
-        appdata.version_tag = version
+    if version is not None and version != appdata.version.text:
+        appdata.version.text = version
+        appdata.version.num += 1
         appdata.save()
 
 
-def listApplication():
+def listApplication(package=''):
     ret = {}
-    for app in Application.objects().order_by('-version'):
-        if app.name not in ret.keys():
-            ret[app.name] = app
+    query = {}
+    if package != '':
+        query['package__istartswith']=package
+
+    for app in Application.objects(**query).order_by('package'):
+        if app.package != '':
+            name = '%s.%s' % (app.package, app.name)
+        else:
+            name = app.name
+        if name not in ret.keys() or ret[name].version.num < app.version.num:
+            ret[name] = app
     return ret
 
 

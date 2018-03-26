@@ -16,12 +16,38 @@ class ApplicationUI:
         self.app = app
         self._ProgressWidget = widgets.FloatProgress(
             0, description=self.app.__class__.__name__)
+        self._PauseButton = widgets.Button(description="Pause")
+        self._PauseButton.on_click(self.on_pause_button_clicked)
+        self._InterruptButton = widgets.Button(description="Interrupt")
+        self._InterruptButton.on_click(self.on_interrupt_button_clicked)
+        self.ui = widgets.HBox([self._PauseButton, self._InterruptButton, self._ProgressWidget])
 
     def setProcess(self, value):
         self._ProgressWidget.value = value
 
+    def on_pause_button_clicked(self, btn):
+        if btn.description == 'Pause':
+            btn.description = 'Continue'
+            self.app.pause()
+        else:
+            btn.description = 'Pause'
+            self.app.continue_()
+
+    def on_interrupt_button_clicked(self, btn):
+        if btn.description == 'Interrupt':
+            btn.description = 'Restart'
+            self.app.interrupt()
+        else:
+            btn.description = 'Interrupt'
+            self._PauseButton.disabled=False
+            self.app.restart()
+
     def display(self):
-        display(self._ProgressWidget)
+        display(self.ui)
+
+    def set_done(self):
+        self._InterruptButton.description = 'Restart'
+        self._PauseButton.disabled=True
 
 
 def display_source_code(source_code, language='python'):
@@ -29,36 +55,51 @@ def display_source_code(source_code, language='python'):
 
 
 def listApps(apps):
+    th = ['package', 'name', 'version', 'author', 'discription', 'time']
     table = [
-        ' name | version | author | discription | time ',
-        '----|----|----|----|----',
+        '<table><thead><tr>',
+        *['<th style="text-align:left">%s</th>' % item for item in th],
+        '</tr></thead><tbody>'
     ]
     for app in apps:
-        table.append('%s|%s.%d|%s|%s|%s' % (app.name, app.version_tag, app.version,
-                                         app.author.fullname, app.discription,
-                                         app.created_time.strftime('%Y-%m-%d %H:%M:%S')))
-    display(Markdown('\n'.join(table)))
+        discription = app.discription.split('\n')[0] if app.discription is not None else ''
+        tr = ['<td style="text-align:left">%s</td>' % item for item in (
+            app.package, app.name, app.version.text, app.author.fullname,
+            discription, app.created_time.strftime('%Y-%m-%d %H:%M:%S'))]
+        table.append(''.join(['<tr>', *tr, '</tr>']))
+
+    table.append('</tbody></table>')
+    display(HTML(''.join(table)))
 
 
 def list_drivers(drivers):
+    th = ['name', 'version', 'modules', 'time']
     table = [
-        ' name | version | modules | time ',
-        '----|----|----|----',
+        '<table><thead><tr>',
+        *['<th style="text-align:left">%s</th>' % item for item in th],
+        '</tr></thead><tbody>'
     ]
     for driver in drivers:
         module = driver.module
         if module is None:
-            table.append('%s|%s| Error! Module for driver not set |N/A' % (
-                driver.name, driver.version))
+            tr = ['<td style="text-align:left">%s</td>' % item for item in (
+                driver.name, driver.version, 'Error! Module for driver not set', 'N/A')]
+            table.append(''.join(['<tr>', *tr, '</tr>']))
             continue
-        table.append('%s|%s|%s|%s' % (driver.name, driver.version,
-            module.fullname, module.created_time.strftime('%Y-%m-%d %H:%M:%S')))
+        tr = ['<td style="text-align:left">%s</td>' % item for item in (
+            driver.name, driver.version, module.fullname,
+            module.created_time.strftime('%Y-%m-%d %H:%M:%S'))]
+        table.append(''.join(['<tr>', *tr, '</tr>']))
         if not module.is_package:
             continue
         for sub_module in module.modules:
-            table.append('%s|%s|%s|%s' % ('', '', sub_module.fullname,
-                sub_module.created_time.strftime('%Y-%m-%d %H:%M:%S')))
-    display(Markdown('\n'.join(table)))
+            tr = ['<td style="text-align:left">%s</td>' % item for item in (
+                '', '', sub_module.fullname,
+                sub_module.created_time.strftime('%Y-%m-%d %H:%M:%S'))]
+            table.append(''.join(['<tr>', *tr, '</tr>']))
+
+    table.append('</tbody></table>')
+    display(HTML(''.join(table)))
 
 
 def list_instruments(instruments):

@@ -97,14 +97,14 @@ class TestApp(lab.Application):
 ```
 将其提交到数据库
 ```python
-TestApp.save()
+TestApp.save(package='test')
 ```
 一旦将App提交到数据库，以后就不必重复将代码复制过来运行了。直接配置并运行即可。
 ```python
 import lab
 import numpy as np
 
-app = lab.make_app('TestApp').sweep([
+app = lab.make_app('TestApp', package='test').sweep([
     ('x', np.linspace(0, 1, 11))
 ])
 lab.make_figure_for_app(app)
@@ -123,7 +123,7 @@ class ComplexApp(lab.Application):
     async def work(self):
         async for y in self.sweep['y']:
             # 一定要注意设置 parent
-            app = lab.make_app('TestApp', parent=self)
+            app = lab.make_app('test.TestApp', parent=self)
             x, z = await app.done()
             yield x, y, z
 
@@ -140,16 +140,17 @@ class ComplexApp(lab.Application):
     def plot(fig, data):
         x, y, z = data
         ax = fig.add_subplot(111)
-        try:
-            ax.imshow(z, extend=(min(x), max(x), min(y), max(y)))
-        except:
-            pass
+        if isinstance(y, np.ndarray):
+            ax.imshow(z, extent=(min(x), max(x), min(y), max(y)),
+                     aspect='auto', origin='lower', interpolation='nearest')
+        else:
+            ax.plot(x, z)
         ax.set_xlabel('x (a.u.)')
         ax.set_ylabel('y (a.u.)')
 ```
 保存
 ```python
-ComplexApp.save()
+ComplexApp.save(package='test')
 ```
 运行
 
@@ -157,11 +158,12 @@ ComplexApp.save()
 import lab
 import numpy as np
 
-app = lab.make_app('ComplexApp').sweep([
+app = lab.make_app('ComplexApp', package='test').sweep([
     ('x', np.linspace(0, 1, 11)),
     ('y', np.linspace(3,5,11))
 ])
 lab.make_figure_for_app(app)
+lab.make_figures_for_App('TestApp')
 app.run()
 ```
 
@@ -188,7 +190,7 @@ import skrf as rf
 from lab import Application
 
 
-class GetPNAS21(Application):
+class S21(Application):
     '''从网分上读取 S21
 
     require:
@@ -208,15 +210,15 @@ class GetPNAS21(Application):
             self.increaseProcess()
 
     def pre_save(self, x, re, im):
-        if self.status['result']['rows'] > 1:
+        if self.data.rows > 1:
             x = x[0]
             re = np.mean(re, axis=0)
             im = np.mean(im, axis=0)
         return x, re, im
 
     @staticmethod
-    def plot(fig, obj):
-        x, re, im = obj
+    def plot(fig, data):
+        x, re, im = data
         s = re + 1j * im
         ax = fig.add_subplot(111)
         ax.plot(x / 1e9, rf.mag_2_db(np.abs(s)))
@@ -225,13 +227,13 @@ class GetPNAS21(Application):
 ```
 保存
 ```python
-GetPNAS21.save()
+S21.save(package='PNA')
 ```
 运行
 ```python
 import lab
 
-app = lab.make_app('GetPNAS21').with_rc({
+app = lab.make_app('PNA.S21').with_rc({
     'PNA': 'PNA-II'     # PNA-II 必须是已经添加到数据库里的设备名
 }).with_settings({
     'repeat': 10

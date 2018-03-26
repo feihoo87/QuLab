@@ -26,11 +26,19 @@ class QuerySetUI():
         display(self.widget)
 
         self.tableHTML = ['' for i in range(stop-start)]
+        self.update()
 
         def callback(future, pos):
             row = future.result()
             self.tableHTML[pos] = row
             self.update()
+
+        loop = asyncio.get_event_loop()
+        _new_loop = False
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            _new_loop = True
 
         for index, record in enumerate(self.querySet.query_set[start:stop]):
             #tableHTML[index+2] = self.tableRow(index+start, record, figsize)
@@ -38,6 +46,11 @@ class QuerySetUI():
             task.add_done_callback(functools.partial(callback, pos=index))
             self._tasks.append(task)
             #self.widget.value = ''.join(tableHTML)
+
+        if not loop.is_running():
+            loop.run_until_complete(asyncio.gather(*self._tasks))
+        if _new_loop:
+            loop.close()
 
     def update(self):
         style = '''<style>
@@ -53,7 +66,8 @@ class QuerySetUI():
         </style>'''
 
         table_head = '''<table class="output_html rendered_html"><thead>
-        <tr><th>Index</th><th>Time</th><th>Title</th><th>User</th>
+        <tr><th>Index</th><th style="text-align:left">Time</th>
+        <th style="text-align:left">Title</th><th style="text-align:left">User</th>
         <th>Tags</th><th>Parameters</th><th>Image</th></tr></thead><tbody>'''
 
         table_close = '''</tbody><caption>%d records in total.</caption>
@@ -82,9 +96,9 @@ class QuerySetUI():
             return html
 
         return '''<tr><td>%(index)d</td>
-            <td>%(time)s</td>
-            <td>%(title)s</td>
-            <td>%(user)s</td>
+            <td style="text-align:left">%(time)s</td>
+            <td style="text-align:left">%(title)s</td>
+            <td style="text-align:left">%(user)s</td>
             <td>%(tags)s</td>
             <td>%(params)s</td>
             <td>%(image)s</td></tr>''' % {
@@ -158,15 +172,7 @@ def query(q=None, app=None, show_hidden=False, **kwds):
 
 def query_by_app_name(app_name, show_hidden=False, version=None):
     rec_q = {'app__in': []}
-    app_q = {'name': app_name}
-    if isinstance(version, int):
-        app_q['version'] = version
-    elif isinstance(version, str):
-        if len(version.split('.')) == 3:
-            app_q['version'] = int(version.split('.')[2])
-        else:
-            app_q['version_tag__istartswith'] = version
-    for app in _schema.Application.objects(**app_q):
+    for app in _schema.getApplication(name=app_name, version=version, many=True):
         rec_q['app__in'].append(app)
     if not show_hidden:
         rec_q['hidden'] = False
