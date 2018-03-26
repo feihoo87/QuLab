@@ -18,7 +18,7 @@ __connected = False
 
 
 if platform.system() != 'Windows':
-    p_executor = ProcessPoolExecutor()
+    p_executor = None #ProcessPoolExecutor()
 else:
     p_executor = None
 
