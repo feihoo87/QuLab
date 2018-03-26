@@ -60,7 +60,8 @@ class Application(HasSource):
         # self.ui.reset()
 
     def title(self):
-        return 'Record by %s (v%s)' % (self.__class__.__name__, self.__DBDocument__.version.text)
+        return 'Record by %s (v%s)' % (self.__DBDocument__.fullname,
+                self.__DBDocument__.version.text)
 
     def reset_status(self):
         self.status = dict(
