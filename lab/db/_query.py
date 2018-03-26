@@ -66,7 +66,8 @@ class QuerySetUI():
         </style>'''
 
         table_head = '''<table class="output_html rendered_html"><thead>
-        <tr><th>Index</th><th>Time</th><th>Title</th><th>User</th>
+        <tr><th>Index</th><th style="text-align:left">Time</th>
+        <th style="text-align:left">Title</th><th style="text-align:left">User</th>
         <th>Tags</th><th>Parameters</th><th>Image</th></tr></thead><tbody>'''
 
         table_close = '''</tbody><caption>%d records in total.</caption>
@@ -95,9 +96,9 @@ class QuerySetUI():
             return html
 
         return '''<tr><td>%(index)d</td>
-            <td>%(time)s</td>
-            <td>%(title)s</td>
-            <td>%(user)s</td>
+            <td style="text-align:left">%(time)s</td>
+            <td style="text-align:left">%(title)s</td>
+            <td style="text-align:left">%(user)s</td>
             <td>%(tags)s</td>
             <td>%(params)s</td>
             <td>%(image)s</td></tr>''' % {

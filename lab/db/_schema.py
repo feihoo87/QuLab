@@ -366,6 +366,13 @@ class Application(Document):
         else:
             return ''
 
+    @property
+    def fullname(self):
+        if self.package == '':
+            return self.name
+        else:
+            return '%s.%s' % (self.package, self.name)
+
     def __str__(self):
         return 'App %s %s.%d by (%s, %s)' % (self.name,
             self.version_tag, self.version, self.author.fullname,
