@@ -21,13 +21,6 @@ log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
 
 
-def beforeSaveFile(fname):
-    '''makesure the path exists before save file'''
-    dirname = os.path.dirname(fname)
-    if not os.path.exists(dirname):
-        os.makedirs(dirname)
-
-
 def now():
     return datetime.datetime.now()
 
