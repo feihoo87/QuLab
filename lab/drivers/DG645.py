@@ -46,3 +46,18 @@ class Driver(BaseDriver):
         QOption('GH Polarity', set_cmd='LPOL 4,%(option)s', get_cmd='LPOL?4',
                 options=[('pos', '1'),('neg', '0')])
     ]
+
+
+    def performGetValue(self, quant, **kw):
+        get_Delays = ['T0 Length','AB Delay','AB Length',
+            'CD Delay','CD Length',
+            'EF Delay','EF Length',
+            'GH Delay','GH Length'
+        ]
+        if quant.name in get_Delays and quant.get_cmd is not '':
+            cmd = quant._formatGetCmd(**kw)
+            res = self.query_ascii_values(cmd)
+            quant.value= res[1]
+            return quant.value
+        else:
+            return super(Driver, self).performGetValue(quant, **kw)
