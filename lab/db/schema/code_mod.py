@@ -46,6 +46,8 @@ def getModuleByFullname(fullname, before=None):
 
 
 def makeUniqueModule(fullname, author, codeSnippet, sub_modules=[]):
+    parentname = '.'.join(fullname.split('.')[:-1])
+    parentmodule = getModuleByFullname(parentname)
     m = Module(
         fullname=fullname,
         author=author,
@@ -57,13 +59,16 @@ def makeUniqueModule(fullname, author, codeSnippet, sub_modules=[]):
     if mlast is not None:
         if mlast.fullname == m.fullname and mlast.source == m.source and mlast.modules == m.modules:
             return mlast
+    m.save()
+    if parentmodule is not None:
+        parentmodule.modules.append(m)
+        parentmodule.is_package = True
+        parentmodule.save()
     return m
 
 
 def saveModule(fullname, text, author):
     m = makeUniqueModule(fullname, author, makeUniqueCodeSnippet(text, author))
-    if m.id is None:
-        m.save()
     return m
 
 
