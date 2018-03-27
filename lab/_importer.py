@@ -24,6 +24,10 @@ class Finder(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
         log.debug("find_spec: fullname=%r, path=%r, target=%r",
                   fullname, path, target)
+        if fullname in ['lab.apps', 'lab.drivers']:
+            log.debug("find_spec: module %r found", fullname)
+            loader = EmptyModuleLoader(fullname)
+            return importlib.util.spec_from_loader(fullname, loader)
         module_data = db.query.getModuleByFullname(fullname, self._before)
         if module_data is not None:
             log.debug("find_spec: module %r found", fullname)
@@ -32,6 +36,20 @@ class Finder(importlib.abc.MetaPathFinder):
         else:
             log.debug("find_spec: module %r not found", fullname)
             return None
+
+
+class EmptyModuleLoader(importlib.abc.FileLoader, importlib.abc.SourceLoader):
+    def __init__(self, fullname):
+        self.fullname = fullname
+
+    def is_package(self, fullname):
+        return True
+
+    def get_filename(self, fullname):
+        return "%s.__init__.py" % fullname
+
+    def get_data(self, path):
+        return b''
 
 
 class ModuleLoader(importlib.abc.FileLoader, importlib.abc.SourceLoader):
