@@ -215,11 +215,6 @@ class Application(HasSource):
                                 get_current_user(), package, cls.__doc__,
                                 version)
 
-    @classmethod
-    def show(cls):
-        """Show source code of class."""
-        display_source_code(cls.__source__)
-
 
 class DataCollector:
     '''Collect data when app runs'''
