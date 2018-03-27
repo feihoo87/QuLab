@@ -5,7 +5,7 @@ import logging
 
 import tornado.web
 
-from lab.db._schema import Instrument, User
+from .. import db
 
 log = logging.getLogger(__name__)
 log.addHandler(logging.NullHandler())
@@ -53,7 +53,7 @@ class BaseHandler(tornado.web.RequestHandler):
             return None
 
     def login(self, username, password):
-        user = User.objects(name=username).first()
+        user = db.query.getUserByName(name=username)
         if user is not None and user.hashed_passphrase == password:
             self.set_secure_cookie('user_id', str(user.id))
             self.sessions[str(user.id)] = (user, datetime.datetime.now())
@@ -117,7 +117,7 @@ class OpenInstrumentHandler(BaseHandler):
     def post(self, inst):
         req = self.get_request_data()
         result = {'succeed': False, 'data': 'self'}
-        instrument = Instrument.objects(name=inst).first()
+        instrument = db.query.getInstrumentByName(name=inst)
         try:
             ins = self.instr_mgr.open_local_resource(instrument, **req['kw'])
             if ins is not None:
