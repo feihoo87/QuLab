@@ -10,11 +10,11 @@ from threading import Thread
 
 import numpy as np
 
+from . import db
 from ._bootstrap import get_current_user, open_resource, save_inputCells
 from ._plot import draw
 from ._rcmap import RcMap
 from .base import HasSource
-from .db import _schema
 from .ui import ApplicationUI, display_source_code
 
 
@@ -211,7 +211,7 @@ class Application(HasSource):
     @classmethod
     def save(cls, version=None, package=''):
         """Save Application into database."""
-        _schema.saveApplication(cls.__name__, cls.__source__,
+        db.update.saveApplication(cls.__name__, cls.__source__,
                                 get_current_user(), package, cls.__doc__,
                                 version)
 
@@ -273,7 +273,7 @@ class DataCollector:
 
     def newRecord(self):
         rc = dict([(name, str(v)) for name, v in self.app.rc.items()])
-        record = _schema.Record(
+        record = db.update.newRecord(
             title=self.app.title(),
             user=get_current_user(),
             tags=self.app.tags,
@@ -400,7 +400,7 @@ class SweepSet:
 
 
 def getAppClass(name='', package='', version=None, id=None, **kwds):
-    appdata = _schema.getApplication(name, package, version, id, **kwds)
+    appdata = db.query.getApplication(name, package, version, id, **kwds)
     if appdata is None:
         return None
     mod = importlib.import_module(appdata.module.fullname)

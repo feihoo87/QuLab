@@ -1,7 +1,6 @@
 import getpass
 
-from . import _bootstrap
-from .db import _schema
+from . import _bootstrap, db
 
 
 def getRegisterInfo():
@@ -19,7 +18,7 @@ def getRegisterInfo():
 @_bootstrap.require_db_connection
 def register():
     username, password, email, fullname = getRegisterInfo()
-    user = _schema.User(name=username, email=email, fullname=fullname)
+    user = db.update.newUser(name=username, email=email, fullname=fullname)
     user.password = password
     user.save()
     print('Success.')
@@ -27,9 +26,9 @@ def register():
 
 @_bootstrap.authenticated
 def uploadDriver(path):
-    _schema.uploadDriver(path, _bootstrap.get_current_user())
+    db.update.uploadDriver(path, _bootstrap.get_current_user())
 
 
 @_bootstrap.authenticated
 def setInstrument(name, host, address, driver):
-    _schema.setInstrument(name, host, address, driver)
+    db.update.setInstrument(name, host, address, driver)

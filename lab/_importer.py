@@ -6,7 +6,7 @@ import sys
 
 from lab.config import caches_dir
 
-from .db import _schema
+from . import db
 
 #log = logging.getLogger('qulab.core.importer')
 log = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class Finder(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
         log.debug("find_spec: fullname=%r, path=%r, target=%r",
                   fullname, path, target)
-        module_data = _schema.getModuleByFullname(fullname, self._before)
+        module_data = db.query.getModuleByFullname(fullname, self._before)
         if module_data is not None:
             log.debug("find_spec: module %r found", fullname)
             loader = ModuleLoader(module_data)

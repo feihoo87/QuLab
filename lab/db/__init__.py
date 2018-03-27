@@ -1,1 +1,3 @@
-from . import _query as query
+from . import query
+from . import schema
+from . import update
