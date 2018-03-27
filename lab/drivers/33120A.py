@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-import numpy as np
 import time
 
-from lab.device import BaseDriver
-from lab.device import QReal, QOption, QInteger, QString, QVector
+import numpy as np
+
+from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
+
 
 class Driver(BaseDriver):
     error_command = ''
-    surport_models = ['33120A', '33220A']
+    support_models = ['33120A', '33220A']
     quants = [
         QReal('Frequency', unit='Hz',
           set_cmd='FREQ %(value).11E Hz',

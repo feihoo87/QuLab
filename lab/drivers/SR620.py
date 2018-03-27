@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 import struct
+
 import numpy as np
 from visa import VisaIOWarning
 
-from lab.device import BaseDriver
-from lab.device import QReal, QOption, QInteger, QString, QVector
+from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
+
 
 class Driver(BaseDriver):
     error_command = ''
-    surport_models = ['SR620']
+    support_models = ['SR620']
     quants = [
         QVector('Data', unit=''),
         QReal('Ext Level', unit='V', set_cmd='LEVL 0,%(value)f', get_cmd='LEVL? 0'),

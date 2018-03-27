@@ -5,7 +5,7 @@ from lab.device import BaseDriver, QInteger, QOption, QReal, QVector
 
 
 class Driver(BaseDriver):
-    surport_models = ['E8363C', 'ZNB20-2Port']
+    support_models = ['E8363C', 'ZNB20-2Port']
 
     quants = [
         QReal('Power', value=-20, unit='dBm', set_cmd='SOUR:POW %(value)e', get_cmd='SOUR:POW?'),

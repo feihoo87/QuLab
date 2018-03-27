@@ -258,7 +258,6 @@ lab.listApps()
 ```python
 results = lab.query()
 results.display()
-print('%d results found.' % results.count())
 ```
 
 获取原始数据

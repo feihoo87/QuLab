@@ -374,8 +374,8 @@ class Application(Document):
             return '%s.%s' % (self.package, self.name)
 
     def __str__(self):
-        return 'App %s %s.%d by (%s, %s)' % (self.name,
-            self.version_tag, self.version, self.author.fullname,
+        return 'App %s v%s by (%s, %s)' % (self.fullname,
+            self.version.text, self.author.fullname,
             self.created_time.strftime('%Y-%m-%d %H:%M:%S'))
 
 

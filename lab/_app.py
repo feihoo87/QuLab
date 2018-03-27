@@ -12,12 +12,15 @@ import numpy as np
 
 from ._bootstrap import get_current_user, open_resource, save_inputCells
 from ._plot import draw
+from ._rcmap import RcMap
 from .base import HasSource
 from .db import _schema
 from .ui import ApplicationUI, display_source_code
 
 
 class Application(HasSource):
+    """Base class for apps."""
+
     __source__ = ''
     __DBDocument__ = None
 
@@ -187,14 +190,16 @@ class Application(HasSource):
         return self.data.result()
 
     async def work(self):
-        '''单个返回值不要用 tuple，否则会被解包，下面这些都允许
+        """Overwrite this method to define your work.
+
+        单个返回值不要用 tuple，否则会被解包，下面这些都允许
         yield 0
         yield 0, 1, 2
         yield np.array([1,2,3])
         yield [1,2,3]
         yield 1, (1,2)
         yield 0.5, np.array([1,2,3])
-        '''
+        """
 
     def pre_save(self, *args):
         return args
@@ -205,12 +210,14 @@ class Application(HasSource):
 
     @classmethod
     def save(cls, version=None, package=''):
+        """Save Application into database."""
         _schema.saveApplication(cls.__name__, cls.__source__,
                                 get_current_user(), package, cls.__doc__,
                                 version)
 
     @classmethod
     def show(cls):
+        """Show source code of class."""
         display_source_code(cls.__source__)
 
 
@@ -390,45 +397,6 @@ class SweepSet:
             sweep.parent = self
             self._sweep[sweep.name] = sweep
         return self.app
-
-
-class RcMap:
-    def __init__(self, rc={}, parent=None):
-        self.rc = {}
-        self.parent = parent
-        self.rc.update(rc)
-
-    def update(self, rc={}):
-        self.rc.update(rc)
-
-    def items(self):
-        return [(name, self.__getitem__(name)) for name in self.keys()]
-
-    def keys(self):
-        keys = set(self.rc.keys())
-        if self.parent is not None:
-            keys = keys.union(self.parent.keys())
-        return list(keys)
-
-    def get(self, name, default=None):
-        if name in self.keys():
-            return self.get_resource(name)
-        elif default is None:
-            raise KeyError('key %r not found in RcMap.' % name)
-        else:
-            return default
-
-    def get_resource(self, name):
-        name = self.rc.get(name, name)
-        if not isinstance(name, str):
-            return name
-        elif self.parent is not None:
-            return self.parent.get_resource(name)
-        else:
-            return open_resource(name)
-
-    def __getitem__(self, name):
-        return self.get(name)
 
 
 def getAppClass(name='', package='', version=None, id=None, **kwds):

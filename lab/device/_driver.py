@@ -16,9 +16,16 @@ log.addHandler(logging.NullHandler())
 
 
 class BaseDriver:
+    """Base class for Driver"""
+
     error_command = 'SYST:ERR?'
-    surport_models = []
+    """The SCPI command to query errors."""
+
+    support_models = []
+    """"""
+
     quants = []
+    """"""
 
     def __init__(self, ins=None, addr=None, model=None, timeout=3, **kw):
         self.addr = addr
