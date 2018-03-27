@@ -10,6 +10,8 @@ class Application(Document):
     created_time = ComplexDateTimeField(default=now)
     discription = StringField()
     module = ReferenceField('Module')
+    is_middle_layer = BooleanField()
+    hidden = BooleanField()
 
     @property
     def source(self):
