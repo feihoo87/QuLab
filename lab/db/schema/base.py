@@ -88,3 +88,12 @@ class Version(EmbeddedDocument):
     def __iadd__(self, num):
         self.num += num
         self.micro += num
+
+    def __str__(self):
+        return self.text
+        
+    def __repr__(self):
+        return "Version(major=%d, minor=%d, micro=%d, num=%d)" % (self.major,
+                                                                  self.minor,
+                                                                  self.micro,
+                                                                  self.num)

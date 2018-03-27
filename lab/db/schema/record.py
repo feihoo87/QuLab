@@ -123,7 +123,7 @@ def query_records(q=None, app=None, show_hidden=False, **kwds):
     else:
         if app is not None:
             if isinstance(app, str):
-                return query_by_app_name(app, show_hidden, version=kwds.pop('version', None))
+                return query_records_by_app_name(app, show_hidden, version=kwds.pop('version', None))
             elif hasattr(app, '__DBDocument__'):
                 kwds['app'] = app.__DBDocument__
             elif isinstance(app, _schema.Application):
