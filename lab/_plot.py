@@ -6,6 +6,7 @@ import io
 import ipywidgets as widgets
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
 from IPython.display import (HTML, Image, Markdown, clear_output, display,
                              set_matplotlib_formats)
 from matplotlib.backends import backend_svg
