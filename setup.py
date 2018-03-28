@@ -24,14 +24,6 @@ def dirtree(p):
 driverFiles = [
     path.join('drivers', f) for f in dirtree(path.join(here, 'drivers'))]
 
-if platform.system() in ['Darwin', 'Linux']:
-    driverInstalledPath = path.join(getenv('HOME'), 'QuLab', 'Drivers')
-elif platform.system() == 'Windows':
-    driverInstalledPath = path.join(getenv('ProgramData'), 'QuLab', 'Drivers')
-else:
-    driverInstalledPath = path.join(getenv('HOME'), 'QuLab', 'Drivers')
-
-
 # This reads the __version__ variable from lab/_version.py
 exec(open('lab/_version.py').read())
 
@@ -61,7 +53,7 @@ setup(
     long_description=long_description,
     packages = find_packages(),
     include_package_data = True,
-    data_files=[(driverInstalledPath, driverFiles)],
+    data_files=[('QuLab/Drivers', driverFiles)],
     install_requires=requirements,
     python_requires='>=3.6',
     classifiers=[
