@@ -132,7 +132,7 @@ def open_instrument_mgr():
     from .device.client import InstrumentManager
     global __inst_mgr
     __inst_mgr = InstrumentManager(
-        verify=config['ca_cert'], visa_backends=config['visa_backends'])
+        verify=config['ca_cert'])
 
 
 def open_resource(name, host=None, timeout=10):

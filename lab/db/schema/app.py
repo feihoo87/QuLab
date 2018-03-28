@@ -1,3 +1,5 @@
+import warnings
+
 from .base import *
 from .code_mod import makeUniqueCodeSnippet, makeUniqueModule
 
@@ -10,6 +12,8 @@ class Application(Document):
     created_time = ComplexDateTimeField(default=now)
     discription = StringField()
     module = ReferenceField('Module')
+    is_middle_layer = BooleanField(default=False)
+    hidden = BooleanField(default=False)
 
     @property
     def source(self):
@@ -90,6 +94,8 @@ def saveApplication(name,
             appdata.version.minor = lastapp.version.minor
             appdata.version.micro = lastapp.version.micro + 1
             appdata.version.num = lastapp.version.num + 1
+            lastapp.hidden = True
+            lastapp.save()
         appdata.save()
 
     if version is not None and version != appdata.version.text:
@@ -100,11 +106,11 @@ def saveApplication(name,
 
 def listApplication(package=''):
     ret = {}
-    query = {}
+    query = {'hidden': {'$ne': True}, 'is_middle_layer': {'$ne': True}}
     if package != '':
-        query['package__istartswith']=package
+        query['package'] = {'$regex': r'^%s(\.\w+)*$' % package}
 
-    for app in Application.objects(**query).order_by('package'):
+    for app in Application.objects(__raw__ = query).order_by('package'):
         if app.package != '':
             name = '%s.%s' % (app.package, app.name)
         else:
