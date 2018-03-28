@@ -6,6 +6,7 @@ import io
 import ipywidgets as widgets
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
 from IPython.display import (HTML, Image, Markdown, clear_output, display,
                              set_matplotlib_formats)
 from matplotlib.backends import backend_svg
@@ -112,8 +113,8 @@ def imshow(fig, x, y, z, xlabel='x (a.u.)', ylabel='y (a.u.)', zlabel='z (a.u.)'
     if isinstance(y, np.ndarray):
         ax.imshow(z, extent=(min(x), max(x), min(y), max(y)),
                      aspect='auto', origin='lower', interpolation='nearest')
-        ax.set_ylabel(xlabel)
-        ax.set_xlabel(ylabel)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
     else:
         ax.plot(x, z)
         ax.set_xlabel(xlabel)

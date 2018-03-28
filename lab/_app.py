@@ -1,7 +1,9 @@
 import abc
 import asyncio
+import datetime
 import functools
 import importlib
+import os
 import sys
 import tokenize
 from collections import Awaitable, Iterable, OrderedDict
@@ -67,7 +69,7 @@ class Application(HasSource):
         if self.__title is not None:
             return self.__title
         return 'Record by %s (v%s)' % (self.__DBDocument__.fullname,
-                self.__DBDocument__.version.text)
+                                       self.__DBDocument__.version.text)
 
     def with_title(self, title=''):
         self.__title = title
@@ -135,13 +137,19 @@ class Application(HasSource):
         if self.parent is not None:
             self.parent.status['sub_process_num'] += 1
         self.run_event.set()
+        if self.ui is not None:
+            self.ui.set_start()
+            asyncio.ensure_future(self.start_timing(self.ui.setUsedTime))
 
     def _set_done(self):
         if self.parent is not None:
             self.parent.status['sub_process_num'] -= 1
         self.status['done'] = True
         if self.ui is not None:
-            self.ui.set_done()
+            if not self.interrupt_event.is_set():
+                self.ui.set_done()
+            if self.parent is None:
+                self.interrupt_event.set()
 
     def run(self):
         if self.ui is None:
@@ -172,6 +180,12 @@ class Application(HasSource):
     def restart(self):
         self.interrupt_event.clear()
         self.run()
+
+    async def start_timing(self, handler):
+        start_time = datetime.datetime.now()
+        while not self.interrupt_event.is_set():
+            await asyncio.sleep(1)
+            handler(datetime.datetime.now() - start_time)
 
     async def done(self):
         self.reset()
@@ -212,12 +226,13 @@ class Application(HasSource):
     def save(cls, version=None, package=''):
         """Save Application into database."""
         db.update.saveApplication(cls.__name__, cls.__source__,
-                                get_current_user(), package, cls.__doc__,
-                                version)
+                                  get_current_user(), package, cls.__doc__,
+                                  version)
 
 
 class DataCollector:
     '''Collect data when app runs'''
+
     def __init__(self, app):
         self.app = app
         self.clear()
@@ -287,8 +302,7 @@ class DataCollector:
             if record.id is None:
                 record.save(signal_kwargs=dict(finished=True))
             self.__record.children.append(record)
-            self.__record.save(
-                signal_kwargs=dict(finished=True))
+            self.__record.save(signal_kwargs=dict(finished=True))
 
 
 class Sweep:
@@ -369,6 +383,8 @@ class SweepIter:
 
 
 class SweepSet:
+    """Container of sweep channals."""
+
     def __init__(self, app):
         self.app = app
         self._sweep = {}
@@ -385,8 +401,8 @@ class SweepSet:
             elif isinstance(args, dict):
                 sweep = Sweep(**args)
             elif isinstance(args, Sweep):
-                sweep = Sweep(args.name, args.generator, args.unit, args.setter,
-                              args.start, args.total)
+                sweep = Sweep(args.name, args.generator, args.unit,
+                              args.setter, args.start, args.total)
             else:
                 raise TypeError('Unsupport type %r for sweep.' % type(args))
             sweep.parent = self
@@ -408,3 +424,35 @@ def getAppClass(name='', package='', version=None, id=None, **kwds):
 def make_app(name, package='', version=None, parent=None):
     app_cls = getAppClass(name, package, version)
     return app_cls(parent=parent)
+
+
+def exportApps(dist_path):
+    """Export the latest version of Applications."""
+    from lab.db.utils import beforeSaveFile
+    ret = db.query.listApplication()
+    for app in ret:
+        path = os.path.join(dist_path, *app.package.split('.'),
+                            app.name + '.py')
+        beforeSaveFile(path)
+        with open(path, 'wt') as f:
+            f.write(app.source)
+
+
+def importApps(sour_path, package=''):
+    """Import all Applications in the given path."""
+    for fname in os.listdir(sour_path):
+        path = os.path.join(sour_path, fname)
+        if os.path.isdir(path):
+            importApps(
+                path,
+                package=fname if package == '' else package + '.' + fname)
+        else:
+            with open(path, 'rt') as f:
+                source = f.read()
+            namespace = {}
+            exec(source, namespace)
+            class_name, _ = os.path.splitext(fname)
+            cls = namespace[class_name]
+            db.update.saveApplication(class_name, source, get_current_user(),
+                                      package, cls.__doc__)
+            print('%40s, %s' % (package, class_name))

@@ -117,4 +117,4 @@ def listApplication(package=''):
             name = app.name
         if name not in ret.keys() or ret[name].version.num < app.version.num:
             ret[name] = app
-    return ret
+    return ret.values()
