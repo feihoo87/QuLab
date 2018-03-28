@@ -108,8 +108,7 @@ def listApplication(package=''):
     ret = {}
     query = {'hidden': {'$ne': True}, 'is_middle_layer': {'$ne': True}}
     if package != '':
-        query['package'] = {'$or': {{'$exact', package},
-                                    {'$startswith', package+'.'}}}
+        query['package'] = {'$regex': r'^%s(\.\w+)*$' % package}
 
     for app in Application.objects(__raw__ = query).order_by('package'):
         if app.package != '':
