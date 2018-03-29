@@ -143,7 +143,7 @@ def open_resource(name, host=None, timeout=10):
 
 def listApps(package=''):
     ret = db.query.listApplication(package=package)
-    ui.listApps(ret.values())
+    ui.listApps(ret)
 
 
 def listDrivers():
