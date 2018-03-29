@@ -1,5 +1,6 @@
 from . import admin, util, waveform
-from ._app import Application, Sweep, getAppClass, make_app
+from ._app import (Application, Sweep, exportApps, getAppClass, importApps,
+                   make_app)
 from ._bootstrap import (connect_db, get_current_notebook, get_current_user,
                          get_inputCells, listApps, listDrivers,
                          listInstruments, login, logout, open_resource,
