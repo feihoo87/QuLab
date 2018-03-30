@@ -126,7 +126,7 @@ class Session:
 class InstrumentManager:
     """Manage local instruments and clients of remote instruments."""
 
-    def __init__(self, verify, hosts=[], visa_backends='@ni'):
+    def __init__(self, verify, hosts=[]):
         self.verify = verify
         #self._drvmgr = DriverManager(visa_backends=visa_backends)
         self._drvmgr_py = DriverManager(visa_backends='@py')

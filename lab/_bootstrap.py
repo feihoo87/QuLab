@@ -132,7 +132,7 @@ def open_instrument_mgr():
     from .device.client import InstrumentManager
     global __inst_mgr
     __inst_mgr = InstrumentManager(
-        verify=config['ca_cert'], visa_backends=config['visa_backends'])
+        verify=config['ca_cert'])
 
 
 def open_resource(name, host=None, timeout=10):
@@ -143,14 +143,14 @@ def open_resource(name, host=None, timeout=10):
 
 def listApps(package=''):
     ret = db.query.listApplication(package=package)
-    ui.listApps(ret.values())
+    ui.listApps(ret)
 
 
 def listDrivers():
-    ret = db.schema.Driver.objects()
+    ret = db.schema.Driver.objects.order_by('name')
     ui.list_drivers(ret)
 
 
 def listInstruments():
-    ret = db.schema.Instrument.objects()
+    ret = db.schema.Instrument.objects.order_by('name')
     ui.list_instruments(ret)

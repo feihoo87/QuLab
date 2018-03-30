@@ -39,6 +39,9 @@ class BaseDriver:
         for q in self.quants:
             self._add_quant(q)
 
+    def __del__(self):
+        self.close()
+
     def __repr__(self):
         return 'Driver(addr=%s)' % self.addr
 
@@ -208,6 +211,7 @@ class BaseDriver:
         return self
 
     def close(self):
+        self.performClose()
         if self.ins is not None:
             self.ins.close()
 
@@ -289,6 +293,7 @@ class DriverManager(object):
     def open(self, instrument, **kw):
         if isinstance(instrument, str):
             instrument = db.query.getInstrumentByName(instrument)
-        self.__instr[instrument.name] = self._open_resource(
-            instrument.address, instrument.driver, **kw)
+        if instrument.name not in self.__instr.keys():
+            self.__instr[instrument.name] = self._open_resource(
+                instrument.address, instrument.driver, **kw)
         return self.__instr[instrument.name]

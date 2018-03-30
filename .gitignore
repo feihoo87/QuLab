@@ -102,4 +102,4 @@ ENV/
 
 my_apps/
 README.rst
-Test.ipynb
+/*.ipynb
