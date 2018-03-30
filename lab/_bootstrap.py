@@ -147,10 +147,10 @@ def listApps(package=''):
 
 
 def listDrivers():
-    ret = db.schema.Driver.objects()
+    ret = db.schema.Driver.objects.order_by('name')
     ui.list_drivers(ret)
 
 
 def listInstruments():
-    ret = db.schema.Instrument.objects()
+    ret = db.schema.Instrument.objects.order_by('name')
     ui.list_instruments(ret)

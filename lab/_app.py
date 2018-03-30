@@ -424,12 +424,12 @@ def exportApps(dist_path):
             f.write(app.source)
 
 
-def importApps(sour_path):
+def importApps(sour_path, package = ''):
     """Import all Applications in the given path."""
     for fname in os.listdir(sour_path):
         path = os.path.join(sour_path, fname)
         if os.path.isdir(path):
-            importApps(path)
+            importApps(path, package = fname if package == '' else package + '.' + fname)
         else:
             with open(path, 'rt') as f:
                 source = f.read()
@@ -437,5 +437,6 @@ def importApps(sour_path):
             exec(source, namespace)
             class_name, _ = os.path.splitext(fname)
             cls = namespace[class_name]
-            db.update.saveApplication(fname, source,
+            db.update.saveApplication(class_name, source,
                                       get_current_user(), package, cls.__doc__)
+            print('%40s, %s' % (package, class_name))
