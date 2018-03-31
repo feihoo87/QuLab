@@ -1,6 +1,10 @@
 QuLab
 =====
 
+.. image:: https://travis-ci.org/feihoo87/QuLab.svg?branch=master
+   :alt: View build status
+   :target: https://travis-ci.org/feihoo87/QuLab
+
 QuLab 需要在 Jupyter Notebook 中使用。
 
 准备工作
@@ -312,3 +316,6 @@ License
 -------
 
 `MIT <https://opensource.org/licenses/MIT>`__
+
+.. |View build status| image:: https://travis-ci.org/feihoo87/QuLab.svg?branch=master
+   :target: https://travis-ci.org/feihoo87/QuLab
