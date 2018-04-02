@@ -21,18 +21,22 @@ class ApplicationUI:
         if btn.description == 'Pause':
             btn.description = 'Continue'
             self.app.pause()
+            self._ProgressWidget.bar_style = 'warning'
         else:
             btn.description = 'Pause'
             self.app.continue_()
+            self._ProgressWidget.bar_style = ''
 
     def on_interrupt_button_clicked(self, btn):
         if btn.description == 'Interrupt':
             btn.description = 'Restart'
             self.app.interrupt()
+            self._ProgressWidget.bar_style = 'danger'
         else:
             btn.description = 'Interrupt'
             self._PauseButton.disabled = False
             self.app.restart()
+            self._ProgressWidget.bar_style = ''
 
     def display(self):
         display(self.ui)
