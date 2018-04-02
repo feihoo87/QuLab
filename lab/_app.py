@@ -145,9 +145,10 @@ class Application(HasSource):
         if self.parent is not None:
             self.parent.status['sub_process_num'] -= 1
         self.status['done'] = True
-        self.interrupt_event.set()
         if self.ui is not None:
             self.ui.set_done()
+            if self.parent is None:
+                self.interrupt_event.set()
 
     def run(self):
         if self.ui is None:
