@@ -139,7 +139,7 @@ class Application(HasSource):
         self.run_event.set()
         if self.ui is not None:
             self.ui.set_start()
-        asyncio.ensure_future(self.start_timing(self.ui.setUsedTime))
+            asyncio.ensure_future(self.start_timing(self.ui.setUsedTime))
 
     def _set_done(self):
         if self.parent is not None:
