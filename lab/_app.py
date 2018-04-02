@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import datetime
 import functools
 import importlib
 import os
@@ -138,11 +139,13 @@ class Application(HasSource):
         self.run_event.set()
         if self.ui is not None:
             self.ui.set_start()
+        asyncio.ensure_future(self.start_timing(self.ui.setUsedTime))
 
     def _set_done(self):
         if self.parent is not None:
             self.parent.status['sub_process_num'] -= 1
         self.status['done'] = True
+        self.interrupt_event.set()
         if self.ui is not None:
             self.ui.set_done()
 
@@ -175,6 +178,12 @@ class Application(HasSource):
     def restart(self):
         self.interrupt_event.clear()
         self.run()
+
+    async def start_timing(self, handler):
+        start_time = datetime.datetime.now()
+        while not self.interrupt_event.is_set():
+            await asyncio.sleep(1)
+            handler(datetime.datetime.now() - start_time)
 
     async def done(self):
         self.reset()

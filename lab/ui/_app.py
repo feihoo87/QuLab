@@ -11,8 +11,20 @@ class ApplicationUI:
         self._PauseButton.on_click(self.on_pause_button_clicked)
         self._InterruptButton = widgets.Button(description="Interrupt")
         self._InterruptButton.on_click(self.on_interrupt_button_clicked)
-        self.ui = widgets.HBox(
-            [self._PauseButton, self._InterruptButton, self._ProgressWidget])
+        self._usedTimeLabel = widgets.Label(value='00:00:00')
+        self.ui = widgets.HBox([
+            self._PauseButton, self._InterruptButton, self._ProgressWidget,
+            self._usedTimeLabel
+        ])
+
+    def setUsedTime(self, delta):
+        hours, minutes, seconds = 24 * delta.days, 0, delta.seconds
+        minutes += seconds // 60
+        seconds %= 60
+        hours += minutes // 60
+        minutes %= 60
+        self._usedTimeLabel.value = '%02d:%02d:%02d' % (hours, minutes,
+                                                        seconds)
 
     def setProcess(self, value):
         self._ProgressWidget.value = value
