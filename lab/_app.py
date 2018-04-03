@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import datetime
 import functools
 import importlib
 import os
@@ -136,13 +137,19 @@ class Application(HasSource):
         if self.parent is not None:
             self.parent.status['sub_process_num'] += 1
         self.run_event.set()
+        if self.ui is not None:
+            self.ui.set_start()
+            asyncio.ensure_future(self.start_timing(self.ui.setUsedTime))
 
     def _set_done(self):
         if self.parent is not None:
             self.parent.status['sub_process_num'] -= 1
         self.status['done'] = True
         if self.ui is not None:
-            self.ui.set_done()
+            if not self.interrupt_event.is_set():
+                self.ui.set_done()
+            if self.parent is None:
+                self.interrupt_event.set()
 
     def run(self):
         if self.ui is None:
@@ -173,6 +180,12 @@ class Application(HasSource):
     def restart(self):
         self.interrupt_event.clear()
         self.run()
+
+    async def start_timing(self, handler):
+        start_time = datetime.datetime.now()
+        while not self.interrupt_event.is_set():
+            await asyncio.sleep(1)
+            handler(datetime.datetime.now() - start_time)
 
     async def done(self):
         self.reset()
@@ -418,18 +431,21 @@ def exportApps(dist_path):
     from lab.db.utils import beforeSaveFile
     ret = db.query.listApplication()
     for app in ret:
-        path = os.path.join(dist_path, *app.package.split('.'), app.name+'.py')
+        path = os.path.join(dist_path, *app.package.split('.'),
+                            app.name + '.py')
         beforeSaveFile(path)
         with open(path, 'wt') as f:
             f.write(app.source)
 
 
-def importApps(sour_path, package = ''):
+def importApps(sour_path, package=''):
     """Import all Applications in the given path."""
     for fname in os.listdir(sour_path):
         path = os.path.join(sour_path, fname)
         if os.path.isdir(path):
-            importApps(path, package = fname if package == '' else package + '.' + fname)
+            importApps(
+                path,
+                package=fname if package == '' else package + '.' + fname)
         else:
             with open(path, 'rt') as f:
                 source = f.read()
@@ -437,6 +453,6 @@ def importApps(sour_path, package = ''):
             exec(source, namespace)
             class_name, _ = os.path.splitext(fname)
             cls = namespace[class_name]
-            db.update.saveApplication(class_name, source,
-                                      get_current_user(), package, cls.__doc__)
+            db.update.saveApplication(class_name, source, get_current_user(),
+                                      package, cls.__doc__)
             print('%40s, %s' % (package, class_name))
