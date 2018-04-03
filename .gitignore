@@ -102,3 +102,5 @@ ENV/
 
 my_apps/
 /*.ipynb
+
+.vscode/

@@ -2,6 +2,8 @@
 import numpy as np
 from scipy.special import sici
 from scipy.stats import beta
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 
 
 def get_unit_prefix(value):

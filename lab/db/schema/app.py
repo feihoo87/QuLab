@@ -30,8 +30,8 @@ class Application(Document):
             return '%s.%s' % (self.package, self.name)
 
     def __str__(self):
-        return 'App %s v%s by (%s, %s)' % (self.fullname,
-            self.version.text, self.author.fullname,
+        return 'App %s v%s by (%s, %s)' % (
+            self.fullname, self.version.text, self.author.fullname,
             self.created_time.strftime('%Y-%m-%d %H:%M:%S'))
 
 
@@ -42,7 +42,12 @@ def __get_App_name_and_package(name, package):
     return name, package
 
 
-def getApplication(name='', package='', version=None, id=None, many=False, **kwds):
+def getApplication(name='',
+                   package='',
+                   version=None,
+                   id=None,
+                   many=False,
+                   **kwds):
     name, package = __get_App_name_and_package(name, package)
     kwds['name'] = name
     kwds['package'] = package
@@ -50,14 +55,15 @@ def getApplication(name='', package='', version=None, id=None, many=False, **kwd
         kwds = {'id': id}
     elif isinstance(version, str):
         try:
-            nums = [int(s) for version in tag.split('.')]
+            nums = [int(s) for s in version.split('.')]
             kwds['version.major'] = nums[0]
             if len(nums) > 1:
-                kwds['version.minor'] = nums[0]
+                kwds['version.minor'] = nums[1]
             if len(nums) > 2:
                 kwds['version.micro'] = nums[2]
         except:
-            warnings.warn('illegal argument: version=%r' % version, UserWarning)
+            warnings.warn('illegal argument: version=%r' % version,
+                          UserWarning)
     elif isinstance(version, int):
         kwds['version.num'] = version
     if many:
@@ -80,9 +86,11 @@ def saveApplication(name,
     module = makeUniqueModule(fullname, author, codeSnippet)
     if module.id is None:
         module.save()
-    appdata = Application.objects(name=name, package=package, module=module).first()
+    appdata = Application.objects(
+        name=name, package=package, module=module).first()
     if appdata is None:
-        lastapp = Application.objects(name=name).order_by('-version.num').first()
+        lastapp = Application.objects(
+            name=name).order_by('-version.num').first()
         appdata = Application(
             name=name,
             package=package,
@@ -110,7 +118,7 @@ def listApplication(package=''):
     if package != '':
         query['package'] = {'$regex': r'^%s(\.\w+)*$' % package}
 
-    for app in Application.objects(__raw__ = query).order_by('package'):
+    for app in Application.objects(__raw__=query).order_by('package'):
         if app.package != '':
             name = '%s.%s' % (app.package, app.name)
         else:

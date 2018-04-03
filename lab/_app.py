@@ -190,7 +190,6 @@ class Application(HasSource):
     async def done(self):
         self.reset()
         self._set_start()
-        await self.run_event.wait()
         async for data in self.work():
             self.data.collect(data)
             result = self.data.result()
@@ -336,6 +335,9 @@ class Sweep:
         except TypeError:
             return self.total
 
+    def __iter__(self):
+        return SweepIter(self)
+
     def __aiter__(self):
         return SweepIter(self)
 
@@ -356,6 +358,9 @@ class SweepIter:
         except StopIteration:
             raise StopAsyncIteration
         return data
+
+    def __next__(self):
+        return next(self.iter)
 
     async def set_data(self, data):
         if self.setter is not None:
