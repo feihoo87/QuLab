@@ -190,7 +190,6 @@ class Application(HasSource):
     async def done(self):
         self.reset()
         self._set_start()
-        await self.run_event.wait()
         async for data in self.work():
             self.data.collect(data)
             result = self.data.result()
