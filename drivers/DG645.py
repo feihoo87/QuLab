@@ -59,7 +59,7 @@ class Driver(BaseDriver):
             cmd = quant._formatGetCmd(**kw)
             res = self.query_ascii_values(cmd)
             quant.value= res[1]
-            return quant.value*1e6 #convert to us
+            return res[0],quant.value*1e6 # res[0] is the chanel that related ; quant.value : 's' convert to 'us'
         else:
             return super(Driver, self).performGetValue(quant, **kw)
 
@@ -70,7 +70,7 @@ class Driver(BaseDriver):
             'GH Delay','GH Length'
         ]
         if quant.name in set_Delays and quant.set_cmd is not '':
-            value=value/1e6  #convert to us
+            value=value/1e6  # 'us' convert to 's'
             quant.value = value
             cmd = quant._formatSetCmd(value,**kw)
             self.write(cmd)
