@@ -11,7 +11,7 @@ logger = logging.getLogger('qulab.drivers.ATS')
 
 
 class Driver(BaseDriver):
-    surport_models = ['ATS9870']
+    support_models = ['ATS9870']
     quants = [
         QOption('Clock Source', value='External 10MHz Ref',
                 options=[

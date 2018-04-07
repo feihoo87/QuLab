@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-from lab.device import BaseDriver
-from lab.device import QReal, QOption, QInteger, QString, QVector
+from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
+
 
 class Driver(BaseDriver):
-    surport_models = ['DPO4104B']
+    support_models = ['DPO4104B']
 
     quants = [
         QReal('X Scale', set_cmd='HOR:SCA %(value)e', get_cmd='HOR:SCA?'),

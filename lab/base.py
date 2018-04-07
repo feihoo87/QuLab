@@ -10,9 +10,7 @@ class QuLabRuntimeError(QuLabError): pass
 
 
 class MetaHasSource(type):
-    '''MetaHasSource
-
-    Get the source code of Class so we can record it into database.
+    '''Metaclass for all types that have attribute `__source__` and `__DBDocument__`
     '''
 
     def __new__(cls, name, bases, nmspc):
@@ -27,8 +25,7 @@ class MetaHasSource(type):
                 cls.__source__ = ''
 
     def _getSourceCode(cls):
-        '''getSourceCode
-        '''
+        '''Get the source code of Class so we can record it into database.'''
         module = sys.modules[cls.__module__]
         if module.__name__ == '__main__' and hasattr(module, 'In'):
             code = module.In[-1]
@@ -46,4 +43,9 @@ class MetaHasSource(type):
 
 
 class HasSource(metaclass=MetaHasSource):
-    pass
+    """Base class that have attribute `__source__` and `__DBDocument__`"""
+    @classmethod
+    def show(cls):
+        """Show source code of class."""
+        from .ui import display_source_code
+        display_source_code(cls.__source__)
