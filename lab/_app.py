@@ -335,6 +335,9 @@ class Sweep:
         except TypeError:
             return self.total
 
+    def __iter__(self):
+        return SweepIter(self)
+
     def __aiter__(self):
         return SweepIter(self)
 
@@ -355,6 +358,9 @@ class SweepIter:
         except StopIteration:
             raise StopAsyncIteration
         return data
+
+    def __next__(self):
+        return self.fetch_data()
 
     async def set_data(self, data):
         if self.setter is not None:
