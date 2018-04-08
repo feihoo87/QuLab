@@ -360,7 +360,7 @@ class SweepIter:
         return data
 
     def __next__(self):
-        return self.fetch_data()
+        return next(self.iter)
 
     async def set_data(self, data):
         if self.setter is not None:
