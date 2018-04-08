@@ -4,7 +4,7 @@ from lab.device import BaseDriver, QInteger, QOption, QReal, QVector
 
 
 class Driver(BaseDriver):
-    support_models = ['E8363C', 'ZNB20-2Port']
+    support_models = ['E8363C', 'ZNB20-2Port','E8363B']
 
     quants = [
         QReal('Power', value=-20, unit='dBm', set_cmd='SOUR:POW %(value)e', get_cmd='SOUR:POW?'),
@@ -90,7 +90,7 @@ class Driver(BaseDriver):
 
     def pna_select(self, ch=1):
         '''Select the measurement'''
-        if self.model == 'E8363C':
+        if self.model in ['E8363C','E8363B']:
             quote = '" '
         elif self.model in ['ZNB20-2Port']:
             quote = "' "
@@ -105,9 +105,16 @@ class Driver(BaseDriver):
         self.pna_select(ch)
         if self.model == 'E8363C':
             cmd = 'CALC:X?'
+            return np.asarray(self.query_ascii_values(cmd))
+        if self.model == 'E8363B':
+            freq_star=self.getValue('Frequency start')
+            freq_stop=self.getValue('Frequency stop')
+            num_of_point=self.getValue('Number of points')
+            return np.array(np.linspace(freq_star,freq_stop,num_of_point))
         elif self.model in ['ZNB20-2Port']:
             cmd = 'CALC:DATA:STIM?'
-        return np.asarray(self.query_ascii_values(cmd))
+            return np.asarray(self.query_ascii_values(cmd))
+
 
     def set_segments(self, segments=[], form='Start Stop'):
         self.write('SENS:SEGM:DEL:ALL')
