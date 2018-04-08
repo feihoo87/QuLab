@@ -223,7 +223,7 @@ def _load_driver(driver_data):
 
 
 ats_addr = re.compile(
-    r'^(ATS9626|ATS9850|ATS9870)::SYSTEM([0-9]+)::([0-9]+)(|::INSTR)$')
+    r'^(ATS9360|ATS9850|ATS9870)::SYSTEM([0-9]+)::([0-9]+)(|::INSTR)$')
 gpib_addr = re.compile(r'^GPIB[0-9]?::[0-9]+(::.+)？$')
 p_addr = re.compile(r'^([a-zA-Z]+)[0-9]*::.+$')
 
