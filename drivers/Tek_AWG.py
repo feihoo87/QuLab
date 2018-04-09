@@ -212,13 +212,14 @@ class Driver(BaseDriver):
         self.write('SLIS:SEQ:DEL ALL')
         self.sequence_list.clear()
 
-    def set_sequence_step(self, name, sub_name, step, wait='OFF', goto='NEXT', jump=None):
+    def set_sequence_step(self, name, sub_name, step, wait='OFF', goto='NEXT', repeat=1, jump=None):
         """set a step of sequence
 
         name: sequence name
         sub_name: subsequence name or list of waveforms for every tracks
         wait: ATRigger | BTRigger | ITRigger | OFF
         goto: <NR1> | LAST | FIRSt | NEXT | END
+        repeat: ONCE | INFinite | <NR1>
         jump: a tuple (jump_input, jump_to)
             jump_input: ATRigger | BTRigger | OFF | ITRigger
             jump_to: <NR1> | NEXT | FIRSt | LAST | END
@@ -230,6 +231,7 @@ class Driver(BaseDriver):
                 self.write('SLIS:SEQ:STEP%d:TASS%d:WAV "%s","%s"' % (step, i+1, name, wav))
         self.write('SLIS:SEQ:STEP%d:WINP "%s", %s' % (step, name, wait))
         self.write('SLIS:SEQ:STEP%d:GOTO "%s", %s' % (step, name, goto))
+        self.write('SLIS:SEQ:STEP%d:RCO "%s", %s' % (step, name, repeat))
         if jump is not None:
             self.write('SLIS:SEQ:STEP%d:EJIN "%s", %s' % (step, name, jump[0]))
             self.write('SLIS:SEQ:STEP%d:EJUM "%s", %s' % (step, name, jump[1]))
