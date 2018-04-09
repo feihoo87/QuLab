@@ -1,4 +1,5 @@
 # QuLab
+[![View build status](https://travis-ci.org/feihoo87/QuLab.svg?branch=master)](https://travis-ci.org/feihoo87/QuLab)
 
 QuLab 需要在 Jupyter Notebook 中使用。
 
@@ -35,14 +36,6 @@ db:
   ssl: true
   ssl_ca_certs: *ca_cert
   ssl_match_hostname: true
-
-db_local:
-  db: lab
-  host: localhost
-
-db_dev:
-  db: lab_dev
-  host: localhost
 
 server_port: 8123
 server_name: ['localhost', '127.0.0.1', '10.122.7.18']
@@ -169,7 +162,22 @@ app.run()
 
 ### 涉及到仪器操作
 
-添加仪器设置
+1. 安装 drivers
+```python
+import os
+
+path = 'path/to/drivers'
+
+for f in os.listdir(path):
+    lab.admin.uploadDriver(os.path.join(path, f))
+```
+
+2. 查看已有的 drivers
+```python
+lab.listDrivers()
+```
+
+3. 添加仪器设置
 ```python
 # 第一台网分
 lab.admin.setInstrument('PNA-I', 'localhost', 'TCPIP::10.122.7.250', 'NetworkAnalyzer')
@@ -177,7 +185,7 @@ lab.admin.setInstrument('PNA-I', 'localhost', 'TCPIP::10.122.7.250', 'NetworkAna
 lab.admin.setInstrument('PNA-II', 'localhost', 'TCPIP::10.122.7.251', 'NetworkAnalyzer')
 ```
 
-查看已存在的仪器
+4. 查看已存在的仪器
 
 ```python
 lab.listInstruments()
@@ -258,7 +266,6 @@ lab.listApps()
 ```python
 results = lab.query()
 results.display()
-print('%d results found.' % results.count())
 ```
 
 获取原始数据

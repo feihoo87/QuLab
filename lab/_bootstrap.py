@@ -9,16 +9,15 @@ from concurrent.futures import ProcessPoolExecutor
 
 from mongoengine.connection import connect, disconnect
 
-from . import _importer, ui
+from . import _importer, db, ui
 from .config import config
-from .db import _schema
 
 __run_mode = 'release'
 __connected = False
 
 
 if platform.system() != 'Windows':
-    p_executor = ProcessPoolExecutor()
+    p_executor = None #ProcessPoolExecutor()
 else:
     p_executor = None
 
@@ -83,7 +82,7 @@ def login(username=None, password='', relogin=False):
         return
     if username is None:
         username, password = ui.get_login_info()
-    user = _schema.User.objects(name=username).first()
+    user = db.query.getUserByName(name=username)
     if user is not None and user.check_password(password):
         __login_info['user'] = user
         __login_info['username'] = username
@@ -101,7 +100,7 @@ def get_current_user():
     return __login_info['user']
 
 
-__current_notebook = _schema.Notebook()
+__current_notebook = db.schema.Notebook()
 
 
 def get_current_notebook():
@@ -122,7 +121,7 @@ def save_inputCells():
     aready_saved = len(notebook.inputCells)
     for cell in get_inputCells()[aready_saved + 1:]:
         notebook.inputCells.append(
-            _schema.makeUniqueCodeSnippet(cell, get_current_user()))
+            db.update.makeUniqueCodeSnippet(cell, get_current_user()))
     notebook.save()
 
 
@@ -133,7 +132,7 @@ def open_instrument_mgr():
     from .device.client import InstrumentManager
     global __inst_mgr
     __inst_mgr = InstrumentManager(
-        verify=config['ca_cert'], visa_backends=config['visa_backends'])
+        verify=config['ca_cert'])
 
 
 def open_resource(name, host=None, timeout=10):
@@ -143,15 +142,15 @@ def open_resource(name, host=None, timeout=10):
 
 
 def listApps(package=''):
-    ret = _schema.listApplication(package=package)
-    ui.listApps(ret.values())
+    ret = db.query.listApplication(package=package)
+    ui.listApps(ret)
 
 
 def listDrivers():
-    ret = _schema.Driver.objects()
+    ret = db.schema.Driver.objects.order_by('name')
     ui.list_drivers(ret)
 
 
 def listInstruments():
-    ret = _schema.Instrument.objects()
+    ret = db.schema.Instrument.objects.order_by('name')
     ui.list_instruments(ret)

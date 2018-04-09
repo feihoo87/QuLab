@@ -1,18 +1,11 @@
 import asyncio
 import functools
 import importlib
-import sys
-from abc import ABCMeta, abstractmethod
-from collections import Awaitable, Iterable, OrderedDict
 
 import ipywidgets as widgets
-import numpy as np
-from IPython.display import (HTML, Image, Markdown, clear_output, display,
-                             set_matplotlib_formats)
+from IPython.display import display
 
-from . import _schema
 from .._plot import image_to_uri, make_image_in_process
-from ._schema import Record
 
 
 class QuerySetUI():
@@ -125,56 +118,3 @@ class QuerySetUI():
         imgHTML = u'<img style="height: 30px" src="{}" alt="No Image"/>'.format(
             img_uri)
         return imgHTML
-
-
-class QuerySet():
-    def __init__(self, query_set):
-        self.query_set = query_set
-        self.ui = QuerySetUI(self)
-
-    @functools.lru_cache(maxsize=32)
-    def __getitem__(self, i):
-        return self.query_set[i]
-
-    def __iter__(self):
-        self.__count = self.count()
-        self.__index = 0
-        return self
-
-    def __next__(self):
-        if self.__index < self.__count:
-            return self.__getitem__(self.__index)
-        else:
-            raise StopIteration
-
-    def count(self):
-        return self.query_set.count()
-
-    def display(self, start=0, stop=10, figsize=None):
-        self.ui.display(start, stop, figsize)
-
-
-def query(q=None, app=None, show_hidden=False, **kwds):
-    if q is not None:
-        qs = Record.objects(q).order_by('-finished_time')
-    else:
-        if app is not None:
-            if isinstance(app, str):
-                return query_by_app_name(app, show_hidden, version=kwds.pop('version', None))
-            elif hasattr(app, '__DBDocument__'):
-                kwds['app'] = app.__DBDocument__
-            elif isinstance(app, _schema.Application):
-                kwds['app'] = app
-        if not show_hidden:
-            kwds['hidden'] = False
-        qs = Record.objects(**kwds).order_by('-finished_time')
-    return QuerySet(qs)
-
-def query_by_app_name(app_name, show_hidden=False, version=None):
-    rec_q = {'app__in': []}
-    for app in _schema.getApplication(name=app_name, version=version, many=True):
-        rec_q['app__in'].append(app)
-    if not show_hidden:
-        rec_q['hidden'] = False
-    qs = _schema.Record.objects(**rec_q).order_by('-finished_time')
-    return QuerySet(qs)

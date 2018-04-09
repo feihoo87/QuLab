@@ -1,7 +1,9 @@
 import abc
 import asyncio
+import datetime
 import functools
 import importlib
+import os
 import sys
 import tokenize
 from collections import Awaitable, Iterable, OrderedDict
@@ -10,14 +12,17 @@ from threading import Thread
 
 import numpy as np
 
+from . import db
 from ._bootstrap import get_current_user, open_resource, save_inputCells
 from ._plot import draw
+from ._rcmap import RcMap
 from .base import HasSource
-from .db import _schema
 from .ui import ApplicationUI, display_source_code
 
 
 class Application(HasSource):
+    """Base class for apps."""
+
     __source__ = ''
     __DBDocument__ = None
 
@@ -64,7 +69,7 @@ class Application(HasSource):
         if self.__title is not None:
             return self.__title
         return 'Record by %s (v%s)' % (self.__DBDocument__.fullname,
-                self.__DBDocument__.version.text)
+                                       self.__DBDocument__.version.text)
 
     def with_title(self, title=''):
         self.__title = title
@@ -132,13 +137,19 @@ class Application(HasSource):
         if self.parent is not None:
             self.parent.status['sub_process_num'] += 1
         self.run_event.set()
+        if self.ui is not None:
+            self.ui.set_start()
+            asyncio.ensure_future(self.start_timing(self.ui.setUsedTime))
 
     def _set_done(self):
         if self.parent is not None:
             self.parent.status['sub_process_num'] -= 1
         self.status['done'] = True
         if self.ui is not None:
-            self.ui.set_done()
+            if not self.interrupt_event.is_set():
+                self.ui.set_done()
+            if self.parent is None:
+                self.interrupt_event.set()
 
     def run(self):
         if self.ui is None:
@@ -170,10 +181,15 @@ class Application(HasSource):
         self.interrupt_event.clear()
         self.run()
 
+    async def start_timing(self, handler):
+        start_time = datetime.datetime.now()
+        while not self.interrupt_event.is_set():
+            await asyncio.sleep(1)
+            handler(datetime.datetime.now() - start_time)
+
     async def done(self):
         self.reset()
         self._set_start()
-        await self.run_event.wait()
         async for data in self.work():
             self.data.collect(data)
             result = self.data.result()
@@ -187,14 +203,16 @@ class Application(HasSource):
         return self.data.result()
 
     async def work(self):
-        '''单个返回值不要用 tuple，否则会被解包，下面这些都允许
+        """Overwrite this method to define your work.
+
+        单个返回值不要用 tuple，否则会被解包，下面这些都允许
         yield 0
         yield 0, 1, 2
         yield np.array([1,2,3])
         yield [1,2,3]
         yield 1, (1,2)
         yield 0.5, np.array([1,2,3])
-        '''
+        """
 
     def pre_save(self, *args):
         return args
@@ -205,17 +223,15 @@ class Application(HasSource):
 
     @classmethod
     def save(cls, version=None, package=''):
-        _schema.saveApplication(cls.__name__, cls.__source__,
-                                get_current_user(), package, cls.__doc__,
-                                version)
-
-    @classmethod
-    def show(cls):
-        display_source_code(cls.__source__)
+        """Save Application into database."""
+        db.update.saveApplication(cls.__name__, cls.__source__,
+                                  get_current_user(), package, cls.__doc__,
+                                  version)
 
 
 class DataCollector:
     '''Collect data when app runs'''
+
     def __init__(self, app):
         self.app = app
         self.clear()
@@ -266,7 +282,7 @@ class DataCollector:
 
     def newRecord(self):
         rc = dict([(name, str(v)) for name, v in self.app.rc.items()])
-        record = _schema.Record(
+        record = db.update.newRecord(
             title=self.app.title(),
             user=get_current_user(),
             tags=self.app.tags,
@@ -285,8 +301,7 @@ class DataCollector:
             if record.id is None:
                 record.save(signal_kwargs=dict(finished=True))
             self.__record.children.append(record)
-            self.__record.save(
-                signal_kwargs=dict(finished=True))
+            self.__record.save(signal_kwargs=dict(finished=True))
 
 
 class Sweep:
@@ -367,6 +382,8 @@ class SweepIter:
 
 
 class SweepSet:
+    """Container of sweep channals."""
+
     def __init__(self, app):
         self.app = app
         self._sweep = {}
@@ -383,8 +400,8 @@ class SweepSet:
             elif isinstance(args, dict):
                 sweep = Sweep(**args)
             elif isinstance(args, Sweep):
-                sweep = Sweep(args.name, args.generator, args.unit, args.setter,
-                              args.start, args.total)
+                sweep = Sweep(args.name, args.generator, args.unit,
+                              args.setter, args.start, args.total)
             else:
                 raise TypeError('Unsupport type %r for sweep.' % type(args))
             sweep.parent = self
@@ -392,47 +409,8 @@ class SweepSet:
         return self.app
 
 
-class RcMap:
-    def __init__(self, rc={}, parent=None):
-        self.rc = {}
-        self.parent = parent
-        self.rc.update(rc)
-
-    def update(self, rc={}):
-        self.rc.update(rc)
-
-    def items(self):
-        return [(name, self.__getitem__(name)) for name in self.keys()]
-
-    def keys(self):
-        keys = set(self.rc.keys())
-        if self.parent is not None:
-            keys = keys.union(self.parent.keys())
-        return list(keys)
-
-    def get(self, name, default=None):
-        if name in self.keys():
-            return self.get_resource(name)
-        elif default is None:
-            raise KeyError('key %r not found in RcMap.' % name)
-        else:
-            return default
-
-    def get_resource(self, name):
-        name = self.rc.get(name, name)
-        if not isinstance(name, str):
-            return name
-        elif self.parent is not None:
-            return self.parent.get_resource(name)
-        else:
-            return open_resource(name)
-
-    def __getitem__(self, name):
-        return self.get(name)
-
-
 def getAppClass(name='', package='', version=None, id=None, **kwds):
-    appdata = _schema.getApplication(name, package, version, id, **kwds)
+    appdata = db.query.getApplication(name, package, version, id, **kwds)
     if appdata is None:
         return None
     mod = importlib.import_module(appdata.module.fullname)
@@ -445,3 +423,35 @@ def getAppClass(name='', package='', version=None, id=None, **kwds):
 def make_app(name, package='', version=None, parent=None):
     app_cls = getAppClass(name, package, version)
     return app_cls(parent=parent)
+
+
+def exportApps(dist_path):
+    """Export the latest version of Applications."""
+    from lab.db.utils import beforeSaveFile
+    ret = db.query.listApplication()
+    for app in ret:
+        path = os.path.join(dist_path, *app.package.split('.'),
+                            app.name + '.py')
+        beforeSaveFile(path)
+        with open(path, 'wt') as f:
+            f.write(app.source)
+
+
+def importApps(sour_path, package=''):
+    """Import all Applications in the given path."""
+    for fname in os.listdir(sour_path):
+        path = os.path.join(sour_path, fname)
+        if os.path.isdir(path):
+            importApps(
+                path,
+                package=fname if package == '' else package + '.' + fname)
+        else:
+            with open(path, 'rt') as f:
+                source = f.read()
+            namespace = {}
+            exec(source, namespace)
+            class_name, _ = os.path.splitext(fname)
+            cls = namespace[class_name]
+            db.update.saveApplication(class_name, source, get_current_user(),
+                                      package, cls.__doc__)
+            print('%40s, %s' % (package, class_name))
