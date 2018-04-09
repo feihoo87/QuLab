@@ -186,9 +186,9 @@ class Driver(BaseDriver):
         values = []
         for i in range(len(mk1)):
             d = 0
-            if mk1[i] == '1' || mk1[i] != 0:
+            if mk1[i] == '1' or mk1[i] == 1:
                 d += 64
-            if mk2[i] == '1' || mk2[i] != 0:
+            if mk2[i] == '1' or mk2[i] == 1:
                 d += 128
             values.append(d)
         message = 'WLIST:WAVEFORM:MARKER:DATA "%s",' % name
