@@ -11,7 +11,7 @@ logger = logging.getLogger('qulab.drivers.ATS')
 
 
 class Driver(BaseDriver):
-    support_models = ['ATS9870']
+    support_models = ['ATS9360', 'ATS9870']
     quants = [
         QOption('Clock Source', value='External 10MHz Ref',
                 options=[
@@ -127,8 +127,9 @@ class Driver(BaseDriver):
             Impedance = self.getCmdOption('%s Term' % ch)
             self.dig.AlazarInputControl(chId, Coupling, InputRange, Impedance)
             # bandwidth limit
-            BW = self.getCmdOption('%s Bandwidth limit' % ch)
-            self.dig.AlazarSetBWLimit(chId, BW)
+            if self.model in ['ATS9870']:
+                BW = self.getCmdOption('%s Bandwidth limit' % ch)
+                self.dig.AlazarSetBWLimit(chId, BW)
         Coupling = self.getCmdOption('Ext Coupling')
         self.dig.AlazarSetExternalTrigger(Coupling)
         #
