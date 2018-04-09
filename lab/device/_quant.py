@@ -71,7 +71,7 @@ class QString(Quantity):
         if self.driver is not None and self.get_cmd is not '':
             cmd = self._formatGetCmd(**kw)
             res = self.driver.query(cmd)
-            self.value = res.strip()
+            self.value = res.strip("\n\"' ")
         return self.value
 
 
@@ -132,3 +132,8 @@ class QVector(Quantity):
                 res = self.driver.query_ascii_values(cmd)
             self.value = np.asarray(res)
         return self.value
+
+
+class QList(Quantity):
+    def __init__(self, name, value=None, unit=None, get_cmd='', set_cmd=''):
+        super(QList, self).__init__(name, value, 'List', unit, get_cmd=get_cmd, set_cmd=set_cmd)
