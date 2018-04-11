@@ -14,7 +14,7 @@ class Driver(BaseDriver):
 
     quants = [
         QOption('Output',
-        set_cmd='OUTP%(ch)d %(option)s', get_cmd='OUTP%(ch)d?'
+        set_cmd='OUTP%(ch)d %(option)s', get_cmd='OUTP%(ch)d?',
         options=[('OFF', 'OFF'), ('ON', 'ON')]),  # must set chanel
 
         QOption('Function',set_cmd='SOUR%(ch)d:FUNC %(option)s',get_cmd='SOUR%(ch)d:FUNC?',
@@ -26,6 +26,10 @@ class Driver(BaseDriver):
         QReal('Frequency',unit='Hz',set_cmd='SOUR%(ch)d:FREQ %(value)e',get_cmd='SOUR%(ch)d:FREQ?'),
         QReal('Phase',unit='rad',set_cmd='SOUR%(ch)d:PHAS %(value)f',get_cmd='SOUR%(ch)d:PHAS?'),
         QReal('Pulse Delay',unit='s',set_cmd='SOUR%(ch)d:PULS:DEL %(value).9e',get_cmd='SOUR%(ch)d:PULS:DEL?'),
+        QReal('Pulse Period',unit='s',set_cmd='SOUR%(ch)d:PULS:PER %(value).9e',get_cmd='SOUR%(ch)d:PULS:PER?'),
+        QReal('Pulse Width',unit='s',set_cmd='SOUR%(ch)d:PULS:WIDT %(value).9e',get_cmd='SOUR%(ch)d:PULS:WIDT?'),
+        QReal('Burst Tdelay',unit='s',set_cmd='SOUR%(ch)d:BURS:TDEL %(value).9e',get_cmd='SOUR%(ch)d:BURS:TDEL?'),
+        QReal('Burst Ncycles',set_cmd='SOUR%(ch)d:BURS:NCYC %(value)d',get_cmd='SOUR%(ch)d:BURS:NCYC?'),
         QReal('High Level',unit='V',set_cmd='SOUR%(ch)d:VOLT:HIGH %(value)f',get_cmd='SOUR%(ch)d:VOLT:HIGH?'),
         QReal('Low Level',unit='V',set_cmd='SOUR%(ch)d:VOLT:LOW %(value)f',get_cmd='SOUR%(ch)d:VOLT:LOW?'),
         QReal('Offset',unit='V',set_cmd='SOUR%(ch)d:VOLT:OFFS %(value)f',get_cmd='SOUR%(ch)d:VOLT:OFFS?'),
