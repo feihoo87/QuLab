@@ -2,6 +2,8 @@
 import numpy as np
 from scipy.special import sici
 from scipy.stats import beta
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 
 
 def get_unit_prefix(value):
@@ -149,5 +151,38 @@ def Std_of_norm_from_FWHM(FWHM):
     return FWHM / (2*np.sqrt(2*np.log(2)))
 
 
+class T1_Fit():
+
+    def __init__(self,data):
+        self.data=data
+        self._A=None
+        self._B=None
+        self._T1=None
+
+    def _T1_fitfunc(self,t,A,B,T1):
+        y=A*np.exp(-t/T1)+B
+        return y
+
+    def _Fitcurve(self):
+        t,y=self.data
+        p_est, err_est=curve_fit(self._T1_fitfunc,t,y)
+        [A,B,T1]=p_est
+        self._A=A
+        self._B=B
+        self._T1=T1
+        return p_est, err_est
+
+    def Plot_Fit(self):
+        t,y=self.data
+        p_est, err_est=self._Fitcurve()
+        plt.plot(t,y,'rx')
+        plt.plot(t,self._T1_fitfunc(t,*p_est),'k--')
+        plt.show()
+
+    @property
+    def T1(self):
+        self._Fitcurve()
+        return self._T1
+    
 if __name__ == '__main__':
     pass
