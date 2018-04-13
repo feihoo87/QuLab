@@ -142,56 +142,57 @@ class Driver(BaseDriver):
                 current_waveform_size = self.query_ascii_values('WLIS:WAV:LENGTH? "%s"' % wn, 'd')[0]
         return current_waveform_size, current_waveforms
 
-    def update_waveform(self, points, name='ABS', IQ='I', mk1=None, mk2=None):
+    def update_waveform(self, points, name='ABS', IQ='I', start=0, size=None):
         w_type = self.query('WLISt:WAVeform:TYPE? "%s"' % name).strip()
         if w_type == 'REAL':
-            self._update_waveform_float(points, name, IQ)
+            self._update_waveform_float(points, name, IQ, start, size)
         elif w_type == 'IQ':
-            self._update_waveform_float(points[0], name, 'I')
-            self._update_waveform_float(points[1], name, 'Q')
+            self._update_waveform_float(points[0], name, 'I', start, size)
+            self._update_waveform_float(points[1], name, 'Q', start, size)
         else:
-            self._update_waveform_int(points, name, mk1, mk2)
+            self._update_waveform_int(points, name, start, size)
 
-    def _update_waveform_int(self, points, name='ABS', mk1=None, mk2=None):
+    def _update_waveform_int(self, points, name='ABS', start=0, size=None):
         """
         points : a 1D numpy.array which values between -1 and 1.
-        mk1, mk2: a string contain only '0' and '1'.
         """
-        message = 'WLIST:WAVEFORM:DATA "%s",' % name
+        message = 'WLIST:WAVEFORM:DATA "%s",%d' % (name, start)
+        if size is not None:
+            message = message + ('%d,' % size)
         points = points.clip(-1,1)
         values = (points * 0x1fff).astype(int) + 0x1fff
-        if mk1 is not None:
-            for i in range(min(len(mk1), len(values))):
-                if mk1[i] == '1':
-                    values[i] = values[i] + 0x4000
-        if mk2 is not None:
-            for i in range(min(len(mk2), len(values))):
-                if mk2[i] == '1':
-                    values[i] = values[i] + 0x8000
         self.write_binary_values(message, values, datatype=u'H',
                                  is_big_endian=False,
                                  termination=None, encoding=None)
 
-    def _update_waveform_float(self, points, name='ABS', IQ='I'):
+    def _update_waveform_float(self, points, name='ABS', IQ='I', start=0, size=None):
         if self.model == 'AWG5208':
-            message = 'WLIST:WAVEFORM:DATA:%s "%s",' % (IQ, name)
+            message = 'WLIST:WAVEFORM:DATA:%s "%s",%d,' % (IQ, name, start)
         else:
-            message = 'WLIST:WAVEFORM:DATA "%s",' % name
+            message = 'WLIST:WAVEFORM:DATA "%s",%d,' % (name, start)
+        if size is not None:
+            message = message + ('%d,' % size)
         values = points.clip(-1,1)
         self.write_binary_values(message, values, datatype=u'f',
                                  is_big_endian=False,
                                  termination=None, encoding=None)
 
-    def update_marker(self, name, mk1, mk2):
-        values = []
-        for i in range(len(mk1)):
-            d = 0
-            if mk1[i] == '1' or mk1[i] == 1:
-                d += 64
-            if mk2[i] == '1' or mk2[i] == 1:
-                d += 128
-            values.append(d)
-        message = 'WLIST:WAVEFORM:MARKER:DATA "%s",' % name
+    def update_marker(self, name, mk1, mk2=None, mk3=None, mk4=None, start=0, size=None):
+        def format_marker_data(markers, bits):
+            values = 0
+            for i, v in markers:
+                v = 0 if v is None else np.asarray(v)
+                values += v << bits[i]
+            return values
+
+        if self.model in ['AWG5014C']:
+            values = format_marker_data([mk1, mk2], [5,6])
+        elif self.model in ['AWG5208']:
+            values = format_marker_data([mk1, mk2, mk3, mk4], [7,6,5,4])
+        if size is None:
+            message = 'WLIST:WAVEFORM:MARKER:DATA "%s",%d,' % (name, start)
+        else:
+            message = 'WLIST:WAVEFORM:MARKER:DATA "%s",%d,%d,' % (name, start, size)
         self.write_binary_values(message, values, datatype=u'B',
                                  is_big_endian=False,
                                  termination=None, encoding=None)
