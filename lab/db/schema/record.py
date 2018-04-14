@@ -1,6 +1,6 @@
 import functools
 
-from .app import getApplication
+from .app import Application, getApplication
 from .base import *
 
 
@@ -126,7 +126,7 @@ def query_records(q=None, app=None, show_hidden=False, **kwds):
                 return query_records_by_app_name(app, show_hidden, version=kwds.pop('version', None))
             elif hasattr(app, '__DBDocument__'):
                 kwds['app'] = app.__DBDocument__
-            elif isinstance(app, _schema.Application):
+            elif isinstance(app, Application):
                 kwds['app'] = app
         if not show_hidden:
             kwds['hidden'] = False
