@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector, QList
+from lab.device import BaseDriver, QOption, QReal, QList
 
 
 class Driver(BaseDriver):
@@ -225,7 +225,7 @@ class Driver(BaseDriver):
             jump_input: ATRigger | BTRigger | OFF | ITRigger
             jump_to: <NR1> | NEXT | FIRSt | LAST | END
         """
-        if isinstance(subseq, str):
+        if isinstance(sub_name, str):
             self.write('SLIS:SEQ:STEP%d:TASS:SEQ "%s","%s"' % (step, name, sub_name))
         else:
             for i, wav in enumerate(sub_name):
