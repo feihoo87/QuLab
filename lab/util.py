@@ -152,6 +152,7 @@ def Std_of_norm_from_FWHM(FWHM):
 
 
 class T1_Fit():
+    '''Fit T1'''
 
     def __init__(self,data):
         self.data=data
@@ -159,13 +160,13 @@ class T1_Fit():
         self._B=None
         self._T1=None
 
-    def _T1_fitfunc(self,t,A,B,T1):
+    def _fitfunc(self,t,A,B,T1):
         y=A*np.exp(-t/T1)+B
         return y
 
     def _Fitcurve(self):
         t,y=self.data
-        p_est, err_est=curve_fit(self._T1_fitfunc,t,y)
+        p_est, err_est=curve_fit(self._fitfunc,t,y)
         [A,B,T1]=p_est
         self._A=A
         self._B=B
@@ -176,13 +177,13 @@ class T1_Fit():
         t,y=self.data
         p_est, err_est=self._Fitcurve()
         plt.plot(t,y,'rx')
-        plt.plot(t,self._T1_fitfunc(t,*p_est),'k--')
+        plt.plot(t,self._fitfunc(t,*p_est),'k--')
         plt.show()
 
     @property
     def T1(self):
         self._Fitcurve()
         return self._T1
-    
+
 if __name__ == '__main__':
     pass
