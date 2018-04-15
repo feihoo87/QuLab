@@ -15,6 +15,7 @@ class Driver(BaseDriver):
     quants = [
         QOption('Output',ch=1,
         set_cmd='OUTP%(ch)d %(option)s', get_cmd='OUTP%(ch)d?'
+
         options=[('OFF', 'OFF'), ('ON', 'ON')]),  # must set chanel
 
         QOption('Function',ch=1,set_cmd='SOUR%(ch)d:FUNC %(option)s',get_cmd='SOUR%(ch)d:FUNC?',
@@ -22,6 +23,7 @@ class Driver(BaseDriver):
                 ('PRNoise','PRN'),('DC','DC'),('SINC','SINC'),('Gaussian','GAUS'),
                 ('Lorentz','LOR'),('Erise','ERIS'),('Edecay','EDEC'),('Haversine','HAV'),
                 ('User','USER'),('User2','USER2')]),
+
 
         QReal('Frequency',unit='Hz',ch=1,set_cmd='SOUR%(ch)d:FREQ %(value)e%(unit)s',get_cmd='SOUR%(ch)d:FREQ?'),
         QReal('Phase',unit='rad',ch=1,set_cmd='SOUR%(ch)d:PHAS %(value)f%(unit)s',get_cmd='SOUR%(ch)d:PHAS?'),
