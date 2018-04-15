@@ -27,7 +27,10 @@ class QuerySet():
     def count(self):
         return self.query_set.count()
 
-    def display(self, start=0, stop=10, figsize=None):
+    def display(self, start=None, stop=None, figsize=None):
+        if start is None and stop is None:
+            stop=self.count()
+            start=stop-10
         self.ui.display(start, stop, figsize)
 
 def query(app=None, show_hidden=False, q=None, **kwds):

@@ -7,7 +7,7 @@ from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
 
 class Driver(BaseDriver):
-    error_command = ''
+    error_command = 'LERR?'
     support_models = ['DG645']
 
     quants = [
