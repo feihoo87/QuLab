@@ -21,19 +21,25 @@ class Quantity(object):
     def setDriver(self, driver):
         self.driver = driver
 
-    def getValue(self, ch=ch, **kw):
+    def getValue(self, ch=None, **kw):
+        if ch is None:
+            ch=self.ch
         return self.value
 
-    def setValue(self, value=value, unit=unit, ch=ch, **kw):
+    def setValue(self, value, unit=None, ch=None, **kw):
         self.value = value
+        if ch is None:
+            ch=self.ch
+        if unit is None:
+            unit=self.unit
         if self.driver is not None and self.set_cmd is not '':
             cmd = self._formatSetCmd(value, unit, ch, **kw)
             self.driver.write(cmd)
 
-    def _formatGetCmd(self, ch=ch, **kw):
+    def _formatGetCmd(self, ch, **kw):
         return self.get_cmd % dict(ch=ch,**kw)
 
-    def _formatSetCmd(self, value=value, unit=unit, ch=ch, **kw):
+    def _formatSetCmd(self, value, unit, ch, **kw):
         return self.set_cmd % dict(value=value, unit=unit, ch=ch, **kw)
 
 
@@ -47,7 +53,9 @@ class QReal(Quantity):
         unit = p+self.unit
         return '%g %s' % (value, unit)
 
-    def getValue(self, ch=ch, **kw):
+    def getValue(self, ch=None, **kw):
+        if ch is None:
+            ch=self.ch
         if self.driver is not None and self.get_cmd is not '':
             cmd = self._formatGetCmd(ch, **kw)
             res = self.driver.query_ascii_values(cmd)
@@ -59,7 +67,9 @@ class QInteger(QReal):
     def __init__(self, name, value=None, unit=None, ch=None, get_cmd='', set_cmd=''):
         Quantity.__init__(self, name, value, 'Integer', unit, ch, get_cmd=get_cmd, set_cmd=set_cmd)
 
-    def getValue(self, ch, **kw):
+    def getValue(self, ch=None, **kw):
+        if ch is None:
+            ch=self.ch
         super(QInteger, self).getValue(ch, **kw)
         return int(self.value)
 
@@ -68,7 +78,9 @@ class QString(Quantity):
     def __init__(self, name, value=None, ch=None, get_cmd='', set_cmd=''):
         super(QString, self).__init__(name, value, 'String', ch=ch, get_cmd=get_cmd, set_cmd=set_cmd)
 
-    def getValue(self, ch=ch, **kw):
+    def getValue(self, ch=None, **kw):
+        if ch is None:
+            ch=self.ch
         if self.driver is not None and self.get_cmd is not '':
             cmd = self._formatGetCmd(ch, **kw)
             res = self.driver.query(cmd)
@@ -85,8 +97,10 @@ class QOption(QString):
             self._opts[k] = v
             self._opts[v] = k
 
-    def setValue(self, value=value, ch=ch, **kw):
+    def setValue(self, value, ch=None, **kw):
         self.value = value
+        if ch is None:
+            ch=self.ch
         if self.driver is not None and self.set_cmd is not '':
             options = dict(self.options)
             if value not in options.keys():
@@ -95,8 +109,10 @@ class QOption(QString):
             cmd = self.set_cmd % dict(option = options[value], ch=ch, **kw)
             self.driver.write(cmd)
 
-    def getIndex(self, **kw):
-        value = self.getValue(**kw)
+    def getIndex(self,ch=None, **kw):
+        if ch is None:
+            ch=self.ch
+        value = self.getValue(ch,**kw)
         if value is None:
             return None
 
@@ -105,7 +121,9 @@ class QOption(QString):
                 return i
         return None
 
-    def getCmdOption(self,ch=ch, **kw):
+    def getCmdOption(self,ch=None, **kw):
+        if ch is None:
+            ch=self.ch
         value = self.getValue(ch,**kw)
         if value is None:
             return None
@@ -113,10 +131,12 @@ class QOption(QString):
 
 
 class QBool(QInteger):
-    def __init__(self, name, value=None, ch=None get_cmd='', set_cmd=''):
+    def __init__(self, name, value=None, ch=None, get_cmd='', set_cmd=''):
         Quantity.__init__(self, name, value, 'Bool', ch=ch, get_cmd=get_cmd, set_cmd=set_cmd)
 
-    def getValue(self,ch=ch, **kw):
+    def getValue(self,ch=None, **kw):
+        if ch is None:
+            ch=self.ch
         return bool(super(QBool, self).getValue(ch, **kw))
 
 
@@ -124,7 +144,9 @@ class QVector(Quantity):
     def __init__(self, name, value=None, unit=None, ch=None, get_cmd='', set_cmd=''):
         super(QVector, self).__init__(name, value, 'Vector', unit, ch, get_cmd=get_cmd, set_cmd=set_cmd)
 
-    def getValue(self,ch=ch **kw):
+    def getValue(self,ch=None, **kw):
+        if ch is None:
+            ch=self.ch
         if self.driver is not None and self.get_cmd is not '':
             cmd = self._formatGetCmd(ch,**kw)
             if kw.get('binary'):
@@ -136,5 +158,5 @@ class QVector(Quantity):
 
 
 class QList(Quantity):
-    def __init__(self, name, value=None, unit=None, ch=ch, get_cmd='', set_cmd=''):
+    def __init__(self, name, value=None, unit=None, ch=None, get_cmd='', set_cmd=''):
         super(QList, self).__init__(name, value, 'List', unit, ch, get_cmd=get_cmd, set_cmd=set_cmd)
