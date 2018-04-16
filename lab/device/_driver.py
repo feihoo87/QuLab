@@ -206,7 +206,10 @@ class BaseDriver:
     def init(self, cfg={}):
         log.debug('Init instr ...')
         for key in cfg.keys():
-            self.setValue(key, cfg[key])
+            if isinstance(cfg[key],dict):
+                self.setValue(key, **cfg[key])
+            else:
+                self.setValue(key, cfg[key])
         log.debug('Init instr ... Done')
         return self
 
