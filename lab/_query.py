@@ -31,6 +31,8 @@ class QuerySet():
         if start is None and stop is None:
             stop=self.count()
             start=stop-10
+            if start < 0:
+                start=0
         self.ui.display(start, stop, figsize)
 
 def query(app=None, show_hidden=False, q=None, **kwds):
