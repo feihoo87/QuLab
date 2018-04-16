@@ -226,7 +226,7 @@ class Rabi_Fit():
     @property
     def PPlen(self):
         self._Fitcurve()
-        _PPlen=1/self._B*1e-6
+        _PPlen=1/self._B
         return _PPlen
 
 class Ramsey_Fit():
