@@ -166,7 +166,7 @@ class T1_Fit():
 
     def _Fitcurve(self):
         t,y=self.data
-        p_est, err_est=curve_fit(self._fitfunc,t,y)
+        p_est, err_est=curve_fit(self._fitfunc,t,y,maxfev=100000)
         [A,B,T1]=p_est
         self._A=A
         self._B=B
@@ -202,7 +202,7 @@ class Rabi_Fit():
 
     def _Fitcurve(self):
         t,y=self.data
-        p_est, err_est=curve_fit(self._fitfunc,t,y)
+        p_est, err_est=curve_fit(self._fitfunc,t,y,maxfev=100000)
         [A,B,C,D,Tr]=p_est
         self._A=A
         self._B=B
@@ -232,25 +232,26 @@ class Rabi_Fit():
 class Ramsey_Fit():
     '''Fit Ramsey'''
 
-    def __init__(self,data,T1,delta):
+    def __init__(self,data,T1):
         self.data=data
         self._T1=T1
-        self._delta=delta
+        self._delta=None
         self._A=None
         self._B=None
         self._T_phi=None
 
-    def _fitfunc(self,t,A,B,T_phi):
-        y=A*np.exp(-t/2/self._T1-np.square(t/T_phi))*np.cos(self._delta*t)+B
+    def _fitfunc(self,t,A,B,T_phi,delta):
+        y=A*np.exp(-t/2/self._T1-np.square(t/T_phi))*np.cos(delta*t)+B
         return y
 
     def _Fitcurve(self):
         t,y=self.data
-        p_est, err_est=curve_fit(self._fitfunc,t,y)
-        [A,B,T_phi]=p_est
+        p_est, err_est=curve_fit(self._fitfunc,t,y,maxfev=100000)
+        [A,B,T_phi,delta]=p_est
         self._A=A
         self._B=B
         self._T_phi=T_phi
+        self._delta=delta
         return p_est, err_est
 
     def Plot_Fit(self):
@@ -281,7 +282,7 @@ class Spinecho_Fit():
 
     def _Fitcurve(self):
         t,y=self.data
-        p_est, err_est=curve_fit(self._fitfunc,t,y)
+        p_est, err_est=curve_fit(self._fitfunc,t,y,maxfev=100000)
         [A,B,T_2E]=p_est
         self._A=A
         self._B=B
