@@ -63,7 +63,7 @@ class BaseDriver:
         while True:
             s = self.ins.query(self.error_command)
             _ = s[:-1].split(',"')
-            code = string.atoi(_[0])
+            code = int(_[0])
             msg = _[1]
             if code == 0:
                 break
