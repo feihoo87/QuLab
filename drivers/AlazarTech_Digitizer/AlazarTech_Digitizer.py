@@ -5,7 +5,7 @@ import numpy as np
 from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
 from .AlazarCmd import *
-from .AlazarTech_Wrapper import AlazarTechDigitizer
+from .AlazarTech_Wrapper import AlazarTechDigitizer, getInputRange
 
 logger = logging.getLogger('qulab.drivers.ATS')
 
@@ -90,16 +90,26 @@ class Driver(BaseDriver):
         BaseDriver.__init__(self, **kw)
         self.systemID = kw['systemID']
         self.boardID = kw['boardID']
-        self.dig = None
+        self.__dig = None
         self.config_updated = False
         self.dt = 1E-9
 
-    def __load_wrapper(self):
-        if self.dig is None:
-            self.dig = AlazarTechDigitizer(self.systemID, self.boardID)
+    @property
+    def dig(self):
+        from .AlazarTech_Wrapper import AlazarTechDigitizer
+        if self.__dig is None:
+            self.__dig = AlazarTechDigitizer(self.systemID, self.boardID)
+        return self.__dig
+
+    def testLED(self):
+        self.dig.testLED()
+
+    def setLEDOn(self, on=True):
+        self.dig.setLEDOn(on)
 
     def set_configs(self):
         """Set digitizer configuration based on driver settings"""
+        from .AlazarTech_Wrapper import getInputRange
         if self.config_updated:
             return
         logger.debug('set config ...')
@@ -122,8 +132,8 @@ class Driver(BaseDriver):
             chIds = {'A': CHANNEL_A, 'B': CHANNEL_B}
             chId = chIds[ch]
             Coupling = self.getCmdOption('%s Coupling' % ch)
-            InputRange = self.dig.get_input_range(
-                self.getValue('%s Range' % ch))
+            InputRange = getInputRange(
+                self.getValue('%s Range' % ch), self.model)
             Impedance = self.getCmdOption('%s Term' % ch)
             self.dig.AlazarInputControl(chId, Coupling, InputRange, Impedance)
             # bandwidth limit
@@ -145,18 +155,12 @@ class Driver(BaseDriver):
         for egn in ['J', 'K']:
             sour = self.getValue('%s Source' % egn)
             trigLevel = self.getValue('%s Level' % egn)
-            Amp = {
-                INPUT_RANGE_PM_4_V: 4.0, INPUT_RANGE_PM_2_V: 2.0,
-                INPUT_RANGE_PM_1_V: 1.0, INPUT_RANGE_PM_400_MV: 0.4,
-                INPUT_RANGE_PM_200_MV: 0.2, INPUT_RANGE_PM_100_MV: 0.1,
-                INPUT_RANGE_PM_40_MV: 0.04
-            }
             if sour == 'ChA':
-                maxLevel = Amp[self.dig.get_input_range(
-                    self.getValue('A Range'))]
+                maxLevel = getInputRange(
+                    self.getValue('A Range'), self.model, returnNum=True)
             elif sour == 'ChB':
-                maxLevel = Amp[self.dig.get_input_range(
-                    self.getValue('B Range'))]
+                maxLevel = getInputRange(
+                    self.getValue('B Range'), self.model, returnNum=True)
             elif sour == 'External':
                 maxLevel = 5.0
             if abs(trigLevel) > maxLevel:
@@ -185,12 +189,10 @@ class Driver(BaseDriver):
         self.config_updated = False
 
     def performGetValue(self, quant, **kw):
-        self.__load_wrapper()
         # self.set_configs()
         return quant.getValue(**kw)
 
     def errors(self):
-        self.__load_wrapper()
         ret = []
         try:
             while True:
@@ -201,24 +203,32 @@ class Driver(BaseDriver):
         return []
 
     def getTraces_DMA(self, samplesPerRecord=1024, pre=0, repeats=1000,
-                      procces=None, beforeCapture=None, timeout=10, sum=False):
-        self.__load_wrapper()
+                      procces=None, timeout=10, sum=False):
         self.set_configs()
         a, b = self.dig.get_Traces_DMA(
-            pre, samplesPerRecord-pre, repeats, procces, beforeCapture, timeout, sum)
+            pre, samplesPerRecord-pre, repeats, procces, timeout, sum)
         #a, b = self.dig.get_Traces_NPT(samplesPerRecord, repeats, procces, timeout)
         return np.asarray(a), np.asarray(b)
 
     def setHeterodyneFrequency(self, samplesPerRecord, heterodyne_freq=[]):
         Exp = []
-        t = np.arange(0, samplesPerRecord, 1) * 1e-9
+        sampleRate = {
+            '1k': 1e3, '2k': 2e3, '5k': 5e3, '10k': 10e3,
+            '20k': 20e3, '50k': 50e3, '100k': 100e3, '200k': 200e3,
+            '500k': 500e3, '1M': 1e6, '2M': 2e6, '5M': 5e6,
+            '10M': 10e6, '20M': 20e6, '25M': 25e6, '50M': 50e6,
+            '100M': 100e6, '125M': 125e6, '160M': 160e6, '180M': 180e6,
+            '200M': 200e6, '250M': 250e6, '400M': 400e6, '500M': 500e6,
+            '800M': 800e6, '1G': 1e9, '1200M': 1.2e9, '1500M': 1.5e9,
+            '1600M': 1.6e9, '1800M': 1.8e9, '2G': 2e9,
+        }[self.getValue('Sample Rate')]
+        t = np.arange(0, samplesPerRecord, 1) / sampleRate
         for f in heterodyne_freq:
             Exp.append(np.exp(1j*2*np.pi*f*t))
         self._Exp = np.asarray(Exp).T
 
     def getFFT(self, samplesPerRecord=1024, pre=0, repeats=1000, heterodyne_freq=None,
-               beforeCapture=None, timeout=10):
-        self.__load_wrapper()
+               timeout=10):
         self.set_configs()
         n = samplesPerRecord
         if heterodyne_freq is not None:
@@ -228,5 +238,5 @@ class Driver(BaseDriver):
             return ch1[:n].dot(e).T/n, ch2[:n].dot(e).T/n
 
         A, B = self.dig.get_Traces_DMA(
-            pre, samplesPerRecord-pre, repeats, procces, beforeCapture, timeout)
+            pre, samplesPerRecord-pre, repeats, procces, timeout)
         return np.asarray(A), np.asarray(B)

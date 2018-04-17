@@ -27,6 +27,53 @@ ADMA_FIFO_ONLY_STREAMING = 0x00000800  # ATS9462 mode
 ADMA_INTERLEAVE_SAMPLES = 0x00001000
 ADMA_GET_PROCESSED_DATA = 0x00002000
 
+inputConv = {
+    INPUT_RANGE_PM_20_MV: 0.02,
+    INPUT_RANGE_PM_40_MV: 0.04,
+    INPUT_RANGE_PM_50_MV: 0.05,
+    INPUT_RANGE_PM_80_MV: 0.08,
+    INPUT_RANGE_PM_100_MV: 0.1,
+    INPUT_RANGE_PM_200_MV: 0.2,
+    INPUT_RANGE_PM_400_MV: 0.4,
+    INPUT_RANGE_PM_500_MV: 0.5,
+    INPUT_RANGE_PM_800_MV: 0.8,
+    INPUT_RANGE_PM_1_V: 1.0,
+    INPUT_RANGE_PM_2_V: 2.0,
+    INPUT_RANGE_PM_4_V: 4.0,
+    INPUT_RANGE_PM_5_V: 5.0,
+    INPUT_RANGE_PM_8_V: 8.0,
+    INPUT_RANGE_PM_10_V: 10.0,
+    INPUT_RANGE_PM_20_V: 20.0,
+    INPUT_RANGE_PM_40_V: 40.0,
+    INPUT_RANGE_PM_16_V: 16.0,
+    # INPUT_RANGE_HIFI	=	0x00000020
+    INPUT_RANGE_PM_1_V_25: 1.25,
+    INPUT_RANGE_PM_2_V_5: 2.5,
+    INPUT_RANGE_PM_125_MV: 0.125,
+    INPUT_RANGE_PM_250_MV: 0.25
+}
+
+def getInputRange(maxInput, model, impedance='50 Ohm', returnNum=False):
+    if model in ['ATS9325', 'ATS9350', 'ATS9850', 'ATS9870']:
+        available = [
+            INPUT_RANGE_PM_40_MV, INPUT_RANGE_PM_100_MV, INPUT_RANGE_PM_200_MV,
+            INPUT_RANGE_PM_400_MV, INPUT_RANGE_PM_1_V, INPUT_RANGE_PM_2_V,
+            INPUT_RANGE_PM_4_V
+        ]
+    elif model in ['ATS9351', 'ATS9360']:
+        available = [INPUT_RANGE_PM_400_MV]
+
+    for k in available:
+        if inputConv[k] >= maxInput:
+            ret = k
+            break
+    else:
+        ret = available[-1]
+    if returnNum:
+        ret = inputConv[ret]
+
+    return ret
+
 
 class AlazarTechError(Exception):
     def __init__(self, code, msg):
@@ -93,6 +140,12 @@ class AlazarTechDigitizer():
         self.callFunc('AlazarSetLED', self.handle, LED_ON)
         time.sleep(0.1)
         self.callFunc('AlazarSetLED', self.handle, LED_OFF)
+
+    def setLEDOn(self, on=True):
+        if on:
+            self.callFunc('AlazarSetLED', self.handle, LED_ON)
+        else:
+            self.callFunc('AlazarSetLED', self.handle, LED_OFF)
 
     def getError(self, status):
         """Convert the error in status to a string"""
@@ -167,32 +220,7 @@ class AlazarTechDigitizer():
     # RETURN_CODE AlazarInputControl( HANDLE h, U8 Channel, U32 Coupling, U32 InputRange, U32 Impedance);
     def AlazarInputControl(self, Channel, Coupling, InputRange, Impedance):
         # keep track of input range
-        dConv = {
-            INPUT_RANGE_PM_20_MV: 0.02,
-            INPUT_RANGE_PM_40_MV: 0.04,
-            INPUT_RANGE_PM_50_MV: 0.05,
-            INPUT_RANGE_PM_80_MV: 0.08,
-            INPUT_RANGE_PM_100_MV: 0.1,
-            INPUT_RANGE_PM_200_MV: 0.2,
-            INPUT_RANGE_PM_400_MV: 0.4,
-            INPUT_RANGE_PM_500_MV: 0.5,
-            INPUT_RANGE_PM_800_MV: 0.8,
-            INPUT_RANGE_PM_1_V: 1.0,
-            INPUT_RANGE_PM_2_V: 2.0,
-            INPUT_RANGE_PM_4_V: 4.0,
-            INPUT_RANGE_PM_5_V: 5.0,
-            INPUT_RANGE_PM_8_V: 8.0,
-            INPUT_RANGE_PM_10_V: 10.0,
-            INPUT_RANGE_PM_20_V: 20.0,
-            INPUT_RANGE_PM_40_V: 40.0,
-            INPUT_RANGE_PM_16_V: 16.0,
-            # INPUT_RANGE_HIFI	=	0x00000020
-            INPUT_RANGE_PM_1_V_25: 1.25,
-            INPUT_RANGE_PM_2_V_5: 2.5,
-            INPUT_RANGE_PM_125_MV: 0.125,
-            INPUT_RANGE_PM_250_MV: 0.25
-        }
-        self.dRange[Channel] = dConv[InputRange]
+        self.dRange[Channel] = inputConv[InputRange]
         self.callFunc('AlazarInputControl', self.handle,
                       Channel, Coupling, InputRange, Impedance)
 
@@ -231,53 +259,25 @@ class AlazarTechDigitizer():
                       ChannelId, ParameterId, Value)
         return Value.value
 
-    def get_input_range(self, max_input):
-        input_range = INPUT_RANGE_PM_4_V
-        if max_input <= 2.0:
-            input_range = INPUT_RANGE_PM_2_V
-        if max_input <= 1.0:
-            input_range = INPUT_RANGE_PM_1_V
-        if max_input <= 0.4:
-            input_range = INPUT_RANGE_PM_400_MV
-        if max_input <= 0.2:
-            input_range = INPUT_RANGE_PM_200_MV
-        if max_input <= 0.1:
-            input_range = INPUT_RANGE_PM_100_MV
-        if max_input <= 0.04:
-            input_range = INPUT_RANGE_PM_40_MV
-        return input_range
-
-    def init(self, max_ChA=1.0, max_ChB=1.0):
-        self.AlazarSetCaptureClock(
-            SourceId=EXTERNAL_CLOCK_10MHz_REF, SampleRateId=SAMPLE_RATE_1GSPS)
-        self.AlazarInputControl(CHANNEL_A, DC_COUPLING,
-                                self.get_input_range(max_ChA), IMPEDANCE_50_OHM)
-        self.AlazarInputControl(CHANNEL_B, DC_COUPLING,
-                                self.get_input_range(max_ChB), IMPEDANCE_50_OHM)
-        self.AlazarSetExternalTrigger(DC_COUPLING)
-        self.AlazarSetTriggerOperation(TriggerOperation=TRIG_ENGINE_OP_J,
-                                       TriggerEngine1=TRIG_ENGINE_J, Source1=TRIG_EXTERNAL,
-                                       Slope1=TRIGGER_SLOPE_POSITIVE, Level1=int(
-                                           128+127*0.5/5.0),
-                                       TriggerEngine2=TRIG_ENGINE_K, Source2=TRIG_DISABLE,
-                                       Slope2=TRIGGER_SLOPE_POSITIVE, Level2=128)
-
     def get_Traces_DMA(self, preTriggerSamples=0, postTriggerSamples=1024, repeats=1000,
-                       procces=None, beforeCapture=None, timeout=1, sum=False):
+                       procces=None, timeout=1, sum=False):
         samplesPerRecord = preTriggerSamples+postTriggerSamples
         recordsPerBuffer = 2
         recordsPerAcquisition = repeats*2
         _, bitsPerSample = self.AlazarGetChannelInfo()
+        bytesPerSample = (bitsPerSample + 7) // 8
+
+        dtype = c_uint8 if bytesPerSample == 1 else c_uint16
 
         uFlags = ADMA_TRADITIONAL_MODE | ADMA_ALLOC_BUFFERS | ADMA_EXTERNAL_STARTCAPTURE
-        codeZero = 2 ** (float(bitsPerSample) - 1) - 0.5
-        codeRange = 2 ** (float(bitsPerSample) - 1) - 0.5
+        codeZero = 1 << (bitsPerSample - 1)
+        codeRange = 1 << (bitsPerSample - 1)
         bytesPerHeader = 0
-        lenPerRecord = samplesPerRecord+bytesPerHeader
-        BytesPerBuffer = (lenPerRecord)*recordsPerBuffer
+        bytesPerRecord = bytesPerSample * samplesPerRecord + bytesPerHeader
+        bytesPerBuffer = bytesPerRecord * recordsPerBuffer
         scaleA, scaleB = self.dRange[CHANNEL_A]/codeRange, self.dRange[CHANNEL_B]/codeRange
 
-        Buffer = (c_uint8*BytesPerBuffer)()
+        Buffer = (dtype*(samplesPerRecord*recordsPerBuffer))()
 
         if procces is None and sum == True:
             A, B = np.zeros(samplesPerRecord), np.zeros(samplesPerRecord)
@@ -286,14 +286,12 @@ class AlazarTechDigitizer():
 
         time_out_ms = int(1000*timeout)
 
+        self.AlazarSetParameter(0, SET_DATA_FORMAT, DATA_FORMAT_UNSIGNED)
         self.AlazarBeforeAsyncRead(CHANNEL_A | CHANNEL_B,
                                    -preTriggerSamples, samplesPerRecord, recordsPerBuffer,
                                    recordsPerAcquisition,
                                    uFlags)
         self.check_errors()
-
-        if beforeCapture is not None:
-            beforeCapture()
 
         self.AlazarStartCapture()
         self.check_errors()
@@ -301,12 +299,12 @@ class AlazarTechDigitizer():
         try:
             for i in range(repeats):
                 self.AlazarWaitNextAsyncBufferComplete(
-                    Buffer, BytesPerBuffer, time_out_ms)
-                # RETURN_CODE.ApiTransferComplete
-                self.check_errors(ignores=[589])
-                data = np.array(Buffer)-codeZero
-                ch1, ch2 = scaleA * \
-                    data[:lenPerRecord], scaleB*data[lenPerRecord:]
+                    Buffer, bytesPerBuffer, time_out_ms)
+                self.check_errors(ignores=[RETURN_CODE.ApiTransferComplete])
+                data = np.array(Buffer, dtype=np.float)
+                data -= codeZero
+                ch1, ch2 = scaleA * data[:samplesPerRecord],\
+                           scaleB * data[samplesPerRecord:]
                 if procces is None and sum == False:
                     A.append(ch1[:samplesPerRecord])
                     B.append(ch2[:samplesPerRecord])

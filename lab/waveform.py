@@ -51,12 +51,12 @@ class Waveform():
         x = mask*(x-self._time_shift)+self.__a_point_in_calc_domain()*(fmask+bmask)
         return fmask*self._outside[0] + bmask*self._outside[1] + mask*self.calc(x)
 
-    def generateData(self, sampleRate, t_range=None):
-        if t_range is None:
-            x = np.arange(self._domain[0], self._domain[1], 1.0/sampleRate)
+    def generateData(self, sampleRate, with_x=False):
+        x = np.arange(self._domain[0], self._domain[1], 1.0/sampleRate)
+        if with_x:
+            return x, self._calc(x)
         else:
-            x = np.arange(t_range[0], t_range[1], 1.0/sampleRate)
-        return x, self._calc(x)
+            return self._calc(x)
 
     def _comb_waveform(self, other):
         domain = _comb_domain(self._domain, other._domain)
@@ -68,6 +68,9 @@ class Waveform():
         #w._calc_domain = self._comb_calc_domain(other)
         #w._time_shift = self._time_shift
         return w
+
+    def __call__(self, x):
+        return self._calc(x)
 
     def __add__(self, other):
         if isinstance(other, Waveform):
@@ -200,7 +203,7 @@ class Waveform():
 
     def plot(self, n=1000):
         sampleRate = n/self.len()
-        x, y = self.generateData(sampleRate)
+        x, y = self.generateData(sampleRate, with_x=True)
         plt.plot(x, y)
 
 class DC(Waveform):
@@ -280,7 +283,7 @@ if __name__ == "__main__":
     (squid-8).set_range(-1.5,1.5).plot()
     (sq-10).set_range(-1.5,1.5).plot()
     (sq-10.3+0).set_range(-1.5,1.5).plot()
-    x,y = sq.set_range(-1.5,1.5).generateData(sampleRate=2000)
+    x,y = sq.set_range(-1.5,1.5).generateData(sampleRate=2000, with_x=True)
     plt.plot(x,y-10.6)
     (igauss-12).set_range(-1.5,1.5).plot()
     (sqA-14).set_range(-1.5,1.5).plot()
