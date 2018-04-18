@@ -5,6 +5,7 @@ import functools
 import importlib
 import os
 import sys
+import time
 import tokenize
 from collections import Awaitable, Iterable, OrderedDict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
@@ -153,13 +154,16 @@ class Application(HasSource):
             if self.parent is None:
                 self.interrupt_event.set()
 
-    def run(self):
+    def run(self, block=False):
         if self.ui is None:
             self.ui = ApplicationUI(self)
             self.ui.display()
         loop = asyncio.get_event_loop()
         if loop.is_running():
             future = asyncio.ensure_future(self.done())
+            if block:
+                while not future.done():
+                    time.sleep(1)
         else:
             with ThreadPoolExecutor() as executor:
                 loop = asyncio.new_event_loop()
