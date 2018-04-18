@@ -59,7 +59,7 @@ class QuerySetUI():
         </style>'''
 
         table_head = '''<table class="output_html rendered_html"><thead>
-        <tr><th>Index</th><th style="text-align:left">Time</th>
+        <tr><th>Index</th><th>ID</th><th style="text-align:left">Time</th>
         <th style="text-align:left">Title</th><th style="text-align:left">User</th>
         <th>Tags</th><th>Parameters</th><th>Image</th></tr></thead><tbody>'''
 
@@ -89,6 +89,7 @@ class QuerySetUI():
             return html
 
         return '''<tr><td>%(index)d</td>
+            <td>%(ID)r</td>
             <td style="text-align:left">%(time)s</td>
             <td style="text-align:left">%(title)s</td>
             <td style="text-align:left">%(user)s</td>
@@ -96,6 +97,7 @@ class QuerySetUI():
             <td>%(params)s</td>
             <td>%(image)s</td></tr>''' % {
             'index': i,
+            'ID': record.id,
             'time': record.finished_time.strftime('%Y-%m-%d %H:%M:%S'),
             'title': record.title,
             'tags': tags_html(record.tags),
