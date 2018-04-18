@@ -42,6 +42,8 @@ class Application(HasSource):
         self.run_event = asyncio.Event()
         self.interrupt_event = asyncio.Event()
         self.__title = None
+        self._setUp = lambda : None
+        self._tearDown = lambda : None
 
         if parent is not None:
             self.rc.parent = parent.rc
@@ -190,6 +192,7 @@ class Application(HasSource):
     async def done(self):
         self.reset()
         self._set_start()
+        self._setUp()
         async for data in self.work():
             self.data.collect(data)
             result = self.data.result()
@@ -200,7 +203,16 @@ class Application(HasSource):
                 break
             await self.run_event.wait()
         self._set_done()
+        self._tearDown()
         return self.data.result()
+
+    def setUp(self, f):
+        self._setUp = f
+        return self
+
+    def tearDown(self, f):
+        self._tearDown = f
+        return self
 
     async def work(self):
         """Overwrite this method to define your work.
