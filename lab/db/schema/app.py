@@ -55,7 +55,7 @@ def getApplication(name='',
         kwds = {'id': id}
     elif isinstance(version, str):
         try:
-            nums = [int(s) for version in tag.split('.')]
+            nums = [int(s) for s in version.split('.')]
             kwds['version.major'] = nums[0]
             if len(nums) > 1:
                 kwds['version.minor'] = nums[1]

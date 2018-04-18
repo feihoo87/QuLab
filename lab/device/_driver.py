@@ -63,7 +63,7 @@ class BaseDriver:
         while True:
             s = self.ins.query(self.error_command)
             _ = s[:-1].split(',"')
-            code = string.atoi(_[0])
+            code = int(_[0])
             msg = _[1]
             if code == 0:
                 break
@@ -206,7 +206,10 @@ class BaseDriver:
     def init(self, cfg={}):
         log.debug('Init instr ...')
         for key in cfg.keys():
-            self.setValue(key, cfg[key])
+            if isinstance(cfg[key],dict):
+                self.setValue(key, **cfg[key])
+            else:
+                self.setValue(key, cfg[key])
         log.debug('Init instr ... Done')
         return self
 
