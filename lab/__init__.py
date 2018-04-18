@@ -7,4 +7,5 @@ from ._bootstrap import (connect_db, get_current_notebook, get_current_user,
                          save_inputCells, set_mode)
 from ._plot import imshow, make_figure_for_app, make_figures_for_App, plot
 from ._query import query
+from ._unit import unit
 from ._version import __version__

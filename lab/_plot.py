@@ -110,11 +110,15 @@ def plot(fig, *args, xlabel='x (a.u.)', ylabel='y (a.u.)', **kwds):
 def imshow(fig, x, y, z, xlabel='x (a.u.)', ylabel='y (a.u.)', zlabel='z (a.u.)'):
     ax = fig.add_subplot(111)
 
-    if isinstance(y, np.ndarray):
+    if isinstance(x, np.ndarray) and isinstance(y, np.ndarray):
         ax.imshow(z, extent=(min(x), max(x), min(y), max(y)),
                      aspect='auto', origin='lower', interpolation='nearest')
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
+    elif isinstance(y, np.ndarray):
+        ax.plot(y, z)
+        ax.set_xlabel(ylabel)
+        ax.set_ylabel(zlabel)
     else:
         ax.plot(x, z)
         ax.set_xlabel(xlabel)

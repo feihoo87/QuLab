@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-
 from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
 
@@ -38,9 +37,35 @@ class Driver(BaseDriver):
           set_cmd='INST CH3;CURR %(value).13e',
           get_cmd='MEAS:CURR? CH3'),
 
+        QReal('Voltage', unit='V',
+          #set_cmd='SYST:REM;INST CH3;VOLT %(value).13e'
+          set_cmd='INST CH%(ch)d;VOLT %(value).13e',
+          get_cmd='MEAS? CH%(ch)d'),
+
+        QReal('Current', unit='A',
+          #set_cmd='SYST:REM;INST CH3;CURR %(value).13e'
+          set_cmd='INST CH%(ch)d;CURR %(value).13e',
+          get_cmd='MEAS:CURR? CH%(ch)d'),
+
+        QReal('Voltage Limit', unit='V',
+          set_cmd='INST CH%(ch)d;VOLT %(value).13e',
+          get_cmd='INST CH%(ch)d;VOLT?'),
+
+        QReal('Current Limit', unit='A',
+          set_cmd='INST CH%(ch)d;CURR %(value).13e',
+          get_cmd='INST CH%(ch)d;CURR?'),
+
         QOption('Output',
-          set_cmd='OUTP %(option)s', options=[('OFF', 'OFF'), ('ON', 'ON')]),
+          set_cmd='OUTP %(option)s', get_cmd='OUTP:STAT?',
+          options=[('OFF', '0'), ('ON', '1')]),
+
+        QOption('Combine',
+          set_cmd='INST:COM:%(option)s', get_cmd='INST:COM?',
+          options=[('Parallel', 'Parallel') ,('Series','Series'), ('OFF', 'OFF')]),
     ]
 
     def performOpen(self):
         self.write('SYST:REM')
+
+    def performClose(self):
+        self.write('SYST:LOC')

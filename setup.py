@@ -38,7 +38,8 @@ requirements = [
     'blinker>=1.4',
     'pyvisa>=1.8',
     'pyvisa-py>=0.2',
-    'PyYAML>=3.12'
+    'PyYAML>=3.12',
+    'quantities>=0.12.1',
 ]
 
 setup(

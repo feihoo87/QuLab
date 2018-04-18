@@ -1,6 +1,6 @@
 import functools
 
-from .app import getApplication
+from .app import Application, getApplication
 from .base import *
 
 
@@ -114,20 +114,20 @@ def query_records_by_app_name(app_name, show_hidden=False, version=None):
         rec_q['app__in'].append(app)
     if not show_hidden:
         rec_q['hidden'] = False
-    return Record.objects(**rec_q).order_by('-finished_time')
+    return Record.objects(**rec_q).order_by('+finished_time')
 
 
 def query_records(q=None, app=None, show_hidden=False, **kwds):
     if q is not None:
-        return Record.objects(q).order_by('-finished_time')
+        return Record.objects(q).order_by('+finished_time')
     else:
         if app is not None:
             if isinstance(app, str):
                 return query_records_by_app_name(app, show_hidden, version=kwds.pop('version', None))
             elif hasattr(app, '__DBDocument__'):
                 kwds['app'] = app.__DBDocument__
-            elif isinstance(app, _schema.Application):
+            elif isinstance(app, Application):
                 kwds['app'] = app
         if not show_hidden:
             kwds['hidden'] = False
-        return Record.objects(**kwds).order_by('-finished_time')
+        return Record.objects(**kwds).order_by('+finished_time')
