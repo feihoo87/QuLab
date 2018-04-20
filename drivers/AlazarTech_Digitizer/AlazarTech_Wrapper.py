@@ -268,16 +268,18 @@ class AlazarTechDigitizer():
         recordsPerBuffer = 2
         recordsPerAcquisition = repeats*2
         _, bitsPerSample = self.AlazarGetChannelInfo()
+        bytesPerSample = (bitsPerSample + 7) // 8
 
         uFlags = ADMA_TRADITIONAL_MODE | ADMA_ALLOC_BUFFERS | ADMA_EXTERNAL_STARTCAPTURE
-        codeZero = 2 ** (float(bitsPerSample) - 1) - 0.5
-        codeRange = 2 ** (float(bitsPerSample) - 1) - 0.5
+        codeZero = float(1 << (bitsPerSample - 1))
+        codeRange = 1 << (bitsPerSample - 1)
         bytesPerHeader = 0
         lenPerRecord = samplesPerRecord+bytesPerHeader
-        BytesPerBuffer = (lenPerRecord)*recordsPerBuffer
+        bytesPerRecord = bytesPerSample*lenPerRecord
+        bytesPerBuffer = bytesPerRecord*recordsPerBuffer
         scaleA, scaleB = self.dRange[CHANNEL_A]/codeRange, self.dRange[CHANNEL_B]/codeRange
 
-        Buffer = (c_uint8*BytesPerBuffer)()
+        Buffer = (c_uint8*bytesPerBuffer)()
 
         if procces is None and sum == True:
             A, B = np.zeros(samplesPerRecord), np.zeros(samplesPerRecord)
@@ -301,12 +303,15 @@ class AlazarTechDigitizer():
         try:
             for i in range(repeats):
                 self.AlazarWaitNextAsyncBufferComplete(
-                    Buffer, BytesPerBuffer, time_out_ms)
+                    Buffer, bytesPerBuffer, time_out_ms)
                 # RETURN_CODE.ApiTransferComplete
                 self.check_errors(ignores=[589])
-                data = np.array(Buffer)-codeZero
-                ch1, ch2 = scaleA * \
-                    data[:lenPerRecord], scaleB*data[lenPerRecord:]
+                buff = np.asarray(Buffer)
+                data = buff[::bytesPerSample]
+                for i in range(bytesPerSample-1):
+                    data = (data << 8) + buff[i+1::bytesPerSample]
+                ch1, ch2 = scaleA * (data[:lenPerRecord] - codeZero),\
+                           scaleB * (data[lenPerRecord:] - codeZero)
                 if procces is None and sum == False:
                     A.append(ch1[:samplesPerRecord])
                     B.append(ch2[:samplesPerRecord])
