@@ -5,7 +5,7 @@ import numpy as np
 from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
 from .AlazarCmd import *
-from .AlazarTech_Wrapper import AlazarTechDigitizer
+from .AlazarTech_Wrapper import AlazarTechDigitizer, getInputRange
 
 logger = logging.getLogger('qulab.drivers.ATS')
 
@@ -122,8 +122,8 @@ class Driver(BaseDriver):
             chIds = {'A': CHANNEL_A, 'B': CHANNEL_B}
             chId = chIds[ch]
             Coupling = self.getCmdOption('%s Coupling' % ch)
-            InputRange = self.dig.get_input_range(
-                self.getValue('%s Range' % ch))
+            InputRange = getInputRange(
+                self.getValue('%s Range' % ch), self.model)
             Impedance = self.getCmdOption('%s Term' % ch)
             self.dig.AlazarInputControl(chId, Coupling, InputRange, Impedance)
             # bandwidth limit
@@ -145,18 +145,12 @@ class Driver(BaseDriver):
         for egn in ['J', 'K']:
             sour = self.getValue('%s Source' % egn)
             trigLevel = self.getValue('%s Level' % egn)
-            Amp = {
-                INPUT_RANGE_PM_4_V: 4.0, INPUT_RANGE_PM_2_V: 2.0,
-                INPUT_RANGE_PM_1_V: 1.0, INPUT_RANGE_PM_400_MV: 0.4,
-                INPUT_RANGE_PM_200_MV: 0.2, INPUT_RANGE_PM_100_MV: 0.1,
-                INPUT_RANGE_PM_40_MV: 0.04
-            }
             if sour == 'ChA':
-                maxLevel = Amp[self.dig.get_input_range(
-                    self.getValue('A Range'))]
+                maxLevel = getInputRange(
+                    self.getValue('A Range'), self.model, returnNum=True)
             elif sour == 'ChB':
-                maxLevel = Amp[self.dig.get_input_range(
-                    self.getValue('B Range'))]
+                maxLevel = getInputRange(
+                    self.getValue('B Range'), self.model, returnNum=True)
             elif sour == 'External':
                 maxLevel = 5.0
             if abs(trigLevel) > maxLevel:
