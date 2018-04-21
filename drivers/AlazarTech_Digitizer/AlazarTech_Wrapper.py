@@ -261,16 +261,17 @@ class AlazarTechDigitizer():
         _, bitsPerSample = self.AlazarGetChannelInfo()
         bytesPerSample = (bitsPerSample + 7) // 8
 
+        dtype = c_uint8 if bytesPerSample == 1 else c_uint16
+
         uFlags = ADMA_TRADITIONAL_MODE | ADMA_ALLOC_BUFFERS | ADMA_EXTERNAL_STARTCAPTURE
-        codeZero = float(1 << (bitsPerSample - 1))
+        codeZero = 1 << (bitsPerSample - 1)
         codeRange = 1 << (bitsPerSample - 1)
         bytesPerHeader = 0
-        lenPerRecord = samplesPerRecord+bytesPerHeader
-        bytesPerRecord = bytesPerSample*lenPerRecord
-        bytesPerBuffer = bytesPerRecord*recordsPerBuffer
+        bytesPerRecord = bytesPerSample * samplesPerRecord + bytesPerHeader
+        bytesPerBuffer = bytesPerRecord * recordsPerBuffer
         scaleA, scaleB = self.dRange[CHANNEL_A]/codeRange, self.dRange[CHANNEL_B]/codeRange
 
-        Buffer = (c_uint8*bytesPerBuffer)()
+        Buffer = (dtype*samplesPerRecord)()
 
         if procces is None and sum == True:
             A, B = np.zeros(samplesPerRecord), np.zeros(samplesPerRecord)
@@ -297,12 +298,9 @@ class AlazarTechDigitizer():
                     Buffer, bytesPerBuffer, time_out_ms)
                 # RETURN_CODE.ApiTransferComplete
                 self.check_errors(ignores=[589])
-                buff = np.asarray(Buffer)
-                data = buff[::bytesPerSample]
-                for i in range(bytesPerSample-1):
-                    data = (data << 8) + buff[i+1::bytesPerSample]
-                ch1, ch2 = scaleA * (data[:lenPerRecord] - codeZero),\
-                           scaleB * (data[lenPerRecord:] - codeZero)
+                data = np.asarray(Buffer)
+                ch1, ch2 = scaleA * (data[:samplesPerRecord] - codeZero),\
+                           scaleB * (data[samplesPerRecord:] - codeZero)
                 if procces is None and sum == False:
                     A.append(ch1[:samplesPerRecord])
                     B.append(ch2[:samplesPerRecord])
