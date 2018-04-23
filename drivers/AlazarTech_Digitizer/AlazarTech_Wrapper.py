@@ -271,7 +271,7 @@ class AlazarTechDigitizer():
         bytesPerBuffer = bytesPerRecord * recordsPerBuffer
         scaleA, scaleB = self.dRange[CHANNEL_A]/codeRange, self.dRange[CHANNEL_B]/codeRange
 
-        Buffer = (dtype*samplesPerRecord)()
+        Buffer = (dtype*(samplesPerRecord*recordsPerBuffer))()
 
         if procces is None and sum == True:
             A, B = np.zeros(samplesPerRecord), np.zeros(samplesPerRecord)
@@ -279,6 +279,8 @@ class AlazarTechDigitizer():
             A, B = [], []
 
         time_out_ms = int(1000*timeout)
+
+        self.AlazarSetParameter(0, SET_DATA_FORMAT, DATA_FORMAT_UNSIGNED)
 
         self.AlazarBeforeAsyncRead(CHANNEL_A | CHANNEL_B,
                                    -preTriggerSamples, samplesPerRecord, recordsPerBuffer,
@@ -298,7 +300,7 @@ class AlazarTechDigitizer():
                     Buffer, bytesPerBuffer, time_out_ms)
                 # RETURN_CODE.ApiTransferComplete
                 self.check_errors(ignores=[589])
-                data = np.asarray(Buffer)
+                data = np.array(Buffer, dtype=np.float)
                 ch1, ch2 = scaleA * (data[:samplesPerRecord] - codeZero),\
                            scaleB * (data[samplesPerRecord:] - codeZero)
                 if procces is None and sum == False:
