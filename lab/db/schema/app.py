@@ -56,11 +56,11 @@ def getApplication(name='',
     elif isinstance(version, str):
         try:
             nums = [int(s) for s in version.split('.')]
-            kwds['version.major'] = nums[0]
+            kwds['version__major'] = nums[0]
             if len(nums) > 1:
-                kwds['version.minor'] = nums[1]
+                kwds['version__minor'] = nums[1]
             if len(nums) > 2:
-                kwds['version.micro'] = nums[2]
+                kwds['version__micro'] = nums[2]
         except:
             warnings.warn('illegal argument: version=%r' % version,
                           UserWarning)

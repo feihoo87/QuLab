@@ -254,7 +254,7 @@ class AlazarTechDigitizer():
         return Value.value
 
     def get_Traces_DMA(self, preTriggerSamples=0, postTriggerSamples=1024, repeats=1000,
-                       procces=None, beforeCapture=None, timeout=1, sum=False):
+                       procces=None, timeout=1, sum=False):
         samplesPerRecord = preTriggerSamples+postTriggerSamples
         recordsPerBuffer = 2
         recordsPerAcquisition = repeats*2
@@ -271,7 +271,7 @@ class AlazarTechDigitizer():
         bytesPerBuffer = bytesPerRecord * recordsPerBuffer
         scaleA, scaleB = self.dRange[CHANNEL_A]/codeRange, self.dRange[CHANNEL_B]/codeRange
 
-        Buffer = (dtype*samplesPerRecord)()
+        Buffer = (dtype*(samplesPerRecord*recordsPerBuffer))()
 
         if procces is None and sum == True:
             A, B = np.zeros(samplesPerRecord), np.zeros(samplesPerRecord)
@@ -280,14 +280,12 @@ class AlazarTechDigitizer():
 
         time_out_ms = int(1000*timeout)
 
+        self.AlazarSetParameter(0, SET_DATA_FORMAT, DATA_FORMAT_UNSIGNED)
         self.AlazarBeforeAsyncRead(CHANNEL_A | CHANNEL_B,
                                    -preTriggerSamples, samplesPerRecord, recordsPerBuffer,
                                    recordsPerAcquisition,
                                    uFlags)
         self.check_errors()
-
-        if beforeCapture is not None:
-            beforeCapture()
 
         self.AlazarStartCapture()
         self.check_errors()
@@ -296,11 +294,11 @@ class AlazarTechDigitizer():
             for i in range(repeats):
                 self.AlazarWaitNextAsyncBufferComplete(
                     Buffer, bytesPerBuffer, time_out_ms)
-                # RETURN_CODE.ApiTransferComplete
-                self.check_errors(ignores=[589])
-                data = np.asarray(Buffer)
-                ch1, ch2 = scaleA * (data[:samplesPerRecord] - codeZero),\
-                           scaleB * (data[samplesPerRecord:] - codeZero)
+                self.check_errors(ignores=[RETURN_CODE.ApiTransferComplete])
+                data = np.array(Buffer, dtype=np.float)
+                data -= codeZero
+                ch1, ch2 = scaleA * data[:samplesPerRecord],\
+                           scaleB * data[samplesPerRecord:]
                 if procces is None and sum == False:
                     A.append(ch1[:samplesPerRecord])
                     B.append(ch2[:samplesPerRecord])

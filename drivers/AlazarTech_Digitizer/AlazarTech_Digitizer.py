@@ -195,11 +195,11 @@ class Driver(BaseDriver):
         return []
 
     def getTraces_DMA(self, samplesPerRecord=1024, pre=0, repeats=1000,
-                      procces=None, beforeCapture=None, timeout=10, sum=False):
+                      procces=None, timeout=10, sum=False):
         self.__load_wrapper()
         self.set_configs()
         a, b = self.dig.get_Traces_DMA(
-            pre, samplesPerRecord-pre, repeats, procces, beforeCapture, timeout, sum)
+            pre, samplesPerRecord-pre, repeats, procces, timeout, sum)
         #a, b = self.dig.get_Traces_NPT(samplesPerRecord, repeats, procces, timeout)
         return np.asarray(a), np.asarray(b)
 
@@ -221,7 +221,7 @@ class Driver(BaseDriver):
         self._Exp = np.asarray(Exp).T
 
     def getFFT(self, samplesPerRecord=1024, pre=0, repeats=1000, heterodyne_freq=None,
-               beforeCapture=None, timeout=10):
+               timeout=10):
         self.__load_wrapper()
         self.set_configs()
         n = samplesPerRecord
@@ -232,5 +232,5 @@ class Driver(BaseDriver):
             return ch1[:n].dot(e).T/n, ch2[:n].dot(e).T/n
 
         A, B = self.dig.get_Traces_DMA(
-            pre, samplesPerRecord-pre, repeats, procces, beforeCapture, timeout)
+            pre, samplesPerRecord-pre, repeats, procces, timeout)
         return np.asarray(A), np.asarray(B)
