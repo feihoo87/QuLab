@@ -69,6 +69,9 @@ class Waveform():
         #w._time_shift = self._time_shift
         return w
 
+    def __call__(self, x):
+        return self._calc(x)
+
     def __add__(self, other):
         if isinstance(other, Waveform):
             w = self._comb_waveform(other)
