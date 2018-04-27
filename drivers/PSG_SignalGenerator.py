@@ -5,7 +5,7 @@ from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
 
 class Driver(BaseDriver):
-    support_models = ['E8257D', 'SMF100A', 'SMB100A']
+    support_models = ['E8257D', 'SMF100A', 'SMB100A','SGS100A']
 
     quants = [
         QReal('Frequency', unit='Hz',
