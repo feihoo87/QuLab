@@ -7,11 +7,11 @@ class Driver(BaseDriver):
     support_models = ['E8363C', 'ZNB20-2Port','E8363B']
 
     quants = [
-        QReal('Power', value=-20, unit='dBm', set_cmd='SOUR:POW %(value)e', get_cmd='SOUR:POW?'),
-        QReal('Frequency center', value=5e9, unit='Hz', set_cmd='SENS:FREQ:CENT %(value)e', get_cmd='SENS:FREQ:CENT?'),
-        QReal('Frequency span', value=2e9, unit='Hz', set_cmd='SENS:FREQ:SPAN %(value)e', get_cmd='SENS:FREQ:SPAN?'),
-        QReal('Frequency start', value=4e9, unit='Hz', set_cmd='SENS:FREQ:STAR %(value)e', get_cmd='SENS:FREQ:STAR?'),
-        QReal('Frequency stop', value=6e9, unit='Hz', set_cmd='SENS:FREQ:STOP %(value)e', get_cmd='SENS:FREQ:STOP?'),
+        QReal('Power', value=-20, unit='dBm', set_cmd='SOUR:POW %(value)e%(unit)s', get_cmd='SOUR:POW?'),
+        QReal('Frequency center', value=5e9, unit='Hz', set_cmd='SENS:FREQ:CENT %(value)e%(unit)s', get_cmd='SENS:FREQ:CENT?'),
+        QReal('Frequency span', value=2e9, unit='Hz', set_cmd='SENS:FREQ:SPAN %(value)e%(unit)s', get_cmd='SENS:FREQ:SPAN?'),
+        QReal('Frequency start', value=4e9, unit='Hz', set_cmd='SENS:FREQ:STAR %(value)e%(unit)s', get_cmd='SENS:FREQ:STAR?'),
+        QReal('Frequency stop', value=6e9, unit='Hz', set_cmd='SENS:FREQ:STOP %(value)e%(unit)s', get_cmd='SENS:FREQ:STOP?'),
         QVector('Frequency', unit='Hz'),
         QVector('Trace'),
         QVector('S'),

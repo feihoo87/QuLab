@@ -9,11 +9,11 @@ class Driver(BaseDriver):
 
     quants = [
         QReal('Frequency', unit='Hz',
-          set_cmd=':FREQ %(value).13e',
+          set_cmd=':FREQ %(value).13e%(unit)s',
           get_cmd=':FREQ?'),
 
         QReal('Power', unit='dBm',
-          set_cmd=':POWER %(value).8e',
+          set_cmd=':POWER %(value).8e%(unit)s',
           get_cmd=':POWER?'),
 
         QOption('Output',
