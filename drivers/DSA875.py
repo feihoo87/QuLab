@@ -30,6 +30,7 @@ class Driver(BaseDriver):
         self.setValue('Sweep', 'OFF')
         if average==1:
             self.setValue('Trace Mode','Write',ch=ch)
+            self.write(':SWE:COUN 1')
         else:
             self.setValue('Trace Mode','Poweravg',ch=ch)
             self.write(':TRAC:AVER:COUN %d' % average)
@@ -52,7 +53,7 @@ class Driver(BaseDriver):
             data.append(float(d))
         #Start the sweep
         self.setValue('Sweep', 'ON')
-        return data
+        return np.array(data)
 
 
     def get_Frequency(self):
@@ -62,3 +63,23 @@ class Driver(BaseDriver):
         freq_stop=self.getValue('Frequency Stop')
         sweep_point=self.getValue('Sweep Points')
         return np.array(np.linspace(freq_star,freq_stop,sweep_point))
+
+    def get_SNR(self,signalfreqlist=[],signalbandwidth=10e6,average=1, ch=1):
+        '''get SNR_dB '''
+
+        Frequency=self.get_Frequency()
+        Spectrum=self.get_Trace(average=average, ch=ch)
+        Total_power=sum(np.exp(Spectrum/10*np.log(10)))
+        Signal_power=0
+        #Total_dB=sum(Spectrum)
+        #Signal_dB=0
+        for sf in signalfreqlist:
+            for f in Frequency :
+                if f > (sf-signalbandwidth/2) and f < (sf+signalbandwidth/2):
+                    index = np.where(Frequency==f)
+                    Signal_power = Signal_power + np.exp(Spectrum[index]/10*np.log(10))
+                    #Signal_dB = Signal_dB + Spectrum[index]
+        _SNR=Signal_power/(Total_power-Signal_power)
+        #_SNR=Signal_dB/(Total_dB-Signal_dB)
+        SNR = 10*np.log10(_SNR)
+        return SNR
