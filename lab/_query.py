@@ -27,13 +27,14 @@ class QuerySet():
     def count(self):
         return self.query_set.count()
 
-    def display(self, start=None, stop=None, figsize=None):
+    def display(self, start=None, stop=None,
+        cols=['Index', 'Time', 'Title', 'User', 'Tags', 'Parameters', 'Image'], figsize=None):
         if start is None and stop is None:
             stop=self.count()
             start=stop-10
             if start < 0:
                 start=0
-        self.ui.display(start, stop, figsize)
+        self.ui.display(start, stop, cols, figsize)
 
 def query(app=None, show_hidden=False, q=None, **kwds):
     return QuerySet(db.query.query_records(q=q, app=app, show_hidden=show_hidden, **kwds))

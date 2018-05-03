@@ -29,7 +29,7 @@ class QuerySetUI():
         'Tags': ['<th>Tags</th>',
             lambda i,r: '<td>%s</td>' % ''.join(['<div class="tag %s">%s</div>' % ('tag-red' if tag[-1]=='!' else 'tag-blue', tag) for tag in r.tags])],
         'Parameters': ['<th>Parameters</th>',
-            lambda i,r: '<td>%s</td>' % ''.join(['<div class="tag tag-border">%s = %g %s</div>' % (k, v[0], v[1]) for k,v in r.params])],
+            lambda i,r: '<td>%s</td>' % ''.join(['<div class="tag tag-border">%s = %g %s</div>' % (k, v[0], v[1]) for k,v in r.params.items()])],
         'Image': ['<th>Image</th>', None]
     }
 
@@ -94,7 +94,7 @@ class QuerySetUI():
     async def tableRow(self, cols, i, record, figsize):
         return '''<tr>%s</tr>''' % ''.join([
             self.cols_formater[col][1](i, record) if col != 'Image'
-            else await self.plot(record, figsize)
+            else '<td>%s</td>' % await self.plot(record, figsize)
             for col in cols])
 
     async def plot(self, record, figsize):
