@@ -46,10 +46,10 @@ class Driver(BaseDriver):
         #Get the data
         self.write('FORMAT:BORD NORM')
         self.write('FORMAT ASCII')
-        data_raw = self.query("TRAC:DATA? TRACE%d" % ch)
-        _data = re.split(r", | |\n",data_raw)
+        data_raw = self.query("TRAC:DATA? TRACE%d" % ch).strip('\n')
+        _data = re.split(r",",data_raw[11:])
         data=[]
-        for d in _data[1:1+points]:
+        for d in _data[:points]:
             data.append(float(d))
         #Start the sweep
         self.setValue('Sweep', 'ON')
@@ -67,19 +67,17 @@ class Driver(BaseDriver):
     def get_SNR(self,signalfreqlist=[],signalbandwidth=10e6,average=1, ch=1):
         '''get SNR_dB '''
 
+        Y_unit =self.query(':UNIT:POW?;:UNIT:POW W').strip('\n')
         Frequency=self.get_Frequency()
         Spectrum=self.get_Trace(average=average, ch=ch)
-        Total_power=sum(np.exp(Spectrum/10*np.log(10)))
         Signal_power=0
-        #Total_dB=sum(Spectrum)
-        #Signal_dB=0
+        Total_power=sum(Spectrum)
         for sf in signalfreqlist:
             for f in Frequency :
                 if f > (sf-signalbandwidth/2) and f < (sf+signalbandwidth/2):
                     index = np.where(Frequency==f)
-                    Signal_power = Signal_power + np.exp(Spectrum[index]/10*np.log(10))
-                    #Signal_dB = Signal_dB + Spectrum[index]
+                    Signal_power = Signal_power + Spectrum[index]
+        self.write(':UNIT:POW %s'%Y_unit)
         _SNR=Signal_power/(Total_power-Signal_power)
-        #_SNR=Signal_dB/(Total_dB-Signal_dB)
         SNR = 10*np.log10(_SNR)
         return SNR
