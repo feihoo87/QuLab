@@ -79,7 +79,7 @@ class Driver(BaseDriver):
             return []
 
     def get_sequence_list(self):
-        if self.model in ['AWG5208', 'AWG5014C']:
+        if self.model in ['AWG5208']:
             ret = []
             slist_size = int(self.query("SLIS:SIZE?"))
             for i in range(slist_size):
