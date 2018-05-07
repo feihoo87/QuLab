@@ -141,6 +141,12 @@ class AlazarTechDigitizer():
         time.sleep(0.1)
         self.callFunc('AlazarSetLED', self.handle, LED_OFF)
 
+    def setLEDOn(self, on=True):
+        if on:
+            self.callFunc('AlazarSetLED', self.handle, LED_ON)
+        else:
+            self.callFunc('AlazarSetLED', self.handle, LED_OFF)
+
     def getError(self, status):
         """Convert the error in status to a string"""
         # const char* AlazarErrorToText(RETURN_CODE retCode)
