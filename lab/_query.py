@@ -11,6 +11,7 @@ class QuerySet():
 
     @functools.lru_cache(maxsize=32)
     def __getitem__(self, i):
+        i = i % self.count()
         return self.query_set[i]
 
     def __iter__(self):
@@ -24,6 +25,7 @@ class QuerySet():
         else:
             raise StopIteration
 
+    @functools.lru_cache(maxsize=1)
     def count(self):
         return self.query_set.count()
 
