@@ -33,8 +33,7 @@ class Record(Document):
     def data(self):
         return from_pickle(self.datafield)
 
-    @data.setter
-    def data(self, obj):
+    def set_data(self, obj):
         if self.datafield is None:
             self.datafield.put(
                 to_pickle(obj), content_type='application/octet-stream')

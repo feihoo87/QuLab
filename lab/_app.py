@@ -293,7 +293,7 @@ class DataCollector:
     def save(self):
         if self.__record is None:
             self.__record = self.newRecord()
-        self.__record.data = self.result()
+        self.__record.set_data(self.result())
         self.__record.save(signal_kwargs=dict(finished=True))
 
     def newRecord(self):
