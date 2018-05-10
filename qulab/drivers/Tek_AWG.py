@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-from lab.device import BaseDriver, QOption, QReal, QList
+from qulab import BaseDriver, QOption, QReal, QList
 
 
 class Driver(BaseDriver):
@@ -156,7 +156,7 @@ class Driver(BaseDriver):
         """
         points : a 1D numpy.array which values between -1 and 1.
         """
-        message = 'WLIST:WAVEFORM:DATA "%s",%d' % (name, start)
+        message = 'WLIST:WAVEFORM:DATA "%s",%d,' % (name, start)
         if size is not None:
             message = message + ('%d,' % size)
         points = points.clip(-1,1)

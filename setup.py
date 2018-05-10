@@ -10,30 +10,18 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-
-def dirtree(p):
-    flist = []
-    for f in listdir(p):
-        if path.isdir(path.join(p, f)):
-            flist.extend([path.join(f, item) for
-                item in dirtree(path.join(p, f))])
-        else:
-            flist.append(f)
-    return flist
-
-driverFiles = [
-    path.join('drivers', f) for f in dirtree(path.join(here, 'drivers'))]
-
 # This reads the __version__ variable from lab/_version.py
-exec(open('lab/_version.py').read())
+exec(open('qulab/_version.py').read())
 
 requirements = [
+    'aiohttp>=3.2.1',
     'numpy>=1.13.3',
     'scipy>=1.0.0',
     'matplotlib>=2.1.0',
     'jupyter>=1.0.0',
     'requests>=2.18.4',
     'tornado>=5.0.1',
+    'motor>=1.2.1',
     'mongoengine>=0.15.0',
     'blinker>=1.4',
     'pyvisa>=1.8',
@@ -54,21 +42,22 @@ setup(
     long_description=long_description,
     packages = find_packages(),
     include_package_data = True,
-    data_files=[('QuLab/Drivers', driverFiles)],
+    #data_files=[('QuLab/Drivers', driverFiles)],
     install_requires=requirements,
+    extras_require={
+        'test': ['pytest'],
+    },
     python_requires='>=3.6',
     classifiers=[
-        # How mature is this project? Common values are
-        #   3 - Alpha
-        #   4 - Beta
-        #   5 - Production/Stable
         'Development Status :: 3 - Alpha',
-
-        # Pick your license as you wish (should match "license" above)
-         'License :: OSI Approved :: MIT License',
-
-        # Specify the Python versions you support here. In particular, ensure
-        # that you indicate whether you support Python 2, Python 3 or both.
+        'Intended Audience :: Developers',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: MIT License',
+        'Operating System :: Microsoft :: Windows',
+        'Operating System :: POSIX :: Linux',
+        'Operating System :: MacOS :: MacOS X',
+        'Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator',
+        'Programming Language :: Python',
         'Programming Language :: Python :: 3.6',
     ],
     project_urls={  # Optional

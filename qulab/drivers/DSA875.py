@@ -2,7 +2,7 @@
 import numpy as np
 import re
 import time
-from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
+from qulab import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
 
 class Driver(BaseDriver):

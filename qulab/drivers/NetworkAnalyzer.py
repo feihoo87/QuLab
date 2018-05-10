@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-from lab.device import BaseDriver, QInteger, QOption, QReal, QVector
+from qulab import BaseDriver, QInteger, QOption, QReal, QVector
 
 
 class Driver(BaseDriver):

@@ -146,6 +146,15 @@ def listApps(package=''):
     ui.listApps(ret)
 
 
+def listOneApp(name='', package=''):
+    result={}
+    for app in db.query.getApplication(name=name, package=package, many=True):
+        version = app.version.num
+        result[version] = app
+    ret=result.values()
+    ui.listApps(ret)
+
+
 def listDrivers():
     ret = db.schema.Driver.objects.order_by('name')
     ui.list_drivers(ret)

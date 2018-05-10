@@ -1,8 +1,8 @@
 import numpy as np
 import time
 
-from lab.device import BaseDriver
-from lab.device import QReal, QOption, QInteger, QString, QVector
+from qulab import BaseDriver
+from qulab import QReal, QOption, QInteger, QString, QVector
 
 
 class Driver(BaseDriver):
@@ -17,7 +17,7 @@ class Driver(BaseDriver):
 
         #BURST mod, 2 chanels ,then use pulse delay/width/period to modify parameters
         QReal('Burst Ncycles',value=2, set_cmd=':TRIG:COUN %(value)d; :TRIG:SOUR INT; :DIG:PATT OFF',get_cmd=':TRIG:COUN?'),
-        
+
         #double pulse mode,could use burst mode together, but can't change trigger delay
         #
         QReal('Double Pulse Delay',ch=1,unit='s',set_cmd=':PULS:DOUB%(ch)d:DEL %(value).9e%(unit)s',get_cmd=':PULS:DOUB%(ch)d:DEL?'),

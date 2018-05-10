@@ -90,7 +90,7 @@ def saveApplication(name,
         name=name, package=package, module=module).first()
     if appdata is None:
         lastapp = Application.objects(
-            name=name).order_by('-version.num').first()
+            name=name, package=package).order_by('-version.num').first()
         appdata = Application(
             name=name,
             package=package,

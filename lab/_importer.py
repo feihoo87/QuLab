@@ -24,7 +24,7 @@ class Finder(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
         log.debug("find_spec: fullname=%r, path=%r, target=%r",
                   fullname, path, target)
-        if fullname in ['lab.apps', 'lab.drivers']:
+        if fullname in ['lab.apps']:
             log.debug("find_spec: module %r found", fullname)
             loader = EmptyModuleLoader(fullname)
             return importlib.util.spec_from_loader(fullname, loader)

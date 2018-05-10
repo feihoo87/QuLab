@@ -1,4 +1,3 @@
-
 from .base import *
 from .code_mod import savePackageFile
 
@@ -10,11 +9,11 @@ class Driver(Document):
     created_time = ComplexDateTimeField(default=now)
     modified_time = ComplexDateTimeField(default=now)
     module = ReferenceField('Module')
-    
+
 
 def uploadDriver(path, author=None):
     module_name, _ = os.path.splitext(os.path.basename(path))
-    fullname = 'lab.drivers.%s' % module_name
+    fullname = 'qulab.drivers.%s' % module_name
     module = savePackageFile(path, fullname, author)
     driver = Driver.objects(name=module_name).order_by('-version').first()
     if driver is None:

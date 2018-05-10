@@ -104,3 +104,4 @@ my_apps/
 /*.ipynb
 
 .vscode/
+.pytest_cache/
