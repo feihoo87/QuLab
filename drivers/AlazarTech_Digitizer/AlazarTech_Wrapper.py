@@ -141,6 +141,12 @@ class AlazarTechDigitizer():
         time.sleep(0.1)
         self.callFunc('AlazarSetLED', self.handle, LED_OFF)
 
+    def setLEDOn(self, on=True):
+        if on:
+            self.callFunc('AlazarSetLED', self.handle, LED_ON)
+        else:
+            self.callFunc('AlazarSetLED', self.handle, LED_OFF)
+
     def getError(self, status):
         """Convert the error in status to a string"""
         # const char* AlazarErrorToText(RETURN_CODE retCode)
@@ -254,7 +260,7 @@ class AlazarTechDigitizer():
         return Value.value
 
     def get_Traces_DMA(self, preTriggerSamples=0, postTriggerSamples=1024, repeats=1000,
-                       procces=None, beforeCapture=None, timeout=1, sum=False):
+                       procces=None, timeout=1, sum=False):
         samplesPerRecord = preTriggerSamples+postTriggerSamples
         recordsPerBuffer = 2
         recordsPerAcquisition = repeats*2
@@ -281,15 +287,11 @@ class AlazarTechDigitizer():
         time_out_ms = int(1000*timeout)
 
         self.AlazarSetParameter(0, SET_DATA_FORMAT, DATA_FORMAT_UNSIGNED)
-
         self.AlazarBeforeAsyncRead(CHANNEL_A | CHANNEL_B,
                                    -preTriggerSamples, samplesPerRecord, recordsPerBuffer,
                                    recordsPerAcquisition,
                                    uFlags)
         self.check_errors()
-
-        if beforeCapture is not None:
-            beforeCapture()
 
         self.AlazarStartCapture()
         self.check_errors()
@@ -298,11 +300,11 @@ class AlazarTechDigitizer():
             for i in range(repeats):
                 self.AlazarWaitNextAsyncBufferComplete(
                     Buffer, bytesPerBuffer, time_out_ms)
-                # RETURN_CODE.ApiTransferComplete
-                self.check_errors(ignores=[589])
+                self.check_errors(ignores=[RETURN_CODE.ApiTransferComplete])
                 data = np.array(Buffer, dtype=np.float)
-                ch1, ch2 = scaleA * (data[:samplesPerRecord] - codeZero),\
-                           scaleB * (data[samplesPerRecord:] - codeZero)
+                data -= codeZero
+                ch1, ch2 = scaleA * data[:samplesPerRecord],\
+                           scaleB * data[samplesPerRecord:]
                 if procces is None and sum == False:
                     A.append(ch1[:samplesPerRecord])
                     B.append(ch2[:samplesPerRecord])

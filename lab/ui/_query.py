@@ -15,38 +15,25 @@ class QuerySetUI():
         self.tableHTML = []
         self._tasks = []
 
-    def display(self, start=0, stop=10, figsize=None):
-        display(self.widget)
+    cols_formater = {
+        'Index': ['<th>Index</th>',
+            lambda i,r: '<td>%d</td>' % i],
+        'Id': ['<th>ID</th>',
+            lambda i,r: '<td>%r</td>' % r.id],
+        'Time': ['<th style="text-align:left">Time</th>',
+            lambda i,r: '<td style="text-align:left">%s</td>' % r.finished_time.strftime('%Y-%m-%d %H:%M:%S')],
+        'Title': ['<th style="text-align:left">Title</th>',
+            lambda i,r: '<td style="text-align:left">%s</td>' % r.title],
+        'User': ['<th style="text-align:left">User</th>',
+            lambda i,r: '<td style="text-align:left">%s</td>' % r.user.fullname],
+        'Tags': ['<th>Tags</th>',
+            lambda i,r: '<td>%s</td>' % ''.join(['<div class="tag %s">%s</div>' % ('tag-red' if tag[-1]=='!' else 'tag-blue', tag) for tag in r.tags])],
+        'Parameters': ['<th>Parameters</th>',
+            lambda i,r: '<td>%s</td>' % ''.join(['<div class="tag tag-border">%s = %g %s</div>' % (k, v[0], v[1]) for k,v in r.params.items()])],
+        'Image': ['<th>Image</th>', None]
+    }
 
-        self.tableHTML = ['' for i in range(stop-start)]
-        self.update()
-
-        def callback(future, pos):
-            row = future.result()
-            self.tableHTML[pos] = row
-            self.update()
-
-        loop = asyncio.get_event_loop()
-        _new_loop = False
-        if loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            _new_loop = True
-
-        for index, record in enumerate(self.querySet.query_set[start:stop]):
-            #tableHTML[index+2] = self.tableRow(index+start, record, figsize)
-            task = asyncio.ensure_future(self.tableRow(index+start, record, figsize))
-            task.add_done_callback(functools.partial(callback, pos=index))
-            self._tasks.append(task)
-            #self.widget.value = ''.join(tableHTML)
-
-        if not loop.is_running():
-            loop.run_until_complete(asyncio.gather(*self._tasks))
-        if _new_loop:
-            loop.close()
-
-    def update(self):
-        style = '''<style>
+    style = '''<style>
         .tag-blue {background: #2d8cf0; color: #fff; border: 0;}
         .tag-red {background: #f02d2d; color: #fff; border: 0;}
         .tag-border {height: 24px; line-height: 24px; border: 1px solid #e9eaec!important;
@@ -58,53 +45,57 @@ class QuerySetUI():
         .tag:hover {opacity: .85;}
         </style>'''
 
-        table_head = '''<table class="output_html rendered_html"><thead>
-        <tr><th>Index</th><th>ID</th><th style="text-align:left">Time</th>
-        <th style="text-align:left">Title</th><th style="text-align:left">User</th>
-        <th>Tags</th><th>Parameters</th><th>Image</th></tr></thead><tbody>'''
+    def display(self, start=0, stop=10,
+        cols=['Index', 'Time', 'Title', 'User', 'Tags', 'Parameters', 'Image'],
+        figsize=None):
 
-        table_close = '''</tbody><caption>%d records in total.</caption>
+        display(self.widget)
+
+        table_begin = '''<table class="output_html rendered_html"><thead>
+        <tr>%s</tr></thead><tbody>''' % self.tableHead(cols)
+
+        table_end = '''</tbody><caption>%d records in total.</caption>
         </table>''' % self.querySet.count()
 
-        tableHTML = list((style, table_head, *self.tableHTML, table_close))
+        self.tableHTML = ['' for i in range(stop-start)]
+        self.update(table_begin, table_end)
 
+        def callback(future, pos):
+            row = future.result()
+            self.tableHTML[pos] = row
+            self.update(table_begin, table_end)
+
+        loop = asyncio.get_event_loop()
+        _new_loop = False
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            _new_loop = True
+
+        for index, record in enumerate(self.querySet.query_set[start:stop]):
+            #tableHTML[index+2] = self.tableRow(index+start, record, figsize)
+            task = asyncio.ensure_future(self.tableRow(cols, index+start, record, figsize))
+            task.add_done_callback(functools.partial(callback, pos=index))
+            self._tasks.append(task)
+            #self.widget.value = ''.join(tableHTML)
+
+        if not loop.is_running():
+            loop.run_until_complete(asyncio.gather(*self._tasks))
+        if _new_loop:
+            loop.close()
+
+    def update(self, table_begin, table_end):
+        tableHTML = list((self.style, table_begin, *self.tableHTML, table_end))
         self.widget.value = ''.join(tableHTML)
 
-    async def tableRow(self, i, record, figsize):
-        def tags_html(tags):
-            html = ''
-            for tag in tags:
-                if tag[-1] == '!':
-                    html += '<div class="tag tag-red">%s</div>' % tag
-                else:
-                    html += '<div class="tag tag-blue">%s</div>' % tag
-            return html
+    def tableHead(self, cols):
+        return ''.join([self.cols_formater[col][0] for col in cols])
 
-        def params_html(params):
-            html = ''
-            for name, v in params.items():
-                html += '<div class="tag tag-border">%s = %g %s</div>' % (name,
-                                                                          v[0],
-                                                                          v[1])
-            return html
-
-        return '''<tr><td>%(index)d</td>
-            <td>%(ID)r</td>
-            <td style="text-align:left">%(time)s</td>
-            <td style="text-align:left">%(title)s</td>
-            <td style="text-align:left">%(user)s</td>
-            <td>%(tags)s</td>
-            <td>%(params)s</td>
-            <td>%(image)s</td></tr>''' % {
-            'index': i,
-            'ID': record.id,
-            'time': record.finished_time.strftime('%Y-%m-%d %H:%M:%S'),
-            'title': record.title,
-            'tags': tags_html(record.tags),
-            'params': params_html(record.params),
-            'user': record.user.fullname,
-            'image': await self.plot(record, figsize)
-        }
+    async def tableRow(self, cols, i, record, figsize):
+        return '''<tr>%s</tr>''' % ''.join([
+            self.cols_formater[col][1](i, record) if col != 'Image'
+            else '<td>%s</td>' % await self.plot(record, figsize)
+            for col in cols])
 
     async def plot(self, record, figsize):
         try:

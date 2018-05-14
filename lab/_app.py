@@ -39,7 +39,7 @@ class Application(HasSource):
         self.ui = None
         self.reset_status()
         self.level = 1
-        self.level_limit = 3
+        self.level_limit = 1
         self.run_event = asyncio.Event()
         self.interrupt_event = asyncio.Event()
         self.__title = None
@@ -293,7 +293,7 @@ class DataCollector:
     def save(self):
         if self.__record is None:
             self.__record = self.newRecord()
-        self.__record.data = self.result()
+        self.__record.set_data(self.result())
         self.__record.save(signal_kwargs=dict(finished=True))
 
     def newRecord(self):

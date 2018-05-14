@@ -90,16 +90,26 @@ class Driver(BaseDriver):
         BaseDriver.__init__(self, **kw)
         self.systemID = kw['systemID']
         self.boardID = kw['boardID']
-        self.dig = None
+        self.__dig = None
         self.config_updated = False
         self.dt = 1E-9
 
-    def __load_wrapper(self):
-        if self.dig is None:
-            self.dig = AlazarTechDigitizer(self.systemID, self.boardID)
+    @property
+    def dig(self):
+        from .AlazarTech_Wrapper import AlazarTechDigitizer
+        if self.__dig is None:
+            self.__dig = AlazarTechDigitizer(self.systemID, self.boardID)
+        return self.__dig
+
+    def testLED(self):
+        self.dig.testLED()
+
+    def setLEDOn(self, on=True):
+        self.dig.setLEDOn(on)
 
     def set_configs(self):
         """Set digitizer configuration based on driver settings"""
+        from .AlazarTech_Wrapper import getInputRange
         if self.config_updated:
             return
         logger.debug('set config ...')
@@ -179,12 +189,10 @@ class Driver(BaseDriver):
         self.config_updated = False
 
     def performGetValue(self, quant, **kw):
-        self.__load_wrapper()
         # self.set_configs()
         return quant.getValue(**kw)
 
     def errors(self):
-        self.__load_wrapper()
         ret = []
         try:
             while True:
@@ -195,11 +203,10 @@ class Driver(BaseDriver):
         return []
 
     def getTraces_DMA(self, samplesPerRecord=1024, pre=0, repeats=1000,
-                      procces=None, beforeCapture=None, timeout=10, sum=False):
-        self.__load_wrapper()
+                      procces=None, timeout=10, sum=False):
         self.set_configs()
         a, b = self.dig.get_Traces_DMA(
-            pre, samplesPerRecord-pre, repeats, procces, beforeCapture, timeout, sum)
+            pre, samplesPerRecord-pre, repeats, procces, timeout, sum)
         #a, b = self.dig.get_Traces_NPT(samplesPerRecord, repeats, procces, timeout)
         return np.asarray(a), np.asarray(b)
 
@@ -221,8 +228,7 @@ class Driver(BaseDriver):
         self._Exp = np.asarray(Exp).T
 
     def getFFT(self, samplesPerRecord=1024, pre=0, repeats=1000, heterodyne_freq=None,
-               beforeCapture=None, timeout=10):
-        self.__load_wrapper()
+               timeout=10):
         self.set_configs()
         n = samplesPerRecord
         if heterodyne_freq is not None:
@@ -232,5 +238,5 @@ class Driver(BaseDriver):
             return ch1[:n].dot(e).T/n, ch2[:n].dot(e).T/n
 
         A, B = self.dig.get_Traces_DMA(
-            pre, samplesPerRecord-pre, repeats, procces, beforeCapture, timeout)
+            pre, samplesPerRecord-pre, repeats, procces, timeout)
         return np.asarray(A), np.asarray(B)
