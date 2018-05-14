@@ -11,13 +11,13 @@ class Driver(BaseDriver):
     support_models = ['33120A', '33220A']
     quants = [
         QReal('Frequency', unit='Hz',
-          set_cmd='FREQ %(value).11E Hz',
+          set_cmd='FREQ %(value).11E %(unit)s',
           get_cmd='FREQ?'),
-        QReal('Vpp', unit='V',
-          set_cmd='VOLT %(value).5E VPP',
+        QReal('Vpp', unit='VPP',
+          set_cmd='VOLT %(value).5E %(unit)s',
           get_cmd='VOLT?'),
         QReal('Offset', unit='V',
-          set_cmd='VOLT:OFFS %(value).5E V',
+          set_cmd='VOLT:OFFS %(value).5E %(unit)s',
           get_cmd='VOLT:OFFS?'),
         QVector('Waveform', unit='V'),
         QString('Trigger',
