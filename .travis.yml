@@ -4,9 +4,10 @@ python:
 services:
   - mongodb
 install:
+  - python -m pip install pytest
   - python setup.py install
 script:
-  - echo Done
+  - pytest
 deploy:
   provider: pypi
   user: feihoo87
