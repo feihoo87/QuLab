@@ -2,10 +2,10 @@
 import time
 
 import numpy as np
-
 from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
 
+# yapf: disable
 class Driver(BaseDriver):
     error_command = ''
     support_models = ['33120A', '33220A']
@@ -49,6 +49,9 @@ class Driver(BaseDriver):
             value = np.array(value)
             vpp  = value.max() - value.min()
             offs = (value.max() + value.min())/2.0
+            if vpp == 0:
+                self.DC(offs)
+                return
             name = kw['name'] if 'name' in kw.keys() else 'ABS'
             freq = kw['freq'] if 'freq' in kw.keys() else None
             self.update_waveform(2*(value-offs)/vpp, name=name)
