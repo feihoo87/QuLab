@@ -1,4 +1,3 @@
-
 from .base import *
 from .code_mod import savePackageFile
 
@@ -10,7 +9,7 @@ class Driver(Document):
     created_time = ComplexDateTimeField(default=now)
     modified_time = ComplexDateTimeField(default=now)
     module = ReferenceField('Module')
-    
+
 
 def uploadDriver(path, author=None):
     module_name, _ = os.path.splitext(os.path.basename(path))

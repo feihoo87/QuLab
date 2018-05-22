@@ -10,20 +10,6 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-
-def dirtree(p):
-    flist = []
-    for f in listdir(p):
-        if path.isdir(path.join(p, f)):
-            flist.extend([path.join(f, item) for
-                item in dirtree(path.join(p, f))])
-        else:
-            flist.append(f)
-    return flist
-
-driverFiles = [
-    path.join('drivers', f) for f in dirtree(path.join(here, 'drivers'))]
-
 # This reads the __version__ variable from lab/_version.py
 exec(open('lab/_version.py').read())
 
@@ -54,7 +40,7 @@ setup(
     long_description=long_description,
     packages = find_packages(),
     include_package_data = True,
-    data_files=[('QuLab/Drivers', driverFiles)],
+    #data_files=[('QuLab/Drivers', driverFiles)],
     install_requires=requirements,
     python_requires='>=3.6',
     classifiers=[
