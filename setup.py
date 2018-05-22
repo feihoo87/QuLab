@@ -11,7 +11,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 # This reads the __version__ variable from lab/_version.py
-exec(open('lab/_version.py').read())
+exec(open('qulab/_version.py').read())
 
 requirements = [
     'numpy>=1.13.3',
