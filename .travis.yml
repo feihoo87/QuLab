@@ -4,7 +4,6 @@ python:
 services:
   - mongodb
 install:
-  - python -m pip install pytest
   - python setup.py install
 script:
   - pytest
