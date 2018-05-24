@@ -14,6 +14,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 exec(open('qulab/_version.py').read())
 
 requirements = [
+    'aiohttp>=3.2.1',
     'numpy>=1.13.3',
     'scipy>=1.0.0',
     'matplotlib>=2.1.0',
