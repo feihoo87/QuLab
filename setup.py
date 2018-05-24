@@ -43,6 +43,9 @@ setup(
     include_package_data = True,
     #data_files=[('QuLab/Drivers', driverFiles)],
     install_requires=requirements,
+    extras_require={
+        'test': ['pytest'],
+    },
     python_requires='>=3.6',
     classifiers=[
         # How mature is this project? Common values are
