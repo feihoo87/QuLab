@@ -21,6 +21,7 @@ requirements = [
     'jupyter>=1.0.0',
     'requests>=2.18.4',
     'tornado>=5.0.1',
+    'motor>=1.2.1',
     'mongoengine>=0.15.0',
     'blinker>=1.4',
     'pyvisa>=1.8',
