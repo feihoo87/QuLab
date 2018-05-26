@@ -93,9 +93,9 @@ class QSWorker:
 
     def run(self, conn):
         self.initialize()
-        current = None
+        current_id, current_coro = None, None
         while True:
-            if len(self._tasks) == 0 and current is None or conn.poll():
+            if len(self._tasks) == 0 and current_id is None or conn.poll():
                 data = conn.recv()
             else:
                 data = None
@@ -106,18 +106,18 @@ class QSWorker:
             elif data is not None:
                 self._tasks.append(data)
             try:
-                if current is None and len(self._tasks) != 0:
+                if current_id is None and len(self._tasks) != 0:
                     task = self._tasks.pop(0)
-                    current = task.id, self.do(task)
-                if current is not None:
+                    current_id, current_coro = task.id, self.do(task)
+                if current_id is not None:
                     try:
-                        conn.send((current[0], next(current[1])))
+                        conn.send((current_id, next(current_coro)))
                     except StopIteration:
-                        conn.send((current[0], EndOfResult()))
-                        current = None
+                        conn.send((current_id, EndOfResult()))
+                        current_id, current_coro = None, None
             except Exception as e:
-                if current is not None:
-                    conn.send((current[0], QSError(e)))
+                if current_id is not None:
+                    conn.send((current_id, QSError(e)))
                 else:
                     conn.send(QSError(e))
             finally:
@@ -196,16 +196,23 @@ class QulabService:
 
 
 class QSInstrumentWorker(QSWorker):
-    def __init__(self, addr, driver):
+    def __init__(self, inst_name, backends='@ni'):
         super().__init__()
-        self.addr = addr
-        self.driver = driver
+        self.name = inst_name
+        self.backends = backends
 
     def initialize(self):
-        mod = importlib.import_module(self.driver)
-        Driver = getattr(mod, 'Driver')
-        self.ins = Driver(**info)
+        from qulab._driver import DriverManager
+        self.mgr = DriverManager(self.backends)
+        self.ins = self.mgr.open(self.name)
         self.ins.performOpen()
 
     def do(self, task):
-        pass
+        ret = getattr(self.ins, task.kw['method'])(
+            *task.kw['args'], **task.kw['kw'])
+        if ret == self.ins:
+            ret = 'self'
+        yield ret
+
+    def finalize(self):
+        self.ins.close()
