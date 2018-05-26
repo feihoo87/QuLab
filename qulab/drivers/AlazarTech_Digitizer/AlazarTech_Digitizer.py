@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 
-from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
+from qulab import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
 from .AlazarCmd import *
 from .AlazarTech_Wrapper import AlazarTechDigitizer, getInputRange

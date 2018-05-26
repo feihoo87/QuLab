@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-from lab.device import BaseDriver, QInteger, QOption, QReal, QString, QVector
+from qulab import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
 
 class Driver(BaseDriver):
