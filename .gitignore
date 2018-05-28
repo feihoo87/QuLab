@@ -105,3 +105,4 @@ my_apps/
 
 .vscode/
 .pytest_cache/
+tests/instruments.py
