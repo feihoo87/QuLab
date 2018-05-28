@@ -19,7 +19,7 @@ class QuerySetUI():
         'Index': ['<th>Index</th>',
             lambda i,r: '<td>%d</td>' % i],
         'Id': ['<th>ID</th>',
-            lambda i,r: '<td>%r</td>' % r.id],
+            lambda i,r: '<td>%s</td>' % r.id],
         'Time': ['<th style="text-align:left">Time</th>',
             lambda i,r: '<td style="text-align:left">%s</td>' % r.finished_time.strftime('%Y-%m-%d %H:%M:%S')],
         'Title': ['<th style="text-align:left">Title</th>',
