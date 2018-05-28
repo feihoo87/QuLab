@@ -196,15 +196,16 @@ class QulabService:
 
 
 class QSInstrumentWorker(QSWorker):
-    def __init__(self, inst_name, backends='@ni'):
+    def __init__(self, address, driver, backends='@ni'):
         super().__init__()
-        self.name = inst_name
+        self.address = address
+        self.driver = driver
         self.backends = backends
 
     def initialize(self):
         from qulab._driver import DriverManager
         self.mgr = DriverManager(self.backends)
-        self.ins = self.mgr.open(self.name)
+        self.ins = self.mgr._open_resource(self.address, self.driver)
         self.ins.performOpen()
 
     def do(self, task):
