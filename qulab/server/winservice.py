@@ -32,7 +32,8 @@ class PythonService(win32serviceutil.ServiceFramework):
         return logger
 
     def _getServer(self):
-        pass
+        from qulab.server.server import QuLabServer
+        return QuLabServer()
 
     def SvcDoRun(self):
         self.server.run_for_ever()
