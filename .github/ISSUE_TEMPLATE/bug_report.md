@@ -3,33 +3,28 @@ name: Bug report
 about: Create a report to help us improve
 
 ---
+<!-- Please also try to search for your issue to avoid it being closed as a duplicate. -->
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+<!-- Change these to match your system. If you're using a version from GitHub, please mention so here along with the commit you're using. -->
+**System and QuLab version:**
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+- macOS 10.13.3
+- Python 3.6.4
+- QuLab 0.2.1
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+**Steps to reproduce:**
+- Code:
+```python
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+```
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+**Expected behavior:**
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+**Actual behavior:**
 
-**Additional context**
-Add any other context about the problem here.
+<!-- If you're reporting a crash, please copy the stack trace below.  If not, feel free to delete this section. -->
+
+- Crash report:
+```
+
+```
