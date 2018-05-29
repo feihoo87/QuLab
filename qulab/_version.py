@@ -1,2 +1,2 @@
 """Define version number here and read it from setup.py automatically"""
-__version__ = "0.3.6"
+__version__ = "0.4.0"
