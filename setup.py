@@ -30,6 +30,11 @@ requirements = [
     'quantities>=0.12.1',
 ]
 
+if platform.system() == 'Windows':
+    requirements.extend([
+        'pywin32>=220.1'
+    ])
+
 setup(
     name="QuLab",
     version=__version__,
