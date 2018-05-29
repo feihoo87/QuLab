@@ -233,7 +233,10 @@ class Step(Waveform):
     def __init__(self, width):
         super(Step, self).__init__(domain=(-0.5*width,0.5*width), outside=(0,1))
         self.width = width
-        self.calc = lambda x: (erf(5*x/width)+1)/2
+        if width == 0:
+            self.calc = lambda x: x>0
+        else:
+            self.calc = lambda x: (erf(5*x/width)+1)/2
         #self.calc = lambda t: a + (b - a) / (1 + np.exp(-(20*t)/width))
 
 class Gaussian(Waveform):
@@ -261,7 +264,7 @@ class Sinc(Waveform):
 __all__ = ['Waveform', 'DC', 'Interpolation', 'Step', 'Gaussian', 'Sin', 'Cos', 'Sinc']
 
 if __name__ == "__main__":
-    w = (0.7*Step(0.7)<<1) - (0.2*Step(0.2)) - (0.5*Step(0.5)>>1)
+    w = (0.7*Step(0.7)<<1) - (0.2*Step(0.2)) - (0.5*Step(0)>>1)
     readout = 0.2*Gaussian(0.05) << 0.11
     pulse = Gaussian(0.3)
     buff = DC(-0.2, 0.1)
