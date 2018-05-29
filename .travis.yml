@@ -14,4 +14,4 @@ deploy:
     secure: Ih0A1d1puzNsmbMHRF1vFGQixRs0wqDC93VZHYaW1tDDI0wGpidaKgHmm3vpHP+uJlQrtil/OUPv0xnQC5QCNX3I4fD6akr2QwYlYxvlbisHYZ5vOHSv/cVud5ezYaIz4dP1m/cbatf0K5YlaD92ETfNMwTzd4LmcPtihPgyq7u/6Az0yL+pfqRVsshmcQV/bAH8VvkPCYjZ/3nuQV9cKBHzP7ZbRzOI5z5pTv1oTlnGyhxczB1uKpY9GPcdLxZDyAeVcqG1Pnwdq1UUHve3aXAWTyPMG9I9EC4B33FgpQRj4gLhp0HeLs2glkQlfLapVbV6kWuFRoslYXB5Hh6l4zNasqhn8FUrU2yUFtJEnnatxNJ/7ZpnYuWS3CG9r+Mfu4IwF1L8iW++ogUW6nhwnwxPCZKMmvwlMvs2Q8kF4ikqbkL4ZBgPWv9qoKfkrvg2/AsUfTvzACICMaJ4CUBVEp8yOQWvguzvct/IbhGMqWhr5czW54HD5qBCudXAUI4TjZU5EBgFseckKidt7jWsYKKewj7krKPjpPPOwIUj8eA+QI0pWkijlFyzezghhDLKgxZLenS0IQkyrFuWvYz5C9fxYzFUZ/XKeKgEa10h5NUHMNjn9QLbES9qXEg2CTNfnB9LctmkMXg5zCICIVSCKB80jGDV2/eVYCK2jgdp+cg=
   on:
     branch: master
-    condition: $(python -c "exec(open('qulab/_version.py').read());print(__version__)") != $(curl https://pypi.org/simple/qulab/ | grep QuLab | tail -1 | sed "s/^.*QuLab-//" | sed "s/.tar.gz.*$//")
+    tags: true
