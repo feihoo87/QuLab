@@ -1,16 +1,16 @@
 aiohttp==3.2.1
-numpy==1.13.3
-scipy==1.0.0
-matplotlib==2.1.0
+numpy==1.14.3
+scipy==1.1.0
+matplotlib==2.2.2
 jupyter==1.0.0
 requests==2.18.4
-tornado==5.0.1
-motor==1.2.1
+tornado==5.0.2
+motor==1.2.2
 mongoengine==0.15.0
 blinker==1.4
-pyvisa==1.8
+pyvisa==1.9.0
 pyvisa-py==0.2
 PyYAML==3.12
 quantities==0.12.1
 
-pywin32==220.1; platform_system=="Windows"
+pywin32==223; platform_system=="Windows"
