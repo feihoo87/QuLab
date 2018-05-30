@@ -1,6 +1,6 @@
 aiohttp==3.2.1
 numpy==1.14.3
-scipy==1.0.0
+scipy==1.1.0
 matplotlib==2.2.2
 jupyter==1.0.0
 requests==2.18.4
