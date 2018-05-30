@@ -4,7 +4,7 @@ scipy==1.0.0
 matplotlib==2.1.0
 jupyter==1.0.0
 requests==2.18.4
-tornado==5.0.1
+tornado==5.0.2
 motor==1.2.1
 mongoengine==0.15.0
 blinker==1.4
