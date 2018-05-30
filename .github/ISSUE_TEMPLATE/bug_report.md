@@ -3,6 +3,7 @@ name: Bug report
 about: Create a report to help us improve
 
 ---
+
 <!-- Please also try to search for your issue to avoid it being closed as a duplicate. -->
 
 <!-- Change these to match your system. If you're using a version from GitHub, please mention so here along with the commit you're using. -->
