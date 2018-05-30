@@ -8,6 +8,7 @@ import yaml
 CONFIG_DIRNAME = 'QuLab'
 CONFIG_FILENAME = 'config.yaml'
 CACHES_DIRNAME = 'caches'
+LOG_DIRNAME = 'logs'
 DEFAULT_CONFIG = {'db': {'db': 'lab', 'host': 'localhost'}}
 CONFIG_TEMPLATE = '''
 ca_cert: &ca_cert '{cfg_path}/ca.pem'
@@ -58,6 +59,10 @@ def config_file():
 
 def caches_dir():
     return config_dir() / CACHES_DIRNAME
+
+
+def log_dir():
+    return config_dir() / LOG_DIRNAME
 
 
 def create_config(db_user, db_password):

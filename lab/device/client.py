@@ -152,10 +152,10 @@ class InstrumentManager:
             self._sessions[(server, port)] = s
         return self._sessions[(server, port)]
 
-    def open_remote_resource(self, instrument, host=None, timeout=10):
+    def open_remote_resource(self, instrument, host=None, port=DEFAULT_PORT, timeout=10):
         host = instrument.host if host is None else host
         client = InstrumentClient(
-            instrument.name, session=self.get_session(host), timeout=timeout)
+            instrument.name, session=self.get_session(host, port), timeout=timeout)
         client.open()
         return client
 
@@ -168,7 +168,7 @@ class InstrumentManager:
         else:
             return self._drvmgr_ni.open(instrument, timeout=timeout, **kwds)
 
-    def open_resource(self, instrument, host=None, timeout=10):
+    def open_resource(self, instrument, host=None, port=DEFAULT_PORT, timeout=10):
         if isinstance(instrument, str):
             inst = db.query.getInstrumentByName(instrument)
             if inst is None:
@@ -178,4 +178,4 @@ class InstrumentManager:
         if instrument.host == 'localhost' and host is None:
             return self.open_local_resource(instrument, timeout)
         else:
-            return self.open_remote_resource(instrument, host, timeout)
+            return self.open_remote_resource(instrument, host, port, timeout)
