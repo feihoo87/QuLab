@@ -14,17 +14,14 @@ class Driver(BaseDriver):
 
     quants = [
         QOption('Output',ch=1,
-        set_cmd='OUTP%(ch)d %(option)s', get_cmd='OUTP%(ch)d?'
-        options=[('OFF', 'OFF'), ('ON', 'ON')]),  # must set chanel
-
+        set_cmd='OUTP%(ch)d %(option)s', get_cmd='OUTP%(ch)d?',
+        options=[('OFF', 'OFF'), ('ON', 'ON')]),
         QOption('Function',ch=1,set_cmd='SOUR%(ch)d:FUNC %(option)s',get_cmd='SOUR%(ch)d:FUNC?',
             options=[('Sin','SIN'),('Square','SQU'),('Pulse','PULS'),('Ramp','RAMP'),
                 ('PRNoise','PRN'),('DC','DC'),('SINC','SINC'),('Gaussian','GAUS'),
                 ('Lorentz','LOR'),('Erise','ERIS'),('Edecay','EDEC'),('Haversine','HAV'),
                 ('User','USER'),('User2','USER2')]),
-
-        QReal('Frequency',unit='Hz',ch=1,set_cmd='SOUR%(ch)d:FREQ %(value)e%(unit)s',get_cmd='SOUR%(ch)d:FREQ?'),
-        QReal('Phase',unit='rad',ch=1,set_cmd='SOUR%(ch)d:PHAS %(value)f%(unit)s',get_cmd='SOUR%(ch)d:PHAS?'),
+        # Pulse Func
         QReal('Pulse Delay',unit='s',ch=1,set_cmd='SOUR%(ch)d:PULS:DEL %(value).9e%(unit)s',get_cmd='SOUR%(ch)d:PULS:DEL?'),
         QReal('Pulse Period',unit='s',ch=1,set_cmd='SOUR%(ch)d:PULS:PER %(value).9e%(unit)s',get_cmd='SOUR%(ch)d:PULS:PER?'),
         QReal('Pulse Width',unit='s',ch=1,set_cmd='SOUR%(ch)d:PULS:WIDT %(value).9e%(unit)s',get_cmd='SOUR%(ch)d:PULS:WIDT?'),

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 logger = logging.getLogger('qulab.drivers.ATS')
-logger.addHandler(logging.NullHandler())
+logger.setLevel(logging.DEBUG)
 
 logger.debug('ATS driver start loading APIs ...')
 
