@@ -14,7 +14,7 @@ class Driver(BaseDriver):
 
     quants = [
         QOption('Output',ch=1,
-        set_cmd='OUTP%(ch)d %(option)s', get_cmd='OUTP%(ch)d?'
+        set_cmd='OUTP%(ch)d %(option)s', get_cmd='OUTP%(ch)d?',
         options=[('OFF', 'OFF'), ('ON', 'ON')]),  # must set chanel
 
         QOption('Function',ch=1,set_cmd='SOUR%(ch)d:FUNC %(option)s',get_cmd='SOUR%(ch)d:FUNC?',
