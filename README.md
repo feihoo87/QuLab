@@ -17,7 +17,6 @@ python -m pip install QuLab
 ```bash
 git clone https://github.com/feihoo87/QuLab.git
 cd QuLab
-make
 python -m pip install .
 ```
 
