@@ -1,5 +1,5 @@
 aiohttp==3.3.0
-numpy==1.14.3
+numpy==1.14.4
 scipy==1.1.0
 matplotlib==2.2.2
 jupyter==1.0.0
