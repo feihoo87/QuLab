@@ -4,7 +4,7 @@ from qulab import BaseDriver, QInteger, QOption, QReal, QVector
 
 
 class Driver(BaseDriver):
-    support_models = ['E8363C', 'ZNB20-2Port','E8363B']
+    support_models = ['E8363B', 'E8363C', 'E5071C', 'ZNB20-2Port']
 
     quants = [
         QReal('Power', value=-20, unit='dBm', set_cmd='SOUR:POW %(value)e%(unit)s', get_cmd='SOUR:POW?'),
@@ -78,11 +78,17 @@ class Driver(BaseDriver):
         self.write('*WAI')
         #Get the data
         self.write('FORMAT:BORD NORM')
-        self.write('FORMAT ASCII')
-        if formated:
-            data = np.asarray(self.query_ascii_values("CALC%d:DATA? FDATA" % ch))
+        if self.model in ['E5071C']:
+            self.write(':FORM:DATA ASC')
+            cmd = ("CALC%d:DATA:FDATA?" % ch) if formated else ("CALC%d:DATA:SDATA?" % ch)
         else:
-            data = np.asarray(self.query_ascii_values("CALC%d:DATA? SDATA" % ch))
+            self.write('FORMAT ASCII')
+            cmd = ("CALC%d:DATA? FDATA" % ch) if formated else ("CALC%d:DATA? SDATA" % ch)
+        data = np.asarray(self.query_ascii_values(cmd))
+        if formated:
+            if self.model in ['E5071C']:
+                data = [::2]
+        else:
             data = data[::2]+1j*data[1::2]
         #Start the sweep
         self.setValue('Sweep', 'ON')
@@ -90,6 +96,8 @@ class Driver(BaseDriver):
 
     def pna_select(self, ch=1):
         '''Select the measurement'''
+        if self.model in ['E5071C']:
+            return
         if self.model in ['E8363C','E8363B']:
             quote = '" '
         elif self.model in ['ZNB20-2Port']:
@@ -114,7 +122,6 @@ class Driver(BaseDriver):
         elif self.model in ['ZNB20-2Port']:
             cmd = 'CALC:DATA:STIM?'
             return np.asarray(self.query_ascii_values(cmd))
-
 
     def set_segments(self, segments=[], form='Start Stop'):
         self.write('SENS:SEGM:DEL:ALL')
