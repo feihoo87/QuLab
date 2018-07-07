@@ -10,8 +10,6 @@ class Driver(BaseDriver):
     error_command = '*ESR?'
     support_models = ['AFG3102']
 
-
-
     quants = [
         QOption('Output',ch=1,
         set_cmd='OUTP%(ch)d %(option)s', get_cmd='OUTP%(ch)d?',
