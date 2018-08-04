@@ -87,7 +87,7 @@ class Driver(BaseDriver):
         data = np.asarray(self.query_ascii_values(cmd))
         if formated:
             if self.model in ['E5071C']:
-                data = [::2]
+                data = data[::2]
         else:
             data = data[::2]+1j*data[1::2]
         #Start the sweep
