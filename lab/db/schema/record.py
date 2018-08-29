@@ -63,10 +63,41 @@ class Project(Document):
         return Record.objects(project=self)
 
 
+class Layout(Document):
+    name = StringField(max_length=50)
+    complete_date = ComplexDateTimeField()
+    import_time = ComplexDateTimeField(default=now)
+    author = ListField(StringField(max_length=50))
+    email = ListField(EmailField())
+    serial_number = StringField(max_length=50,unique=True)
+    layout_file = FileField(collection_name='layout')
+    description = StringField()
+    modify_comment = StringField()
+    tags = ListField(StringField(max_length=50))
+    images = ListField(FileField(collection_name='images'))
+
+    cavities = DictField()
+    other = DictField()
+
+def import_Layout():
+    '''from the yaml file of the layout'''
+    pass
+
+
 class Sample(Document):
     name = StringField(max_length=50)
-    discription = StringField()
+    complete_date = ComplexDateTimeField()
+    set_time = ComplexDateTimeField(default=now)
+    maker = ListField(StringField(max_length=50))
+    layout = ReferenceField('Layout')
+    fabrication_number = StringField(max_length=50,unique=True)
+    serial_number = StringField(max_length=100,unique=True)
+    description = StringField()
+    tags = ListField(StringField(max_length=50))
     images = ListField(FileField(collection_name='images'))
+
+    technology = DictField()
+    pretest = DictField()
 
     @property
     def _imageFS(self):
@@ -105,6 +136,11 @@ class Sample(Document):
             content_type=content_type)
         self.collection.update({'_id': self.id}, {"$set": {'images': files}})
         self._imageFS.delete(oldfid)
+
+
+def set_Sample():
+    '''from the yaml file of the sample'''
+    pass
 
 
 def query_records_by_app_name(app_name, show_hidden=False, version=None):
