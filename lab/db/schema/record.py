@@ -89,6 +89,7 @@ class Sample(Document):
     complete_date = ComplexDateTimeField()
     set_time = ComplexDateTimeField(default=now)
     maker = ListField(StringField(max_length=50))
+    email = ListField(EmailField())
     layout = ReferenceField('Layout')
     fabrication_number = StringField(max_length=50,unique=True)
     serial_number = StringField(max_length=100,unique=True)
@@ -98,6 +99,7 @@ class Sample(Document):
 
     technology = DictField()
     pretest = DictField()
+    other = DictField()
 
     @property
     def _imageFS(self):
