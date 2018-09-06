@@ -229,6 +229,7 @@ ats_addr = re.compile(
     r'^(ATS9360|ATS9850|ATS9870)::SYSTEM([0-9]+)::([0-9]+)(|::INSTR)$')
 gpib_addr = re.compile(r'^GPIB[0-9]?::[0-9]+(::.+)？$')
 p_addr = re.compile(r'^([a-zA-Z]+)[0-9]*::.+$')
+zi_addr = re.compile(r'^ZI::([a-zA-Z]+[0-9]*)::([a-zA-Z-]+[0-9]*)(|::INSTR)$')
 
 def parse_resource_name(addr):
     m = p_addr.search(addr)
@@ -249,11 +250,24 @@ def _parse_ats_resource_name(m, addr):
         boardID=boardID,
         addr=addr)
 
+def _parse_zi_resource_name(z, addr):
+    model = z.group(1)
+    deviceID = z.group(2)
+    return dict(
+        type='ZI',
+        ins=None,
+        company='ZurichInstruments',
+        model=model,
+        deviceID=deviceID,
+        addr=addr)
 
 def _parse_resource_name(addr):
     m = ats_addr.search(addr)
+    z = zi_addr.search(addr)
     if m is not None:
         return _parse_ats_resource_name(m, addr)
+    if z is not None:
+        return _parse_zi_resource_name(z, addr)
     else:
         return dict(type='Visa', addr=addr)
 
