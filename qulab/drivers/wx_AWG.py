@@ -20,10 +20,10 @@ class Driver(BaseDriver):
            set_cmd=':VOLT:LEV:OFFS %(value)f',
            get_cmd=':VOLT:LEV:OFFS?'),
 
-        Qoption('Output',
+        QOption('Output',
 			set_cmd=':OUTP %(option)s',
 			get_cmd=':OUTP?',
-			options=['ON','OFF']),
+			options=[('OFF', 'OFF'), ('ON', 'ON')]),
 
         QInteger('Select_ch', value=1, unit='',
 			set_cmd=':INST:SEL CH%(value)d',
@@ -37,7 +37,7 @@ class Driver(BaseDriver):
 
     def reset(self,samplerate):
         #设置采样率
-        self.write(':FREQ:RAST %d',%samplerate)
+        self.write(':FREQ:RAST %d' %samplerate)
         #设置外部时钟
         self.write(':ROSCillator:SOURce EXTernal')
         #清除原有波形
