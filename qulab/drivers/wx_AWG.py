@@ -48,8 +48,8 @@ class Driver(BaseDriver):
         self.write(':TRAC:DEL:ALL')
         #将几个通道的设置设为同一个，详见manual
         self.write(':INST:COUPle:STATe ON')
-#		self.write(':INIT:CONT OFF')
-#		self.write(':TRIG:COUN 1')
+        self.write(':INIT:CONT OFF')
+        self.write(':TRIG:COUN 1')
 #		self.write('enable')
 
     #创建波形文件
@@ -57,7 +57,7 @@ class Driver(BaseDriver):
         self.write(':TRAC:DEF %d,%d' %(segment_num,sample_num))
 
     #在创建好的波形文件中，写入或者更新具体波形
-    def upwave(self,message,points,ch=1,trac=1):
+    def upwave(self,points,ch=1,trac=1):
         #选择特定channel
         self.write(':INST:SEL CH%d' %ch)
         #选择特定的segment
