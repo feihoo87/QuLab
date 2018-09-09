@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-from qulab import BaseDriver, QOption, QReal, QList
+from qulab import BaseDriver, QOption, QReal, QList, QInteger
 
 
 class Driver(BaseDriver):
@@ -25,11 +25,12 @@ class Driver(BaseDriver):
 			get_cmd=':OUTP?',
 			options=[('OFF', 'OFF'), ('ON', 'ON')]),
 
-        QInteger('Select_ch', value=1, unit='',
-			set_cmd=':INST:SEL CH%(value)d',
-			get_cmd=':INST:SEL?'),
+        QOption('Select_ch',
+			set_cmd=':INST:SEL CH%(option)s',
+			get_cmd=':INST:SEL?',
+            options=[('1', '1'), ('2', '2'), ('3', '3'), ('4', '4')]),
 
-        QInteger('Select_trac', value=1, unit='',
+        QInteger('Select_trac',value=1,unit='',
 			set_cmd=':TRAC:SEL %(value)d',
 			get_cmd=':TRAC:SEL?'),
 
