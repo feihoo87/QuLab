@@ -5,7 +5,7 @@ from qulab import BaseDriver, QOption, QReal, QList
 
 
 class Driver(BaseDriver):
-    support_models = ['AWG5014C', 'AWG5208']
+    support_models = ['wx2184']
 
     quants = [
         QReal('Sample Rate', unit='S/s',
@@ -15,7 +15,7 @@ class Driver(BaseDriver):
 		QReal('Vpp', unit='V',
            set_cmd=':VOLT:LEV:AMPL %(value)f',
            get_cmd=':VOLT:LEV:AMPL?'),
-         
+
         QReal('Offset', unit='V',
            set_cmd=':VOLT:LEV:OFFS %(value)f',
            get_cmd=':VOLT:LEV:OFFS?'),
@@ -32,10 +32,10 @@ class Driver(BaseDriver):
 		QInteger('Select_trac', value=1, unit='',
 			set_cmd=':TRAC:SEL %(value)d',
 			get_cmd=':TRAC:SEL?'),
-			
+
 			)
             ]
-	
+
 	def reset(self,samplerate):
 		#设置采样率
 		self.write(':FREQ:RAST %d',%samplerate)
@@ -51,7 +51,7 @@ class Driver(BaseDriver):
 #		self.write(':INIT:CONT OFF')
 #		self.write(':TRIG:COUN 1')
 #		self.write('enable')
-	
+
 	#创建波形文件
 	def crwave(self,segment_num,sample_num):
 		self.write(':TRAC:DEF %d,%d' %(segment_num,sample_num))
@@ -72,10 +72,9 @@ class Driver(BaseDriver):
         self.write_binary_values(message, values, datatype=u'H',
                                  is_big_endian=False,
                                  termination=None, encoding=None)
-	
+
 	#运行波形
 	def ruwave(self,ch=1,trac=1):
 		self.write(':INST:SEL CH%d' %ch)
 		self.write(':TRAC:SEL %d' %trac)
 		self.write(':OUTP ON')
-
