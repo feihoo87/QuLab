@@ -12,7 +12,7 @@ class Driver(BaseDriver):
           set_cmd=':FREQ:RAST %(value)g',
           get_cmd=':FREQ:RAST?'),
 
-		QReal('Vpp', unit='V',
+        QReal('Vpp', unit='V',
            set_cmd=':VOLT:LEV:AMPL %(value)f',
            get_cmd=':VOLT:LEV:AMPL?'),
 
@@ -20,20 +20,19 @@ class Driver(BaseDriver):
            set_cmd=':VOLT:LEV:OFFS %(value)f',
            get_cmd=':VOLT:LEV:OFFS?'),
 
-		Qoption('Output',
+        Qoption('Output',
 			set_cmd=':OUTP %(option)s',
 			get_cmd=':OUTP?',
 			options=['ON','OFF']),
 
-		QInteger('Select_ch', value=1, unit='',
+        QInteger('Select_ch', value=1, unit='',
 			set_cmd=':INST:SEL CH%(value)d',
 			get_cmd=':INST:SEL?'),
 
-		QInteger('Select_trac', value=1, unit='',
+        QInteger('Select_trac', value=1, unit='',
 			set_cmd=':TRAC:SEL %(value)d',
 			get_cmd=':TRAC:SEL?'),
 
-			)
             ]
 
 	def reset(self,samplerate):
