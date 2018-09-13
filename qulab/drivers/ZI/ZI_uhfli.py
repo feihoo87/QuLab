@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+import os
 import zhinst.utils
 
 from qulab import BaseDriver, QInteger, QOption, QReal, QString, QVector
@@ -29,12 +30,39 @@ class Driver(BaseDriver):
         (daq, device, props) = zhinst.utils.create_api_session(self.deviceID, apilevel)
         zhinst.utils.api_server_version_check(daq)
         # Create a base configuration: Disable all available outputs, awgs, demods, scopes,...
-        zhinst.utils.disable_everything(daq, device)
+        # zhinst.utils.disable_everything(daq, device)
         self.daq = daq
+        self.device = device
+        self.props = props
 
     def performSetValue(self, quant, value, **kw):
         pass
 
     def performGetValue(self, quant, **kw):
-        # self.set_configs()
-        return quant.getValue(**kw)
+        # return quant.getValue(**kw)
+        pass
+
+    def load_settings(self, filename):
+        if os.path.isabs(filename):
+            zhinst.utils.load_settings(self.daq, self.device, filename)
+        else:
+            path_default=zhinst.utils.get_default_settings_path(self.daq)
+            filename=os.path.normpath(os.path.join(path_default,filename))
+            zhinst.utils.load_settings(self.daq, self.device, filename)
+
+    def save_settings(self, filename):
+        if os.path.isabs(filename):
+            zhinst.utils.save_settings(self.daq, self.device, filename)
+        else:
+            path_default=zhinst.utils.get_default_settings_path(self.daq)
+            filename=os.path.normpath(os.path.join(path_default,filename))
+            dir=os.path.dirname(filename)
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+            zhinst.utils.save_settings(self.daq, self.device, filename)
+
+    def disable_everything(self):
+        zhinst.utils.disable_everything(self.daq, self.device)
+
+    def dataaq(self):
+        pass
