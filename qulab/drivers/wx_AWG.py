@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
+import visa
 
 from qulab import BaseDriver, QOption, QReal, QList, QInteger
 
@@ -26,7 +27,7 @@ class Driver(BaseDriver):
 			options=[('OFF', 'OFF'), ('ON', 'ON')]),
 
         QOption('Select_ch',
-			set_cmd=':INST:SEL CH%(option)s',
+			set_cmd=':INST:SEL %(option)s',
 			get_cmd=':INST:SEL?',
             options=[('1', '1'), ('2', '2'), ('3', '3'), ('4', '4')]),
 
@@ -36,7 +37,7 @@ class Driver(BaseDriver):
 
             ]
 
-    def reset(self,samplerate):
+    def reset(self,samplerate=2.3e9):
         #设置采样率
         self.write(':FREQ:RAST %d' %samplerate)
         #设置外部时钟
@@ -58,23 +59,25 @@ class Driver(BaseDriver):
 
     #在创建好的波形文件中，写入或者更新具体波形
     def upwave(self,points,ch=1,trac=1):
+        pointslen=len(points)
+        #选择特定function
+        self.write(':FUNC:MODE USER')
         #选择特定channel
-        self.write(':INST:SEL CH%d' %ch)
+        self.write(':INST:SEL %d' %ch)
+        #定义特定的segment
+        self.write(':TRAC:DEF %d,%d' %(trac,pointslen))
         #选择特定的segment
         self.write(':TRAC:SEL %d' %trac)
         #选择模式为SINGLE，（包括DUPLicate，SINGle等，详见manual）
         self.write(':TRAC:MODE SING' )
         #写入波形数据
-        pointslen=len(points)
-        message=':TRAC:DATA#%d%d' % (len(str(2*pointslen)), 2*pointslen)
+        message=':TRAC:DATA#%d%d' % (len(str(2*pointslen)),2*pointslen)
         points = points.clip(-1,1)
         values = (points * 0x1fff).astype(int) + 0x1fff
-        self.write_binary_values(message, values, datatype=u'H',
-                                 is_big_endian=False,
-                                 termination=None, encoding=None)
+        self.write_binary_values(message, values, datatype=u'H',is_big_endian=False,termination=None, encoding=None)
 
 	#运行波形
     def ruwave(self,ch=1,trac=1):
-        self.write(':INST:SEL CH%d' %ch)
+        self.write(':INST:SEL %d' %ch)
         self.write(':TRAC:SEL %d' %trac)
         self.write(':OUTP ON')
