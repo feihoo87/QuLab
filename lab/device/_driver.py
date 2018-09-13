@@ -229,7 +229,7 @@ ats_addr = re.compile(
     r'^(ATS9360|ATS9850|ATS9870)::SYSTEM([0-9]+)::([0-9]+)(|::INSTR)$')
 gpib_addr = re.compile(r'^GPIB[0-9]?::[0-9]+(::.+)？$')
 p_addr = re.compile(r'^([a-zA-Z]+)[0-9]*::.+$')
-zi_addr = re.compile(r'^ZI::([a-zA-Z]+[0-9]*)::([a-zA-Z-]+[0-9]*)(|::INSTR)$')
+zi_addr = re.compile(r'^(ZI)::([a-zA-Z]+[0-9]*)::([a-zA-Z-]+[0-9]*)(|::INSTR)$')
 
 def parse_resource_name(addr):
     m = p_addr.search(addr)
@@ -251,8 +251,8 @@ def _parse_ats_resource_name(m, addr):
         addr=addr)
 
 def _parse_zi_resource_name(z, addr):
-    model = z.group(1)
-    deviceID = z.group(2)
+    model = z.group(2)
+    deviceID = z.group(3)
     return dict(
         type='ZI',
         ins=None,

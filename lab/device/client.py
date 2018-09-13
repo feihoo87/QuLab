@@ -163,7 +163,7 @@ class InstrumentManager:
         if instrument.host not in self._hosts:
             return None
         protocol, addr = parse_resource_name(instrument.address)
-        if protocol in ['TCPIP']:
+        if protocol in ['TCPIP','ZI']: # 'ZI'仪器不会调用这两个后端，但如果电脑没装NI，用下面那个会报错
             return self._drvmgr_py.open(instrument, timeout=timeout, **kwds)
         else:
             return self._drvmgr_ni.open(instrument, timeout=timeout, **kwds)
