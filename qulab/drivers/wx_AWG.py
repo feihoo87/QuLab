@@ -38,6 +38,10 @@ class Driver(BaseDriver):
             ]
 
     def reset(self,samplerate=2.3e9):
+        self.write('*CLS')
+        self.write('*RST')
+        #选择特定function
+        self.write(':FUNC:MODE USER')
         #设置采样率
         self.write(':FREQ:RAST %d' %samplerate)
         #设置外部时钟
@@ -49,9 +53,9 @@ class Driver(BaseDriver):
         self.write(':TRAC:DEL:ALL')
         #将几个通道的设置设为同一个，详见manual
         self.write(':INST:COUPle:STATe ON')
-        self.write(':INIT:CONT OFF')
-        self.write(':TRIG:COUN 1')
-#		self.write('enable')
+        # self.write(':INIT:CONT OFF')
+        # self.write(':TRIG:COUN 1')
+        # self.write('enable')
 
     #创建波形文件
     def crwave(self,segment_num,sample_num):
@@ -60,6 +64,7 @@ class Driver(BaseDriver):
     #在创建好的波形文件中，写入或者更新具体波形
     def upwave(self,points,ch=1,trac=1):
         pointslen=len(points)
+        pointslen2=2*pointslen
         #选择特定function
         self.write(':FUNC:MODE USER')
         #选择特定channel
@@ -71,13 +76,26 @@ class Driver(BaseDriver):
         #选择模式为SINGLE，（包括DUPLicate，SINGle等，详见manual）
         self.write(':TRAC:MODE SING' )
         #写入波形数据
-        message=':TRAC:DATA#%d%d' % (len(str(2*pointslen)),2*pointslen)
+        message=':TRAC:DATA'# % (len(str(pointslen2)),pointslen2)
         points = points.clip(-1,1)
-        values = (points * 0x1fff).astype(int) + 0x1fff
-        self.write_binary_values(message, values, datatype=u'H',is_big_endian=False,termination=None, encoding=None)
+        values=np.zeros(pointslen).astype(np.uint16)
+        #乘积选用8191是为了防止最终值大于16383
+        values = (points * 8191).astype(np.uint16)+8192 #.astype(np.uint16)
+        byte=np.zeros(pointslen2).astype(np.uint8)
+        #将原先的两比特数据点，分割为高低两个比特
+        byte[0:pointslen2:2]=(values & 0b11111111).astype(np.uint8)
+        byte[1:pointslen2:2]=((values & 0b11111100000000) >> 8).astype(np.uint8)
+        #write_binary_value中的message参数不要包括#42048的信息，因为pyvisa可以自动算出结果。详见pyvisa中util.py内的to_binary_block
+        #wx2184选用little_endian。这表示程序按照我给的顺序将二进制包写进去
+        self.write_binary_values(message, byte, datatype='B',is_big_endian=False,termination=None, encoding=None)
+        # self.write('enable' )
 
 	#运行波形
-    def ruwave(self,ch=1,trac=1):
+    def ruwave(self,amp=2,offset=0,ch=1,trac=1):
         self.write(':INST:SEL %d' %ch)
+        self.write(':VOLT:LEV:AMPL %d' %amp)
+        self.write(':VOLT:LEV:OFFS %d' %offset)
         self.write(':TRAC:SEL %d' %trac)
         self.write(':OUTP ON')
+        self.write(':INIT:CONT OFF')
+        self.write(':TRIG:COUN 1')
