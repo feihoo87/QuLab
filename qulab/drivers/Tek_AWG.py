@@ -48,7 +48,10 @@ class Driver(BaseDriver):
 
     def performOpen(self):
         self.waveform_list = self.get_waveform_list()
-        self.sequence_list = self.get_sequence_list()
+        try: #没有sequence模块的仪器会产生一个错误
+            self.sequence_list = self.get_sequence_list()
+        except:
+            self.sequence_list = None
 
     def performSetValue(self, quant, value, **kw):
         if quant.name == '':

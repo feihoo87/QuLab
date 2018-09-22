@@ -301,6 +301,7 @@ class DataCollector:
         record = db.update.newRecord(
             title=self.app.title(),
             user=get_current_user(),
+            settings=self.app.settings,
             tags=self.app.tags,
             params=self.app.params,
             rc=rc,
