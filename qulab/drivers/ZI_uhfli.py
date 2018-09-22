@@ -2,6 +2,8 @@ import logging
 
 import numpy as np
 import os
+import time
+# need zhinst package
 import zhinst.utils
 
 from qulab import BaseDriver, QInteger, QOption, QReal, QString, QVector
@@ -12,9 +14,7 @@ logger = logging.getLogger('qulab.drivers.ZI')
 
 class Driver(BaseDriver):
     support_models = ['UHFLI', ]
-    quants = [
-
-    ]
+    quants = []
 
     def __init__(self, **kw):
         BaseDriver.__init__(self, **kw)
@@ -29,8 +29,6 @@ class Driver(BaseDriver):
         # - the device's discovery properties.
         (daq, device, props) = zhinst.utils.create_api_session(self.deviceID, apilevel)
         zhinst.utils.api_server_version_check(daq)
-        # Create a base configuration: Disable all available outputs, awgs, demods, scopes,...
-        # zhinst.utils.disable_everything(daq, device)
         self.daq = daq
         self.device = device
         self.props = props
@@ -49,6 +47,8 @@ class Driver(BaseDriver):
             path_default=zhinst.utils.get_default_settings_path(self.daq)
             filename=os.path.normpath(os.path.join(path_default,filename))
             zhinst.utils.load_settings(self.daq, self.device, filename)
+        time.sleeo(0.5)
+        self.daq.sync()
 
     def save_settings(self, filename):
         if os.path.isabs(filename):
