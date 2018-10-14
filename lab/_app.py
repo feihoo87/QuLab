@@ -43,8 +43,8 @@ class Application(HasSource):
         self.run_event = asyncio.Event()
         self.interrupt_event = asyncio.Event()
         self.__title = None
-        self._setUp = lambda : None
-        self._tearDown = lambda : None
+        self._setUp = ''
+        self._tearDown = ''
 
         if parent is not None:
             self.rc.parent = parent.rc
@@ -196,7 +196,7 @@ class Application(HasSource):
     async def done(self):
         self.reset()
         self._set_start()
-        self._setUp()
+        exec(self._setUp())
         async for data in self.work():
             self.data.collect(data)
             result = self.data.result()
@@ -207,14 +207,14 @@ class Application(HasSource):
                 break
             await self.run_event.wait()
         self._set_done()
-        self._tearDown()
+        exec(self._tearDown())
         return self.data.result()
 
-    def setUp(self, f):
+    def setUp(self, f=''):
         self._setUp = f
         return self
 
-    def tearDown(self, f):
+    def tearDown(self, f=''):
         self._tearDown = f
         return self
 
@@ -301,8 +301,11 @@ class DataCollector:
         record = db.update.newRecord(
             title=self.app.title(),
             user=get_current_user(),
+            settings=self.app.settings,
             tags=self.app.tags,
             params=self.app.params,
+            setup=self._setUp
+            teardown=self._tearDown
             rc=rc,
             hidden=False if self.app.parent is None else True,
             app=self.app.__DBDocument__,
