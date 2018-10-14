@@ -22,6 +22,8 @@ class Record(Document):
     settings = DictField()
     rc = DictField()
     params = DictField()
+    setup = StringField()
+    teardown = StringField()
     datafield = FileField(collection_name='data')
 
     def __repr__(self):
