@@ -13,7 +13,7 @@ class Driver(BaseDriver):
           set_cmd=':FREQ:RAST %(value)g',
           get_cmd=':FREQ:RAST?'),
 
-        QReal('Vpp', unit='V',
+        QReal('Amp', unit='V',
            set_cmd=':VOLT:LEV:AMPL %(value)f',
            get_cmd=':VOLT:LEV:AMPL?'),
 
@@ -21,21 +21,46 @@ class Driver(BaseDriver):
            set_cmd=':VOLT:LEV:OFFS %(value)f',
            get_cmd=':VOLT:LEV:OFFS?'),
 
+        QReal('Frequency', unit='Hz',
+           set_cmd=':FREQ %(value)f',
+           get_cmd=':FREQ?'),
+
+        QReal('Phase', unit='Deg',
+           set_cmd=':SIN:PHAS %(value)f',
+           get_cmd=':SIN:PHAS?'),
+
         QOption('Output',
 			set_cmd=':OUTP %(option)s',
 			get_cmd=':OUTP?',
 			options=[('OFF', 'OFF'), ('ON', 'ON')]),
 
-        QOption('Select_ch',
-			set_cmd=':INST:SEL %(option)s',
+        QInteger('Select_ch',value=1,unit='',
+			set_cmd=':INST:SEL %(value)d',
 			get_cmd=':INST:SEL?',
-            options=[('1', '1'), ('2', '2'), ('3', '3'), ('4', '4')]),
+            ),
+            #options=[('1', '1'), ('2', '2'), ('3', '3'), ('4', '4')]
 
         QInteger('Select_trac',value=1,unit='',
 			set_cmd=':TRAC:SEL %(value)d',
 			get_cmd=':TRAC:SEL?'),
 
             ]
+    def dc(self,ch=1,offs=1.0):
+        self.write(':INST:SEL CH%d' %ch)
+        self.write(':FUNC:MODE FIX')
+        self.write(':FUNC:SHAP DC')
+        self.write(':DC %f' %offs)
+        self.write(':OUTP ON')
+
+    def sin(self,ch=1,freq=2e8,amp=0.5,offs=0.0,phas=0):
+        self.write(':INST:SEL CH%d' %ch)
+        self.write(':FUNC:MODE FIX')
+        self.write(':FUNC:SHAP SIN')
+        self.write(':FREQ %f' %freq)
+        self.write(':VOLT:LEV:AMPL %f' %amp)
+        self.write(':VOLT:LEV:OFFS %f' %offs)
+        self.write(':SIN:PHAS %f' %phas)
+        self.write(':OUTP ON')
 
     def reset(self,samplerate=2.3e9):
         self.write('*CLS')
@@ -52,7 +77,7 @@ class Driver(BaseDriver):
         self.write(':INST:SEL CH3')
         self.write(':TRAC:DEL:ALL')
         #将几个通道的设置设为同一个，详见manual
-        self.write(':INST:COUPle:STATe ON')
+        # self.write(':INST:COUPle:STATe ON')
         # self.write(':INIT:CONT OFF')
         # self.write(':TRIG:COUN 1')
         # self.write('enable')
@@ -91,10 +116,27 @@ class Driver(BaseDriver):
         # self.write('enable' )
 
 	#运行波形
-    def ruwave(self,amp=2,offset=0,ch=1,trac=1):
+    def ruwave(self,amp=2,offset=0,ch=1,trac=1,trigdelay=0):
         self.write(':INST:SEL %d' %ch)
-        self.write(':VOLT:LEV:AMPL %d' %amp)
-        self.write(':VOLT:LEV:OFFS %d' %offset)
+        self.write(':VOLT:LEV:AMPL %f' %amp)
+        self.write(':VOLT:LEV:OFFS %f' %offset)
+        self.write(':TRAC:SEL %d' %trac)
+        self.write(':OUTP ON')
+        self.write(':INIT:CONT OFF')
+        self.write(':TRIG:COUN 1')
+        self.write(':TRIG:DEL %d' %trigdelay)
+
+    def ruwave1(self,amp=2,offset=0,ch=1,trac=1):
+        self.write(':INST:SEL %d' %ch)
+        self.write(':VOLT:LEV:AMPL %f' %amp)
+        self.write(':VOLT:LEV:OFFS %f' %offset)
+        self.write(':TRAC:SEL %d' %trac)
+        self.write(':OUTP ON')
+        self.write(':INIT:CONT ON')
+
+    def ruwave2(self,amp=2,ch=1,trac=1):
+        self.write(':INST:SEL %d' %ch)
+        self.write(':VOLT:LEV:AMPL %f' %amp)
         self.write(':TRAC:SEL %d' %trac)
         self.write(':OUTP ON')
         self.write(':INIT:CONT OFF')
