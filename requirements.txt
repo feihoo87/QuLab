@@ -3,7 +3,7 @@ numpy==1.15.4
 scipy==1.1.0
 matplotlib==3.0.0
 jupyter==1.0.0
-requests==2.20.0
+requests==2.20.1
 tornado==5.1.1
 motor==2.0.0
 mongoengine==0.15.3
