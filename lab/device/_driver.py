@@ -240,7 +240,7 @@ def parse_resource_name(addr):
 
 def _parse_ats_resource_name(m, addr):
     type = m.group(1)
-    model = m.group(1)+m.group(2)
+    model = m.group(1)+str(m.group(2))
     systemID = int(m.group(3))
     boardID = int(m.group(4))
     return dict(
@@ -282,8 +282,6 @@ def _parse_resource_name(addr):
         if m is not None:
             type = m.group(1)
             break
-    # m = ats_addr.search(addr)
-    # z = zi_addr.search(addr)
     if type == 'ATS':
         return _parse_ats_resource_name(m, addr)
     elif type == 'ZI':
@@ -296,12 +294,16 @@ def _parse_resource_name(addr):
 
 def _open_visa_resource(rm, addr):
     ins = rm.open_resource(addr)
-    IDN = ins.query("*IDN?").split(',')
-    company = IDN[0].strip()
-    model = IDN[1].strip()
-    version = IDN[3].strip()
-    return dict(ins=ins, company=company, model=model, version=version, addr=addr)
-
+    # 对于非常旧的仪器，不支持IDN查询命令
+    try:
+        IDN = ins.query("*IDN?").split(',')
+    except VisaIOError:
+        return dict(ins=ins, addr=addr)
+    else:
+        company = IDN[0].strip()
+        model = IDN[1].strip()
+        version = IDN[3].strip()
+        return dict(ins=ins, company=company, model=model, version=version, addr=addr)
 
 class DriverManager(object):
     def __init__(self, visa_backends='@ni'):
