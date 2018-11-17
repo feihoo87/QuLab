@@ -304,8 +304,8 @@ class DataCollector:
             settings=self.app.settings,
             tags=self.app.tags,
             params=self.app.params,
-            setup=self._setUp
-            teardown=self._tearDown
+            setup=self._setUp,
+            teardown=self._tearDown,
             rc=rc,
             hidden=False if self.app.parent is None else True,
             app=self.app.__DBDocument__,
