@@ -3,13 +3,12 @@ import sys
 sys.path.append(r'C:\Program Files (x86)\Keysight\SD1\Libraries\Python')
 import keysightSD1
 
-
-
 import numpy as np
-from qulab import BaseDriver, QOption, QReal, QList
+from qulab import BaseDriver, QOption, QReal, QList, QInteger
 
 class Driver(BaseDriver):
     support_models = ['M3202A', ]
+
     quants = [
         QReal('Amplitude', unit='V', ch=0),
         #DC WaveShape
@@ -18,7 +17,7 @@ class Driver(BaseDriver):
         QReal('Frequency', unit='Hz', ch=0),
         QReal('Phase', unit='deg', ch=0),
 
-        QOption('WaveShape', ch=0,
+        QOption('WaveShape', ch=0, value='AWG',
             options = [('HIZ',       -1),
                        ('NoSignal',   0),
                        ('Sin',        1),
@@ -31,15 +30,47 @@ class Driver(BaseDriver):
         QReal('clockFrequency', unit='Hz'),
         QReal('clockSyncFrequency', unit='Hz'),
         # 板卡向外输出的时钟，默认状态关闭
-        QOption('clockIO',
-            options = [('OFF', 0),
-                       ('ON',  1),]),
+        QOption('clockIO', value='OFF', options = [('OFF', 0), ('ON',  1)]),
+        QOption('triggerIO', value='SyncIN',
+                            options = [('noSyncOUT', (0,0)),
+                                       ('SyncOUT',   (0,1)),
+                                       ('noSyncIN',  (1,0)),
+                                       ('SyncIN',    (1,1))]),
+
+        QOption('triggerMode', value='External', ch=0,
+                             options = [('Auto',         0),
+                                        ('SWtri',        1),
+                                        ('SWtriCycle',   5),
+                                        ('External',     2),
+                                        ('ExternalCycle',6)]),
+        # Defines the delay between the trigger and the waveform launch in tens of ns
+        QInteger('startDelay', value='0', unit='ns', ch=0, ),
+        # Number of times the waveform is repeated once launched (negative means infinite)
+        QInteger('cycles', value='1', ch=0,),
+        # Waveform prescaler value, to reduce the effective sampling rate
+        QInteger('prescaler', value='0', ch=0,),
+
+        QOption('Output', ch=0, value='OFF', options = [('OFF', 0),   ('ON', 1),
+                                                        ('Pause', 2), ('Resume', 3)]),
     ]
+    #CHs : 仪器通道
+    CHs=[0,1,2,3]
+    # config : 用来存储参数配置，防止由于多通道引起的混乱
+    config={}
 
     def __init__(self, **kw):
         BaseDriver.__init__(self, **kw)
         self.chassis=kw['CHASSIS']
         self.slot=kw['SLOT']
+        for q in self.quants:
+            _cfg={q.name:{}}
+            if q.ch is not None:
+                for i in self.CHs:
+                    _cfg[q.name].update({i:{'value':q.value, 'unit':q.unit}})
+            else:
+                _cfg[q.name].update({0:{'value':q.value, 'unit':q.unit}})
+            self.config.update(_cfg)
+
 
     def performOpen(self):
         #SD_AOU module
@@ -72,36 +103,57 @@ class Driver(BaseDriver):
         self.AWG.AWGflush(ch)
         self.AWG.channelWaveShape(ch, -1)
 
-    def performSetValue(self, quant, value, **kw):
+    def performSetValue(self, quant, value, ch=0, **kw):
+        _cfg={}
         if quant.name == 'Amplitude':
-            ch=kw.get('ch',quant.ch)
             self.AWG.channelAmplitude(ch, value)
         elif quant.name == 'Offset':
-            ch=kw.get('ch',quant.ch)
             self.AWG.channelOffset(ch, value)
         elif quant.name == 'Frequency':
-            ch=kw.get('ch',quant.ch)
             self.AWG.channelFrequency(ch, value)
         elif quant.name == 'Phase':
-            ch=kw.get('ch',quant.ch)
             self.phaseReset(ch)
             self.AWG.channelPhase(ch, value)
         elif quant.name == 'WaveShape':
-            ch=kw.get('ch',quant.ch)
-            options=dict(self.options)
+            options=dict(quant.options)
             self.AWG.channelWaveShape(ch, options[value])
         elif quant.name == 'clockFrequency':
             mode=kw.get('mode',1)
             self.AWG.clockSetFrequency(value,mode)
+            ch=0
         elif quant.name == 'clockIO':
-            options=dict(self.options)
+            options=dict(quant.options)
             self.AWG.clockIOconfig(options[value])
+            ch=0
+        elif quant.name == 'triggerIO':
+            options=dict(quant.options)
+            self.AWG.triggerIOconfigV5(*options[value])
+            ch=0
+        elif quant.name == 'Output':
+            if value=='OFF':
+                self.AWG.AWGstop(ch)
+            elif value=='ON':
+                self.AWG.AWGstart(ch)
+            elif value=='Pause':
+                self.AWG.AWGpause(ch)
+            elif value=='Resume':
+                self.AWG.AWGresume(ch)
+        _cfg['value']=value
+        self.config[quant.name][ch].update(_cfg)
 
-    def performGetValue(self, quant, **kw):
+
+    def performGetValue(self, quant, ch=0, **kw):
+        _cfg={}
         if quant.name == 'clockFrequency':
-            return self.AWG.clockGetFrequency()
+            value=self.AWG.clockGetFrequency()
+            ch=0
+            _cfg['value']=value
         elif quant.name == 'clockSyncFrequency':
-            return self.AWG.clockGetSyncFrequency()
+            value=self.AWG.clockGetSyncFrequency()
+            ch=0
+            _cfg['value']=value
+        self.config[quant.name][ch].update(_cfg)
+        return self.config[quant.name][ch]['value']
 
     def phaseReset(self,ch=0):
         self.AWG.channelPhaseReset(ch)
@@ -117,12 +169,12 @@ class Driver(BaseDriver):
         # waveformType 0: Analog 16Bits, Analog normalized waveforms (-1..1) defined with doubles
         # please refer AWG Waveform types about others
         wave = keysightSD1.SD_Wave()
-        if isinstance(file_array, str):
-            wave.newFromFile(file_array)
+        if isinstance(file_arrayA, str):
+            wave.newFromFile(file_arrayA)
             return wave
-        elif isinstance(file_array, (list,tuple)):
+        elif isinstance(file_arrayA, (list,tuple)):
             # 5: DigitalType, Digital waveforms defined with integers
-            if waveformType==5：
+            if waveformType==5:
                 wave.newFromArrayInteger(waveformType, file_arrayA, arrayB)
             else:
                 wave.newFromArrayDouble(waveformType, file_arrayA, arrayB)
@@ -142,7 +194,12 @@ class Driver(BaseDriver):
         and flushes all the AWG queues'''
         self.AWG.waveformFlush()
 
-
+    def AWGqueueWaveform(self, ch=0, waveform_num=0):
+        triggerMode = self.getCmdOption('triggerMode')
+        startDelay = self.getValue('startDelay')
+        cycles = self.getValue('cycles')
+        prescaler = self.getValue('prescaler')
+        self.AWG.AWGqueueWaveform(ch, waveform_num, triggerMode, startDelay, cycles, prescaler)
 
 
 
