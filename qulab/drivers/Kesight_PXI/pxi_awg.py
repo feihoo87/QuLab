@@ -4,7 +4,9 @@ sys.path.append(r'C:\Program Files (x86)\Keysight\SD1\Libraries\Python')
 import keysightSD1
 
 import numpy as np
+import yaml
 from qulab import BaseDriver, QOption, QReal, QList, QInteger
+from qulab.config import caches_dir
 
 class Driver(BaseDriver):
     support_models = ['M3202A', ]
@@ -60,11 +62,11 @@ class Driver(BaseDriver):
                                         ('RISE', 3),
                                         ('FALL', 4)]),
         # Defines the delay between the trigger and the waveform launch in tens of ns
-        QInteger('startDelay', value='0', unit='ns', ch=0, ),
+        QInteger('startDelay', value=0, unit='ns', ch=0, ),
         # Number of times the waveform is repeated once launched (negative means infinite)
-        QInteger('cycles', value='1', ch=0,),
+        QInteger('cycles', value=1, ch=0,),
         # Waveform prescaler value, to reduce the effective sampling rate
-        QInteger('prescaler', value='0', ch=0,),
+        QInteger('prescaler', value=0, ch=0,),
 
         QOption('Output', ch=0, value='Close', options = [('Stop', 0),  ('Run', 1),
                                                           ('Pause', 2), ('Resume', 3),
@@ -81,6 +83,9 @@ class Driver(BaseDriver):
         BaseDriver.__init__(self, **kw)
         self.chassis=kw['CHASSIS']
         self.slot=kw['SLOT']
+
+    def newcfg(self):
+        self.config={}
         for q in self.quants:
             _cfg={q.name:{}}
             if q.ch is not None:
@@ -90,6 +95,18 @@ class Driver(BaseDriver):
                 _cfg[q.name].update({0:{'value':q.value, 'unit':q.unit}})
             self.config.update(_cfg)
 
+    def loadcfg(self, file=None):
+        if file == None:
+            file = self.caches_file
+        with open(file, 'r', encoding='utf-8') as f:
+            self.config=yaml.load(f)
+
+    def savecfg(self, file=None):
+        if file == None:
+            file = self.caches_file
+        with open(file, 'w', encoding='utf-8') as f:
+            yaml.dump(self.config, f)
+
 
     def performOpen(self):
         #SD_AOU module
@@ -98,6 +115,8 @@ class Driver(BaseDriver):
         moduleID = self.AWG.openWithSlot(self.product, self.chassis, self.slot)
         if moduleID < 0:
         	print("Module open error:", moduleID)
+        self.newcfg()
+        self.caches_file = caches_dir() / (self.product+'_config_caches.yaml')
 
     def performClose(self):
         """Perform the close instrument connection operation"""
