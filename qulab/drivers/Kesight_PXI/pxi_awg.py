@@ -130,7 +130,6 @@ class Driver(BaseDriver):
                 self.closeCh(ch)
             # close instrument
             self.AWG.close()
-            # 删除
         except Exception:
             # never return error here
             pass
@@ -250,11 +249,7 @@ class Driver(BaseDriver):
         self.AWG.waveformFlush()
         self.config['WList'][0]['value']=[]
 
-    def AWGqueueWaveform(self, ch=0, waveform_num=0):
-        self.setValue('WaveShape', 'AWG', ch=ch)
-        Amplitude=self.getValue('Amplitude',ch=ch)
-        self.setValue('Amplitude', Amplitude, ch=ch)
-
+    def _getParams(self, ch):
         triggerModeIndex = self.getValue('triggerMode',ch=ch)
         triggerModeOptions=self.quantities['triggerMode'].options
         triggerMode = dict(triggerModeOptions)[triggerModeIndex]
@@ -278,30 +273,30 @@ class Driver(BaseDriver):
         startDelay = self.getValue('startDelay',ch=ch)
         cycles = self.getValue('cycles',ch=ch)
         prescaler = self.getValue('prescaler',ch=ch)
+
+        return triggerMode, startDelay, cycles, prescaler
+
+    def AWGqueueWaveform(self, ch=0, waveform_num=0):
+        self.setValue('WaveShape', 'AWG', ch=ch)
+        Amplitude=self.getValue('Amplitude',ch=ch)
+        self.setValue('Amplitude', Amplitude, ch=ch)
+
+        triggerMode, startDelay, cycles, prescaler=self._getParams(ch)
+
         self.AWG.AWGqueueWaveform(ch, waveform_num, triggerMode, startDelay, cycles, prescaler)
         self.config['SList'][ch]['value'].append(waveform_num)
 
+    def AWGrun(self, file_arrayA, arrayB=None, ch=0, waveformType=0, paddingMode = 0):
+        '''从文件或序列快速产生波形'''
+        self.setValue('WaveShape', 'AWG', ch=ch)
+        Amplitude=self.getValue('Amplitude',ch=ch)
+        self.setValue('Amplitude', Amplitude, ch=ch)
 
+        triggerMode, startDelay, cycles, prescaler=self._getParams(ch)
 
-
-    # def AWG_file(self,wave_file,ch=0,wave_id=0):
-    #     '''从文件载入波形，并输出
-    #         wave_file: 波形文件'''
-    #     # create, open from file, load to module RAM and queue for execution
-    #     wave = keysightSD1.SD_Wave()
-    #     wave.newFromFile(wave_file)
-    #     module = self.AWG
-    #     module.waveformLoad(wave, 0)
-    # 	module.AWGqueueWaveform(ch, wave_id, 0, 0, 0, 0)
-    #     error = module.AWGstart(0)
-    #     if error < 0:
-    # 		print("AWG from file error:", error)
-    #
-    # def AWG_array(self,waveform_data_list,ch=0):
-    #     # WAVEFORM FROM ARRAY/LIST
-    # 	# This function is equivalent to create a waveform with new,
-    # 	# and then to call waveformLoad, AWGqueueWaveform and AWGstart
-    #     module = self.AWG
-    # 	error = module.AWGfromArray(ch, 0, 0, 0, 0, 0, waveform_data_list)
-    #     if error < 0:
-    # 		print("AWG from array error:", error)
+        if isinstance(file_arrayA, str):
+            # AWGFromFile 有bug
+            self.AWG.AWGFromFile(ch, file_arrayA, triggerMode, startDelay, cycles, prescaler, paddingMode)
+        else:
+            self.AWG.AWGfromArray(ch, triggerMode, startDelay, cycles, prescaler, waveformType, file_arrayA, arrayB, paddingMode)
+        self.config['Output'][ch]['value']='Run'
