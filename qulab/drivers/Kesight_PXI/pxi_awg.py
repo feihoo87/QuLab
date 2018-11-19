@@ -138,7 +138,7 @@ class Driver(BaseDriver):
     def closeCh(self,ch=0):
         self.AWG.AWGstop(ch)
         self.AWG.AWGflush(ch)
-        self.config['SList'][ch]=[]
+        self.config['SList'][ch]['value']=[]
         self.AWG.channelWaveShape(ch, -1)
         self.config['WaveShape'][ch]['value']='HIZ'
         self.config['Output'][ch]['value']='Close'
@@ -221,7 +221,7 @@ class Driver(BaseDriver):
         if isinstance(file_arrayA, str):
             wave.newFromFile(file_arrayA)
             return wave
-        elif isinstance(file_arrayA, (list,tuple)):
+        else:
             # 5: DigitalType, Digital waveforms defined with integers
             if waveformType==5:
                 wave.newFromArrayInteger(waveformType, file_arrayA, arrayB)
@@ -231,13 +231,13 @@ class Driver(BaseDriver):
 
     def waveformLoad(self, waveform, num, paddingMode = 0):
         '''num: waveform_num, 在板上内存的波形编号'''
-        if num in self.config['WList'][0]:
+        if num in self.config['WList'][0]['value']:
             self.AWG.waveformReLoad(waveform, num, paddingMode)
         else:
             # This function replaces a waveform located in the module onboard RAM.
             # The size of the newwaveform must be smaller than or equal to the existing waveform.
             self.AWG.waveformLoad(waveform, num, paddingMode)
-            self.config['WList'][0].append(num)
+            self.config['WList'][0]['value'].append(num)
 
     # def waveformReLoad(self, waveform, num, paddingMode = 0):
     #     '''This function replaces a waveform located in the module onboard RAM.
@@ -248,7 +248,7 @@ class Driver(BaseDriver):
         '''This function deletes all the waveforms from the module onboard RAM
         and flushes all the AWG queues'''
         self.AWG.waveformFlush()
-        self.config['WList'][0]=[]
+        self.config['WList'][0]['value']=[]
 
     def AWGqueueWaveform(self, ch=0, waveform_num=0):
         self.setValue('WaveShape', 'AWG', ch=ch)
@@ -279,7 +279,7 @@ class Driver(BaseDriver):
         cycles = self.getValue('cycles',ch=ch)
         prescaler = self.getValue('prescaler',ch=ch)
         self.AWG.AWGqueueWaveform(ch, waveform_num, triggerMode, startDelay, cycles, prescaler)
-        self.config['SList'][ch].append(waveform_num)
+        self.config['SList'][ch]['value'].append(waveform_num)
 
 
 
