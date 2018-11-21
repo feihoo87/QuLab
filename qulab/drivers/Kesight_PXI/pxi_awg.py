@@ -5,8 +5,12 @@ import keysightSD1
 
 import numpy as np
 import yaml
+import logging
 from qulab import BaseDriver, QOption, QReal, QList, QInteger
 from qulab.config import caches_dir
+
+log = logging.getLogger(__name__)
+# log.addHandler(logging.NullHandler())
 
 class Driver(BaseDriver):
     support_models = ['M3202A', ]
@@ -94,18 +98,21 @@ class Driver(BaseDriver):
             else:
                 _cfg[q.name].update({0:{'value':q.value, 'unit':q.unit}})
             self.config.update(_cfg)
+        log.info('new config!')
 
     def loadcfg(self, file=None):
         if file == None:
             file = self.caches_file
         with open(file, 'r', encoding='utf-8') as f:
             self.config=yaml.load(f)
+        log.info('load config: %s',file)
 
     def savecfg(self, file=None):
         if file == None:
             file = self.caches_file
         with open(file, 'w', encoding='utf-8') as f:
             yaml.dump(self.config, f)
+        log.info('save config: %s',file)
 
 
     def performOpen(self):
@@ -115,8 +122,13 @@ class Driver(BaseDriver):
         moduleID = self.AWG.openWithSlot(self.product, self.chassis, self.slot)
         if moduleID < 0:
         	print("Module open error:", moduleID)
-        self.newcfg()
         self.caches_file = caches_dir() / (self.product+'_config_caches.yaml')
+        try:
+            self.loadcfg()
+        except Exception:
+            log.exception(Exception)
+            self.newcfg()
+            self.savecfg()
 
     def performClose(self):
         """Perform the close instrument connection operation"""
@@ -126,10 +138,11 @@ class Driver(BaseDriver):
             self.setValue('clockIO','OFF')
             # clear old waveforms and stop awg
             self.waveformFlush()
-            for ch in range(4):
+            for ch in self.CHs:
                 self.closeCh(ch)
             # close instrument
-            self.AWG.close()
+            # self.AWG.close()
+            self.savecfg()
         except Exception:
             # never return error here
             pass
