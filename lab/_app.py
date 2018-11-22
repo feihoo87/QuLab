@@ -196,7 +196,7 @@ class Application(HasSource):
     async def done(self):
         self.reset()
         self._set_start()
-        self._setUp(self)
+        self._setUp()
         async for data in self.work():
             self.data.collect(data)
             result = self.data.result()
@@ -207,7 +207,7 @@ class Application(HasSource):
                 break
             await self.run_event.wait()
         self._set_done()
-        self._tearDown(self)
+        self._tearDown()
         return self.data.result()
 
     def setUp(self, f):
