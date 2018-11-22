@@ -282,6 +282,8 @@ def _parse_resource_name(addr):
         if m is not None:
             type = m.group(1)
             break
+        else:
+            type = None
     if type == 'ATS':
         return _parse_ats_resource_name(m, addr)
     elif type == 'ZI':
