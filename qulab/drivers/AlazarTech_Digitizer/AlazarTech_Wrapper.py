@@ -329,19 +329,8 @@ class AlazarTechDigitizer():
     # 替换原来的get_Traces_DMA函数，使用NPT，即没有预采样, 参数结构保持一致
     def get_Traces_DMA(self, preTriggerSamples=0, postTriggerSamples=1024, repeats=1000,
                        procces=None, timeout=1, sum=False):
-        #Select the number of pre-trigger samples...not supported in NPT, keeping for consistency
-        preTriggerSamplesValue = 0
-        #change alignment to be 128
-        if preTriggerSamplesValue > 0:
-            preTriggerSamples = int(np.ceil(preTriggerSamplesValue / 128.)  *128)
-        else:
-            preTriggerSamples = 0
-
-        #Select the number of samples per record.
-        postTriggerSamplesValue = postTriggerSamples
-        #change alignment to be 128
-        postTriggerSamples = int(np.ceil(postTriggerSamplesValue / 128.)*128)
-        # samplesPerRecordValue = preTriggerSamplesValue + postTriggerSamplesValue
+        # NPT mode, postTriggerSamples 最好为128的整数倍
+        preTriggerSamples=0
 
         samplesPerRecord = preTriggerSamples+postTriggerSamples
         recordsPerBuffer = 2
