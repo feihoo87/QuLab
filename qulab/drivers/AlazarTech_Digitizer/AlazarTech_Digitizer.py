@@ -183,6 +183,16 @@ class Driver(BaseDriver):
         self.config_updated = True
         logger.debug('set config ... Done')
 
+    def performClose(self, bError=False, options={}):
+        """Perform the close instrument connection operation"""
+        # try to remove buffers
+        try:
+            self.dig.removeBuffersDMA()
+        except:
+            pass
+        # remove digitizer object
+        del self.__dig
+
     def performSetValue(self, quant, value, **kw):
         # if quant.name not in ['']:
         BaseDriver.performSetValue(self, quant, value, **kw)

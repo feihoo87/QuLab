@@ -1,7 +1,8 @@
 import time
+import os
 from ctypes import (POINTER, Structure, byref, c_char_p, c_float, c_int,
-                    c_int8, c_int16, c_int64, c_long, c_uint, c_uint8,
-                    c_uint16, c_uint64, c_ulong, c_void_p, c_wchar_p)
+                    c_int8, c_int16, c_int32, c_int64, c_long, c_uint, c_uint8,
+                    c_uint16, c_uint32, c_uint64, c_ulong, c_void_p, c_wchar_p, windll)
 
 import numpy as np
 
@@ -74,6 +75,60 @@ def getInputRange(maxInput, model, impedance='50 Ohm', returnNum=False):
 
     return ret
 
+# refer to labber-drivers AlazarTech_Digitizer_Wrapper
+class DMABuffer:
+    """"Buffer for DMA"""
+    def __init__(self, c_sample_type, size_bytes):
+        self.size_bytes = size_bytes
+
+        npSampleType = {
+            c_uint8: np.uint8,
+            c_uint16: np.uint16,
+            c_uint32: np.uint32,
+            c_int32: np.int32,
+            c_float: np.float32
+        }.get(c_sample_type, 0)
+
+        bytes_per_sample = {
+            c_uint8:  1,
+            c_uint16: 2,
+            c_uint32: 4,
+            c_int32:  4,
+            c_float:  4
+        }.get(c_sample_type, 0)
+
+        self.addr = None
+        if os.name == 'nt':
+            MEM_COMMIT = 0x1000
+            PAGE_READWRITE = 0x4
+            windll.kernel32.VirtualAlloc.argtypes = [c_void_p, c_long, c_long, c_long]
+            windll.kernel32.VirtualAlloc.restype = c_void_p
+            self.addr = windll.kernel32.VirtualAlloc(
+                0, c_long(size_bytes), MEM_COMMIT, PAGE_READWRITE)
+        elif os.name == 'posix':
+            libc.valloc.argtypes = [c_long]
+            libc.valloc.restype = c_void_p
+            self.addr = libc.valloc(size_bytes)
+        else:
+            raise Exception("Unsupported OS")
+
+
+        ctypes_array = (c_sample_type *
+                        (size_bytes // bytes_per_sample)).from_address(self.addr)
+        self.buffer = np.frombuffer(ctypes_array, dtype=npSampleType)
+        self.ctypes_buffer = ctypes_array
+        pointer, read_only_flag = self.buffer.__array_interface__['data']
+
+    def __exit__(self):
+        if os.name == 'nt':
+            MEM_RELEASE = 0x8000
+            windll.kernel32.VirtualFree.argtypes = [c_void_p, c_long, c_long]
+            windll.kernel32.VirtualFree.restype = c_int
+            windll.kernel32.VirtualFree(c_void_p(self.addr), 0, MEM_RELEASE);
+        elif os.name == 'posix':
+            libc.free(self.addr)
+        else:
+            raise Exception("Unsupported OS")
 
 class AlazarTechError(Exception):
     def __init__(self, code, msg):
@@ -87,6 +142,7 @@ class AlazarTechDigitizer():
         """The init case defines a session ID, used to identify the instrument"""
         # range settings
         self.dRange = {}
+        self.buffers = []
         #print('Number of systems:', API.AlazarNumOfSystems())
         handle = API.AlazarGetBoardBySystemID(systemId, boardId)
         if handle is None:
@@ -246,6 +302,9 @@ class AlazarTechDigitizer():
         self.callFunc("AlazarWaitNextAsyncBufferComplete", self.handle,
                       pBuffer, bytesToCopy, timeout_ms)
 
+    def AlazarPostAsyncBuffer(self, pBuffer, size_bytes):
+        RETURN_CODE=self.callFunc('AlazarPostAsyncBuffer', self.handle, pBuffer, size_bytes)
+
     def AlazarAbortAsyncRead(self):
         self.callFunc('AlazarAbortAsyncRead', self.handle)
 
@@ -259,19 +318,137 @@ class AlazarTechDigitizer():
                       ChannelId, ParameterId, Value)
         return Value.value
 
+    def removeBuffersDMA(self):
+        """Clear and remove DMA buffers, to release memory"""
+        # make sure buffers release memory
+        for buf in self.buffers:
+            buf.__exit__()
+        # remove all
+        self.buffers = []
+
+    # 替换原来的get_Traces_DMA函数，使用NPT，即没有预采样, 参数结构保持一致
     def get_Traces_DMA(self, preTriggerSamples=0, postTriggerSamples=1024, repeats=1000,
+                       procces=None, timeout=1, sum=False):
+        #Select the number of pre-trigger samples...not supported in NPT, keeping for consistency
+        preTriggerSamplesValue = 0
+        #change alignment to be 128
+        if preTriggerSamplesValue > 0:
+            preTriggerSamples = int(np.ceil(preTriggerSamplesValue / 128.)  *128)
+        else:
+            preTriggerSamples = 0
+
+        #Select the number of samples per record.
+        postTriggerSamplesValue = postTriggerSamples
+        #change alignment to be 128
+        postTriggerSamples = int(np.ceil(postTriggerSamplesValue / 128.)*128)
+        # samplesPerRecordValue = preTriggerSamplesValue + postTriggerSamplesValue
+
+        samplesPerRecord = preTriggerSamples+postTriggerSamples
+        recordsPerBuffer = 2
+        recordsPerAcquisition = repeats*recordsPerBuffer
+        _, bitsPerSample = self.AlazarGetChannelInfo()
+        bytesPerSample = (bitsPerSample + 7) // 8
+        # bit移位，比如12bit采样深度，返回16bit，需要移位4bit，参考说明书SDK-guide-7.2.2 Processing_data
+        bitShift = bytesPerSample*8 - bitsPerSample
+
+        dtype = c_uint8 if bytesPerSample == 1 else c_uint16
+
+        codeZero = (1 << (bitsPerSample - 1)) -0.5
+        codeRange = (1 << (bitsPerSample - 1)) -0.5
+        bytesPerHeader = 0
+        bytesPerRecord = bytesPerSample * samplesPerRecord + bytesPerHeader
+        bytesPerBuffer = bytesPerRecord * recordsPerBuffer
+        # force buffer size to be integer of 256 * 16 = 4096, not sure why
+        # bytesPerBufferMem = int(4096 * np.ceil(bytesPerBuffer/4096.))
+
+        scaleA, scaleB = self.dRange[CHANNEL_A]/codeRange, self.dRange[CHANNEL_B]/codeRange
+
+        Buffer = (dtype*(samplesPerRecord*recordsPerBuffer))()
+
+        if procces is None and sum == True:
+            A, B = np.zeros(samplesPerRecord), np.zeros(samplesPerRecord)
+        else:
+            A, B = [], []
+
+        time_out_ms = int(1000*timeout)
+
+        self.AlazarSetRecordSize(preTriggerSamples, postTriggerSamples)
+        self.AlazarSetRecordCount(recordsPerAcquisition)
+        self.removeBuffersDMA()
+        self.buffers = []
+        for i in range(repeats):
+            self.buffers.append(DMABuffer(dtype, bytesPerBuffer))
+
+        # Configure the board to make a Traditional AutoDMA acquisition
+        self.AlazarBeforeAsyncRead(CHANNEL_A | CHANNEL_B,
+                              -preTriggerSamples,
+                              samplesPerRecord,
+                              recordsPerBuffer,
+                              recordsPerAcquisition,
+                              ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT)
+        # Post DMA buffers to board
+        for buf in self.buffers:
+            self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
+        try:
+            self.AlazarStartCapture()
+        except:
+            # make sure buffers release memory if failed
+            self.removeBuffersDMA()
+            raise
+
+        try:
+            for i in range(repeats):
+                # Wait for the buffer at the head of the list of available
+                # buffers to be filled by the board.
+                buf = self.buffers[i]
+                self.AlazarWaitAsyncBufferComplete(buf.addr, timeout_ms=time_out_ms)
+                self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
+                self.check_errors(ignores=[RETURN_CODE.ApiTransferComplete])
+
+                buf_truncated = buf.buffer
+                _data = buf_truncated >> bitShift
+                # 两个通道数据交替，所以需要reshape
+                data = np.array(_data, dtype=np.float).reshape((samplesPerRecord,2))
+                data -= codeZero
+                ch1 = scaleA * data[:,0]
+                ch2 = scaleB * data[:,1]
+                if procces is None and sum == False:
+                    A.append(ch1[:samplesPerRecord])
+                    B.append(ch2[:samplesPerRecord])
+                elif procces is None:
+                    A += ch1[:samplesPerRecord]
+                    B += ch2[:samplesPerRecord]
+                else:
+                    a, b = procces(ch1[:samplesPerRecord],
+                                   ch2[:samplesPerRecord])
+                    A.append(a)
+                    B.append(b)
+
+        finally:
+            # release resources
+            try:
+                self.AlazarAbortAsyncRead()
+            except:
+                pass
+
+        return A, B
+
+
+    def get_Traces_DMA_old(self, preTriggerSamples=0, postTriggerSamples=1024, repeats=1000,
                        procces=None, timeout=1, sum=False):
         samplesPerRecord = preTriggerSamples+postTriggerSamples
         recordsPerBuffer = 2
         recordsPerAcquisition = repeats*2
         _, bitsPerSample = self.AlazarGetChannelInfo()
         bytesPerSample = (bitsPerSample + 7) // 8
+        # bit移位，比如12bit采样深度，返回16bit，需要移位4bit，参考说明书SDK-guide-7.2.2 Processing_data
+        bitShift = bytesPerSample*8 - bitsPerSample
 
         dtype = c_uint8 if bytesPerSample == 1 else c_uint16
 
         uFlags = ADMA_TRADITIONAL_MODE | ADMA_ALLOC_BUFFERS | ADMA_EXTERNAL_STARTCAPTURE
-        codeZero = 1 << (bitsPerSample - 1)
-        codeRange = 1 << (bitsPerSample - 1)
+        codeZero = (1 << (bitsPerSample - 1)) - 0.5
+        codeRange = (1 << (bitsPerSample - 1)) - 0.5
         bytesPerHeader = 0
         bytesPerRecord = bytesPerSample * samplesPerRecord + bytesPerHeader
         bytesPerBuffer = bytesPerRecord * recordsPerBuffer
@@ -301,7 +478,8 @@ class AlazarTechDigitizer():
                 self.AlazarWaitNextAsyncBufferComplete(
                     Buffer, bytesPerBuffer, time_out_ms)
                 self.check_errors(ignores=[RETURN_CODE.ApiTransferComplete])
-                data = np.array(Buffer, dtype=np.float)
+                _Buffer = Buffer >> bitShift
+                data = np.array(_Buffer, dtype=np.float)
                 data -= codeZero
                 ch1, ch2 = scaleA * data[:samplesPerRecord],\
                            scaleB * data[samplesPerRecord:]

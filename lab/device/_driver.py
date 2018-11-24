@@ -277,13 +277,12 @@ def _parse_pxi_resource_name(pxi, addr):
         addr=addr)
 
 def _parse_resource_name(addr):
+    type = None
     for addr_re in [ats_addr,zi_addr,pxi_addr]:
         m = addr_re.search(addr)
         if m is not None:
             type = m.group(1)
             break
-        else:
-            type = None
     if type == 'ATS':
         return _parse_ats_resource_name(m, addr)
     elif type == 'ZI':
