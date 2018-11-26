@@ -25,21 +25,29 @@ class Driver(BaseDriver):
         QOption('Reference Source', set_cmd='SOUR:ROSC:SOUR %(option)s', get_cmd='SOUR:ROSC:SOUR?',
           options = [('Internal', 'INT'), ('External', 'EXT')]),
 
-        QReal('Vpp', unit='V',
-          set_cmd='SOURCE%(channel)d:VOLT %(value)f',
-          get_cmd='SOURCE%(channel)d:VOLT?'),
+        QReal('Vpp', unit='V', ch=1,
+          set_cmd='SOURCE%(ch)d:VOLT %(value)f',
+          get_cmd='SOURCE%(ch)d:VOLT?'),
 
-        QReal('Offset', unit='V',
-          set_cmd='SOURCE%(channel)d:VOLT:OFFS %(value)f',
-          get_cmd='SOURCE%(channel)d:VOLT:OFFS?'),
+        QReal('Offset', unit='V', ch=1,
+          set_cmd='SOURCE%(ch)d:VOLT:OFFS %(value)f',
+          get_cmd='SOURCE%(ch)d:VOLT:OFFS?'),
 
-        QReal('Volt Low', unit='V',
-          set_cmd='SOURCE%(channel)d:VOLT:LOW %(value)f',
-          get_cmd='SOURCE%(channel)d:VOLT:LOW?'),
+        QReal('Volt Low', unit='V', ch=1,
+          set_cmd='SOURCE%(ch)d:VOLT:LOW %(value)f',
+          get_cmd='SOURCE%(ch)d:VOLT:LOW?'),
 
-        QReal('Volt High', unit='V',
-          set_cmd='SOURCE%(channel)d:VOLT:HIGH %(value)f',
-          get_cmd='SOURCE%(channel)d:VOLT:HIGH?'),
+        QReal('Volt High', unit='V', ch=1,
+          set_cmd='SOURCE%(ch)d:VOLT:HIGH %(value)f',
+          get_cmd='SOURCE%(ch)d:VOLT:HIGH?'),
+        # output delay in time
+        QReal('timeDelay', unit='s', ch=1,
+          set_cmd='SOURce%(ch)d:DELay:ADJust %(value)f%(unit)s',
+          get_cmd='SOURce%(ch)d:DELay:ADJust?'),
+        # output delay in point
+        QReal('timeDelay', unit='point', ch=1,
+          set_cmd='SOURce%(ch)d:DELay:POINts %(value)d',
+          get_cmd='SOURce%(ch)d:DELay:POINts?'),
 
         QList('WList'),
 
