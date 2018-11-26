@@ -105,10 +105,10 @@ class DMABuffer:
             windll.kernel32.VirtualAlloc.restype = c_void_p
             self.addr = windll.kernel32.VirtualAlloc(
                 0, c_long(size_bytes), MEM_COMMIT, PAGE_READWRITE)
-        elif os.name == 'posix':
-            libc.valloc.argtypes = [c_long]
-            libc.valloc.restype = c_void_p
-            self.addr = libc.valloc(size_bytes)
+        # elif os.name == 'posix':
+        #     libc.valloc.argtypes = [c_long]
+        #     libc.valloc.restype = c_void_p
+        #     self.addr = libc.valloc(size_bytes)
         else:
             raise Exception("Unsupported OS")
 
@@ -125,8 +125,8 @@ class DMABuffer:
             windll.kernel32.VirtualFree.argtypes = [c_void_p, c_long, c_long]
             windll.kernel32.VirtualFree.restype = c_int
             windll.kernel32.VirtualFree(c_void_p(self.addr), 0, MEM_RELEASE);
-        elif os.name == 'posix':
-            libc.free(self.addr)
+        # elif os.name == 'posix':
+        #     libc.free(self.addr)
         else:
             raise Exception("Unsupported OS")
 
