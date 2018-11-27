@@ -26,28 +26,28 @@ class Driver(BaseDriver):
           options = [('Internal', 'INT'), ('External', 'EXT')]),
 
         QReal('Vpp', unit='V', ch=1,
-          set_cmd='SOURCE%(ch)d:VOLT %(value)f',
-          get_cmd='SOURCE%(ch)d:VOLT?'),
+          set_cmd='SOUR%(ch)d:VOLT %(value)f',
+          get_cmd='SOUR%(ch)d:VOLT?'),
 
         QReal('Offset', unit='V', ch=1,
-          set_cmd='SOURCE%(ch)d:VOLT:OFFS %(value)f',
-          get_cmd='SOURCE%(ch)d:VOLT:OFFS?'),
+          set_cmd='SOUR%(ch)d:VOLT:OFFS %(value)f',
+          get_cmd='SOUR%(ch)d:VOLT:OFFS?'),
 
         QReal('Volt Low', unit='V', ch=1,
-          set_cmd='SOURCE%(ch)d:VOLT:LOW %(value)f',
-          get_cmd='SOURCE%(ch)d:VOLT:LOW?'),
+          set_cmd='SOUR%(ch)d:VOLT:LOW %(value)f',
+          get_cmd='SOUR%(ch)d:VOLT:LOW?'),
 
         QReal('Volt High', unit='V', ch=1,
-          set_cmd='SOURCE%(ch)d:VOLT:HIGH %(value)f',
-          get_cmd='SOURCE%(ch)d:VOLT:HIGH?'),
+          set_cmd='SOUR%(ch)d:VOLT:HIGH %(value)f',
+          get_cmd='SOUR%(ch)d:VOLT:HIGH?'),
         # output delay in time
         QReal('timeDelay', unit='s', ch=1,
-          set_cmd='SOURce%(ch)d:DELay:ADJust %(value)f%(unit)s',
-          get_cmd='SOURce%(ch)d:DELay:ADJust?'),
+          set_cmd='SOUR%(ch)d:DEL:ADJ %(value)f%(unit)s',
+          get_cmd='SOUR%(ch)d:DEL:ADJ?'),
         # output delay in point
-        QReal('timeDelay', unit='point', ch=1,
-          set_cmd='SOURce%(ch)d:DELay:POINts %(value)d',
-          get_cmd='SOURce%(ch)d:DELay:POINts?'),
+        QReal('pointDelay', unit='point', ch=1,
+          set_cmd='SOUR%(ch)d:DEL:POIN %(value)d',
+          get_cmd='SOUR%(ch)d:DEL:POIN?'),
 
         QList('WList'),
 
