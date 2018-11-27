@@ -64,7 +64,7 @@ class Driver(BaseDriver):
 
         QOption('Output', ch=1,
             set_cmd='OUTP%(ch)d %(option)d',
-            get_cmd='OUTP%(ch)d?'
+            get_cmd='OUTP%(ch)d?',
             options = [('ON', 1), ('OFF', 0),
                        (1,    1), (0,     0)]),
 
@@ -88,11 +88,11 @@ class Driver(BaseDriver):
 
     def performGetValue(self, quant, **kw):
         if quant.name == 'WList':
-            quant.value = self.waveform_list
-            return quant.value
+            self.waveform_list = self.get_waveform_list()
+            return self.waveform_list
         elif quant.name == 'SList':
-            quant.value = self.sequence_list
-            return quant.value
+            self.sequence_list = self.get_sequence_list()
+            return self.sequence_list
         else:
             return BaseDriver.performGetValue(self, quant, **kw)
 
@@ -101,21 +101,18 @@ class Driver(BaseDriver):
 
 
     def get_sequence_list(self):
-        if self.model in ['AWG70001A', 'AWG70002A']:
-            ret = []
-            slist_size = int(self.query("SLIS:SIZE?"))
-            for i in range(slist_size):
-                ret.append(self.query("SLIS:NAME? %d" % i).strip("\"\n '"))
-            return ret
-        else:
-            return []
+        ret = []
+        slist_size = int(self.query("SLIS:SIZE?"))
+        for i in range(slist_size):
+            ret.append(self.query("SLIS:NAME? %d" % i).strip("\"\n '"))
+        return ret
 
     def create_waveform(self, name, length, format='REAL'):
         '''format: REAL or IQ'''
         if name in self.waveform_list:
             return
         self.write('WLIS:WAV:NEW "%s",%d,%s;' % (name, length, format))
-        self.waveform_list.append(name)
+        self.waveform_list = self.get_waveform_list()
 
     def remove_waveform(self, name=None, all=False):
         if all:
@@ -125,7 +122,7 @@ class Driver(BaseDriver):
             return
         else:
             self.write('WLIS:WAV:DEL "%s"; *CLS' % name)
-            self.waveform_list.remove(name)
+            self.waveform_list = self.get_waveform_list()
 
     def use_waveform(self, name, ch=1, type=None):
         '''type: I or Q'''
@@ -149,15 +146,15 @@ class Driver(BaseDriver):
         current_asset = self.query('SOUR%d:CASS?' % ch)
         return current_type, current_asset
 
-    # def update_waveform(self, points, name='ABS', IQ='I', start=0, size=None):
-    #     w_type = self.query('WLISt:WAVeform:TYPE? "%s"' % name).strip()
-    #     if w_type == 'REAL':
-    #         self._update_waveform_float(points, name, IQ, start, size)
-    #     elif w_type == 'IQ':
-    #         self._update_waveform_float(points[0], name, 'I', start, size)
-    #         self._update_waveform_float(points[1], name, 'Q', start, size)
-    #     else:
-    #         self._update_waveform_int(points, name, start, size)
+    def update_waveform(self, points, name='ABS', IQ='I', start=0, size=None):
+        w_type = self.query('WLISt:WAV:TYPE? "%s"' % name).strip()
+        if w_type == 'REAL':
+            self._update_waveform_float(points, name, IQ, start, size)
+        elif w_type == 'IQ':
+            self._update_waveform_float(points[0], name, 'I', start, size)
+            self._update_waveform_float(points[1], name, 'Q', start, size)
+        # else:
+        #     self._update_waveform_int(points, name, start, size)
 
     # def _update_waveform_int(self, points, name='ABS', start=0, size=None):
     #     """
@@ -171,18 +168,15 @@ class Driver(BaseDriver):
     #     self.write_binary_values(message, values, datatype=u'H',
     #                              is_big_endian=False,
     #                              termination=None, encoding=None)
-    #
-    # def _update_waveform_float(self, points, name='ABS', IQ='I', start=0, size=None):
-    #     if self.model == 'AWG5208':
-    #         message = 'WLIST:WAVEFORM:DATA:%s "%s",%d,' % (IQ, name, start)
-    #     else:
-    #         message = 'WLIST:WAVEFORM:DATA "%s",%d,' % (name, start)
-    #     if size is not None:
-    #         message = message + ('%d,' % size)
-    #     values = points.clip(-1,1)
-    #     self.write_binary_values(message, values, datatype=u'f',
-    #                              is_big_endian=False,
-    #                              termination=None, encoding=None)
+
+    def _update_waveform_float(self, points, name='ABS', IQ='I', start=0, size=None):
+        message = 'WLIST:WAVEFORM:DATA:%s "%s",%d,' % (IQ, name, start)
+        if size is not None:
+            message = message + ('%d,' % size)
+        values = points.clip(-1,1)
+        self.write_binary_values(message, values, datatype=u'f',
+                                 is_big_endian=False,
+                                 termination=None, encoding=None)
 
     # def update_marker(self, name, mk1, mk2=None, mk3=None, mk4=None, start=0, size=None):
     #     def format_marker_data(markers, bits):
@@ -208,7 +202,7 @@ class Driver(BaseDriver):
         if name in self.sequence_list:
             return
         self.write('SLIS:SEQ:NEW "%s", %d, %d' % (name, steps, tracks))
-        self.sequence_list.append(name)
+        self.sequence_list = self.get_sequence_list()
 
     def remove_sequence(self, name=None, all=False):
         if all:
@@ -218,7 +212,7 @@ class Driver(BaseDriver):
             return
         else:
             self.write('SLIS:SEQ:DEL "%s"' % name)
-            self.sequence_list.remove(name)
+            self.sequence_list = self.get_sequence_list()
 
     #
     # def set_sequence_step(self, name, sub_name, step, wait='OFF', goto='NEXT', repeat=1, jump=None):
