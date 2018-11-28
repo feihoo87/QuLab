@@ -25,21 +25,29 @@ class Driver(BaseDriver):
         QOption('Reference Source', set_cmd='SOUR:ROSC:SOUR %(option)s', get_cmd='SOUR:ROSC:SOUR?',
           options = [('Internal', 'INT'), ('External', 'EXT')]),
 
-        QReal('Vpp', unit='V',
-          set_cmd='SOURCE%(channel)d:VOLT %(value)f',
-          get_cmd='SOURCE%(channel)d:VOLT?'),
+        QReal('Vpp', unit='V', ch=1,
+          set_cmd='SOUR%(ch)d:VOLT %(value)f',
+          get_cmd='SOUR%(ch)d:VOLT?'),
 
-        QReal('Offset', unit='V',
-          set_cmd='SOURCE%(channel)d:VOLT:OFFS %(value)f',
-          get_cmd='SOURCE%(channel)d:VOLT:OFFS?'),
+        QReal('Offset', unit='V', ch=1,
+          set_cmd='SOUR%(ch)d:VOLT:OFFS %(value)f',
+          get_cmd='SOUR%(ch)d:VOLT:OFFS?'),
 
-        QReal('Volt Low', unit='V',
-          set_cmd='SOURCE%(channel)d:VOLT:LOW %(value)f',
-          get_cmd='SOURCE%(channel)d:VOLT:LOW?'),
+        QReal('Volt Low', unit='V', ch=1,
+          set_cmd='SOUR%(ch)d:VOLT:LOW %(value)f',
+          get_cmd='SOUR%(ch)d:VOLT:LOW?'),
 
-        QReal('Volt High', unit='V',
-          set_cmd='SOURCE%(channel)d:VOLT:HIGH %(value)f',
-          get_cmd='SOURCE%(channel)d:VOLT:HIGH?'),
+        QReal('Volt High', unit='V', ch=1,
+          set_cmd='SOUR%(ch)d:VOLT:HIGH %(value)f',
+          get_cmd='SOUR%(ch)d:VOLT:HIGH?'),
+        # output delay in time
+        QReal('timeDelay', unit='s', ch=1,
+          set_cmd='SOUR%(ch)d:DEL:ADJ %(value)f%(unit)s',
+          get_cmd='SOUR%(ch)d:DEL:ADJ?'),
+        # output delay in point
+        QReal('pointDelay', unit='point', ch=1,
+          set_cmd='SOUR%(ch)d:DEL:POIN %(value)d',
+          get_cmd='SOUR%(ch)d:DEL:POIN?'),
 
         QList('WList'),
 
@@ -76,7 +84,7 @@ class Driver(BaseDriver):
             ret = []
             wlist_size = int(self.query("WLIS:SIZE?"))
             for i in range(wlist_size):
-                ret.append(self.query("WLIS:NAME? %d" % (i+1)).strip("\"\n '"))
+                ret.append(self.query("WLIS:NAME? %d" % i).strip("\"\n '"))
             return ret
         else:
             return []
