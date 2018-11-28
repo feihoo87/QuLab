@@ -37,7 +37,7 @@ class Driver(BaseDriver):
            set_cmd='CLOC:EREF:DIV %(value)d',
            get_cmd='CLOC:EREF:DIV?'),
 
-        QReal('Amplitude', unit='V', ch=1,
+        QReal('Vpp', unit='V', ch=1,
           set_cmd='SOUR%(ch)d:VOLT %(value)f%(unit)s',
           get_cmd='SOUR%(ch)d:VOLT?'),
 
@@ -61,16 +61,78 @@ class Driver(BaseDriver):
           set_cmd='SOUR%(ch)d:DEL:POIN %(value)d',
           get_cmd='SOUR%(ch)d:DELy:POIN?'),
 
+        QOption('Run', value = 'Play',
+            set_cmd='AWGC:%(option)s; *WAI;',
+            get_cmd='AWGC:RST?',
+            options = [('Play', 'RUN'), ('Stop', 'STOP')]),
 
         QOption('Output', ch=1,
-            set_cmd='OUTP%(ch)d %(option)d',
+            set_cmd='OUTP%(ch)d %(option)s',
             get_cmd='OUTP%(ch)d?',
             options = [('ON', 1), ('OFF', 0),
-                       (1,    1), (0,     0)]),
+                       (1, 'ON'), (0, 'OFF')]),
 
         QList('WList'),
 
         QList('SList'),
+
+        QOption('FG Type', ch=1, value='Sin',
+            set_cmd = 'FGEN:CHAN%(ch)d:TYPE %(option)s',
+            get_cmd = 'FGEN:CHAN%(ch)d:TYPE?',
+            options = [('Sin','SINE'),
+                       ('Square','SQU'),
+                       ('Triangle','TRI'),
+                       ('Noise','NOIS'),
+                       ('DC','DC'),
+                       ('Gaussian','GAUS'),
+                       ('ExpRise','EXPR'),
+                       ('ExpDecay','EXPD'),
+                       ('None','NONE'),
+                ]),
+
+        QReal('FG Amplitude', ch=1, value=0.5, unit='V',
+            set_cmd = 'FGEN:CHAN%(ch)d:AMPL:VOLT %(value)f%(unit)s',
+            get_cmd = 'FGEN:CHAN%(ch)d:AMPL:VOLT?'),
+
+        #FG Offset -150mV~150mV, min Unit 1mV
+        QReal('FG Offset', ch=1, value=0, unit='V',
+            set_cmd = 'FGEN:CHAN%(ch)d:OFFS %(value)f%(unit)s',
+            get_cmd = 'FGEN:CHAN%(ch)d:OFFS?'),
+
+        QReal('FG Phase', ch=1, value=0, unit='deg',
+            set_cmd = 'FGEN:CHAN%(ch)d:PHAS %(value)f',
+            get_cmd = 'FGEN:CHAN%(ch)d:PHAS?'),
+
+        QReal('FG Frequency', ch=1, value=1e6, unit='Hz',
+            set_cmd = 'FGEN:CHAN%(ch)d:FREQ %(value)f%(unit)s',
+            get_cmd = 'FGEN:CHAN%(ch)d:FREQ?'),
+
+        QReal('FG Period', ch=1, unit='s',
+            # 周期与频率绑定，无法设置周期，但可读
+            set_cmd ='',
+            get_cmd = 'FGEN:CHAN%(ch)d:PER?'),
+
+        # DC Level Range: –250 mV to 250 mV
+        QReal('FG DC', ch=1, value=0, unit='V',
+            set_cmd = 'FGEN:CHAN%(ch)d:DCL %(value)f%(unit)s',
+            get_cmd = 'FGEN:CHAN%(ch)d:DCL?'),
+
+        QReal('FG High', ch=1, value=0.25, unit='V',
+            set_cmd = 'FGEN:CHAN%(ch)d:HIGH %(value)f%(unit)s',
+            get_cmd = 'FGEN:CHAN%(ch)d:HIGH?'),
+
+        QReal('FG Low', ch=1, value=-0.25, unit='V',
+            set_cmd = 'FGEN:CHAN%(ch)d:LOW %(value)f%(unit)s',
+            get_cmd = 'FGEN:CHAN%(ch)d:LOW?'),
+
+        #coupling mode: DIR, DCAM, AC
+        QOption('FG Path', ch=1, value='Direct',
+            set_cmd = 'FGEN:CHAN%(ch)d:PATH %(option)s',
+            get_cmd = 'FGEN:CHAN%(ch)d:PATH?',
+            options = [('Direct','DIR'),
+                       ('DCAmplified','DCAM'),
+                       ('AC','AC'),
+                ]),
     ]
 
     def performOpen(self):
@@ -131,6 +193,7 @@ class Driver(BaseDriver):
         else:
             self.write('SOUR%d:CASS:WAV "%s"' % (ch, name))
 
+    # 关于RUN的设置和状态询问，建议使用Quantity：Run的方法
     def run_state(self):
         return int(self.query('AWGC:RST?'))
 
@@ -141,13 +204,20 @@ class Driver(BaseDriver):
     def stop(self):
         self.write('AWGC:STOP')
 
+    # 关于Output的设置和状态询问，建议使用Quantity：Output的方法
+    def output_on(self, ch=1):
+        self.write('OUTP%d:STAT 1' % ch)
+
+    def output_off(self, ch=1):
+        self.write('OUTP%d:STAT 0' % ch)
+
     def get_current_asset(self, ch=1):
         current_type = self.query('SOUR%d:CASS:TYPE?' % ch)
         current_asset = self.query('SOUR%d:CASS?' % ch)
         return current_type, current_asset
 
     def update_waveform(self, points, name='ABS', IQ='I', start=0, size=None):
-        w_type = self.query('WLISt:WAV:TYPE? "%s"' % name).strip()
+        w_type = self.query('WLIS:WAV:TYPE? "%s"' % name).strip()
         if w_type == 'REAL':
             self._update_waveform_float(points, name, IQ, start, size)
         elif w_type == 'IQ':
