@@ -37,7 +37,9 @@ class Driver(BaseDriver):
            set_cmd='CLOC:EREF:DIV %(value)d',
            get_cmd='CLOC:EREF:DIV?'),
 
-        QReal('Vpp', unit='V', ch=1,
+        # 以下四种只在 output path 为 Direct 时有效
+        # Vpp range: 250-500mVpp
+        QReal('Vpp', unit='Vpp', ch=1,
           set_cmd='SOUR%(ch)d:VOLT %(value)f%(unit)s',
           get_cmd='SOUR%(ch)d:VOLT?'),
 
@@ -52,6 +54,7 @@ class Driver(BaseDriver):
         QReal('Volt High', unit='V', ch=1,
           set_cmd='SOUR%(ch)d:VOLT:HIGH %(value)f%(unit)s',
           get_cmd='SOUR%(ch)d:VOLT:HIGH?'),
+
         # output delay in time
         QReal('timeDelay', unit='s', ch=1,
           set_cmd='SOUR%(ch)d:DEL:ADJ %(value)f%(unit)s',
@@ -75,6 +78,14 @@ class Driver(BaseDriver):
         QList('WList'),
 
         QList('SList'),
+
+        # INSTrument MODE : AWG or FG
+        QOption('instMode', value='AWG',
+            set_cmd = 'INST:MODE %(option)s',
+            get_cmd = 'INST:MODE?',
+            options = [('AWG','AWG'),
+                      ('FG','FGEN'),
+                ]),
 
         QOption('FG Type', ch=1, value='Sin',
             set_cmd = 'FGEN:CHAN%(ch)d:TYPE %(option)s',
