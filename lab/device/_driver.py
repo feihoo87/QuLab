@@ -226,10 +226,11 @@ def _load_driver(driver_data):
 
 
 ats_addr = re.compile(
-    r'^(ATS9360|ATS9850|ATS9870)::SYSTEM([0-9]+)::([0-9]+)(|::INSTR)$')
+    r'^(ATS)(9360|9850|9870)::SYSTEM([0-9]+)::([0-9]+)(|::INSTR)$')
 gpib_addr = re.compile(r'^GPIB[0-9]?::[0-9]+(::.+)？$')
 p_addr = re.compile(r'^([a-zA-Z]+)[0-9]*::.+$')
 zi_addr = re.compile(r'^(ZI)::([a-zA-Z]+[0-9]*)::([a-zA-Z-]+[0-9]*)(|::INSTR)$')
+pxi_addr = re.compile(r'^(PXI)[0-9]?::CHASSIS([0-9]*)::SLOT([0-9]*)::FUNC([0-9]*)::INSTR$')
 
 def parse_resource_name(addr):
     m = p_addr.search(addr)
@@ -238,11 +239,12 @@ def parse_resource_name(addr):
 
 
 def _parse_ats_resource_name(m, addr):
-    model = m.group(1)
-    systemID = int(m.group(2))
-    boardID = int(m.group(3))
+    type = m.group(1)
+    model = m.group(1)+str(m.group(2))
+    systemID = int(m.group(3))
+    boardID = int(m.group(4))
     return dict(
-        type='ATS',
+        type=type,
         ins=None,
         company='AlazarTech',
         model=model,
@@ -251,35 +253,58 @@ def _parse_ats_resource_name(m, addr):
         addr=addr)
 
 def _parse_zi_resource_name(z, addr):
+    type = z.group(1)
     model = z.group(2)
     deviceID = z.group(3)
     return dict(
-        type='ZI',
+        type=type,
         ins=None,
         company='ZurichInstruments',
         model=model,
         deviceID=deviceID,
         addr=addr)
 
+def _parse_pxi_resource_name(pxi, addr):
+    type = pxi.group(1)
+    CHASSIS = int(pxi.group(2))
+    SLOT = int(pxi.group(3))
+    return dict(
+        type=type,
+        ins=None,
+        company='KeySight',
+        CHASSIS=CHASSIS,
+        SLOT=SLOT,
+        addr=addr)
+
 def _parse_resource_name(addr):
-    m = ats_addr.search(addr)
-    z = zi_addr.search(addr)
-    if m is not None:
+    type = None
+    for addr_re in [ats_addr,zi_addr,pxi_addr]:
+        m = addr_re.search(addr)
+        if m is not None:
+            type = m.group(1)
+            break
+    if type == 'ATS':
         return _parse_ats_resource_name(m, addr)
-    if z is not None:
-        return _parse_zi_resource_name(z, addr)
+    elif type == 'ZI':
+        return _parse_zi_resource_name(m, addr)
+    elif type == 'PXI':
+        return _parse_pxi_resource_name(m, addr)
     else:
         return dict(type='Visa', addr=addr)
 
 
 def _open_visa_resource(rm, addr):
     ins = rm.open_resource(addr)
-    IDN = ins.query("*IDN?").split(',')
-    company = IDN[0].strip()
-    model = IDN[1].strip()
-    version = IDN[3].strip()
-    return dict(ins=ins, company=company, model=model, version=version, addr=addr)
-
+    # 对于非常旧的仪器，不支持IDN查询命令
+    try:
+        IDN = ins.query("*IDN?").split(',')
+    except VisaIOError:
+        return dict(ins=ins, addr=addr)
+    else:
+        company = IDN[0].strip()
+        model = IDN[1].strip()
+        version = IDN[3].strip()
+        return dict(ins=ins, company=company, model=model, version=version, addr=addr)
 
 class DriverManager(object):
     def __init__(self, visa_backends='@ni'):
