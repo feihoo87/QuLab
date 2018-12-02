@@ -6,7 +6,10 @@ from . import LabBrick_LMS_Wrapper
 class Driver(BaseDriver):
     """ This class implements a Lab Brick generator"""
 
-    support_models = ['LMS-103', ]
+    support_models = [  'LMS-103', 'LMS-123', 'LMS-203', 'LMS-802', 'LMS-163', 'LMS-232D',
+                        'LMS-402D', 'LMS-602D', 'LMS-451D', 'LMS-322D', 'LMS-271D', 'LMS-152D',
+                        'LMS-751D', 'LMS-252D', 'LMS-6123LH', 'LMS-163LH', 'LMS-802LH',
+                        'LMS-802DX', 'LMS-183DX']
 
     quants = [
 
