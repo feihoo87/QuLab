@@ -231,6 +231,8 @@ gpib_addr = re.compile(r'^GPIB[0-9]?::[0-9]+(::.+)？$')
 p_addr = re.compile(r'^([a-zA-Z]+)[0-9]*::.+$')
 zi_addr = re.compile(r'^(ZI)::([a-zA-Z]+[0-9]*)::([a-zA-Z-]+[0-9]*)(|::INSTR)$')
 pxi_addr = re.compile(r'^(PXI)[0-9]?::CHASSIS([0-9]*)::SLOT([0-9]*)::FUNC([0-9]*)::INSTR$')
+#其他类型 (OTHER)::(Key):(Value)::INSTR
+other_addr = re.compile(r'^(OTHER)::([a-zA-Z-]+):([a-zA-Z-]*[0-9]*)::INSTR$')
 
 def parse_resource_name(addr):
     m = p_addr.search(addr)
@@ -276,9 +278,21 @@ def _parse_pxi_resource_name(pxi, addr):
         SLOT=SLOT,
         addr=addr)
 
+def _parse_other_resource_name(m, addr):
+    type = m.group(1)
+    key = m.group(2)
+    value = m.group(3)
+    kw={key:value}
+    kw.update(
+        type=type,
+        ins=None,
+        company=None,
+        addr=addr)
+    return kw
+
 def _parse_resource_name(addr):
     type = None
-    for addr_re in [ats_addr,zi_addr,pxi_addr]:
+    for addr_re in [ats_addr,zi_addr,pxi_addr,other_addr]:
         m = addr_re.search(addr)
         if m is not None:
             type = m.group(1)
@@ -289,6 +303,8 @@ def _parse_resource_name(addr):
         return _parse_zi_resource_name(m, addr)
     elif type == 'PXI':
         return _parse_pxi_resource_name(m, addr)
+    elif type == 'OTHER':
+        return _parse_other_resource_name(m, addr)
     else:
         return dict(type='Visa', addr=addr)
 
