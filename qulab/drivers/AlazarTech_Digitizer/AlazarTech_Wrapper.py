@@ -374,7 +374,7 @@ class AlazarTechDigitizer():
                               samplesPerRecord,
                               recordsPerBuffer,
                               recordsPerAcquisition,
-                              ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT)
+                              ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_INTERLEAVE_SAMPLES)
         # Post DMA buffers to board
         for buf in self.buffers:
             self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
