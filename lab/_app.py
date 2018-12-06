@@ -236,13 +236,13 @@ class Application(HasSource):
 
     def copy(self):
         app_copy=self.__class__()
-        app_copy.parent = self.parent
-        app_copy.rc = self.rc
+        app_copy.parent = copy.deepcopy(self.parent)
+        app_copy.rc = copy.deepcopy(self.rc)
         # app_copy.data = self.data
-        app_copy.settings = self.settings
-        app_copy.params = self.params
-        app_copy.tags = self.tags
-        app_copy.sweep = self.sweep
+        app_copy.settings = copy.deepcopy(self.settings)
+        app_copy.params = copy.deepcopy(self.params)
+        app_copy.tags = copy.deepcopy(self.tags)
+        app_copy.sweep = self.sweep #deepcopy fail
         # app_copy.status = self.status
         # app_copy.ui = self.ui
         # app_copy.reset_status() = self.reset_status()
@@ -251,8 +251,8 @@ class Application(HasSource):
         # app_copy.run_event = self.run_event
         # app_copy.interrupt_event = self.interrupt_event
         # app_copy.__title = self.__title
-        app_copy._setUp = self._setUp
-        app_copy._tearDown = self._tearDown
+        app_copy._setUp = copy.deepcopy(self._setUp)
+        app_copy._tearDown = copy.deepcopy(self._tearDown)
         return app_copy
 
     def inherit(self,app,*args):
