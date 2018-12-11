@@ -7,6 +7,7 @@ import os
 import sys
 import time
 import tokenize
+import copy
 from collections import Awaitable, Iterable, OrderedDict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from threading import Thread
@@ -43,8 +44,8 @@ class Application(HasSource):
         self.run_event = asyncio.Event()
         self.interrupt_event = asyncio.Event()
         self.__title = None
-        self._setUp = ''
-        self._tearDown = ''
+        self._setUp = lambda : None
+        self._tearDown = lambda : None
 
         if parent is not None:
             self.rc.parent = parent.rc
@@ -196,7 +197,7 @@ class Application(HasSource):
     async def done(self):
         self.reset()
         self._set_start()
-        exec(self._setUp())
+        self._setUp()
         async for data in self.work():
             self.data.collect(data)
             result = self.data.result()
@@ -207,14 +208,14 @@ class Application(HasSource):
                 break
             await self.run_event.wait()
         self._set_done()
-        exec(self._tearDown())
+        self._tearDown()
         return self.data.result()
 
-    def setUp(self, f=''):
+    def setUp(self, f):
         self._setUp = f
         return self
 
-    def tearDown(self, f=''):
+    def tearDown(self, f):
         self._tearDown = f
         return self
 
@@ -232,6 +233,40 @@ class Application(HasSource):
 
     def pre_save(self, *args):
         return args
+
+    def copy(self):
+        app_copy=self.__class__()
+        app_copy.parent = copy.deepcopy(self.parent)
+        app_copy.rc = copy.deepcopy(self.rc)
+        # app_copy.data = self.data
+        app_copy.settings = copy.deepcopy(self.settings)
+        app_copy.params = copy.deepcopy(self.params)
+        app_copy.tags = copy.deepcopy(self.tags)
+        app_copy.sweep = self.sweep #deepcopy fail
+        # app_copy.status = self.status
+        # app_copy.ui = self.ui
+        # app_copy.reset_status() = self.reset_status()
+        # app_copy.level = self.level
+        # app_copy.level_limit = self.level_limit
+        # app_copy.run_event = self.run_event
+        # app_copy.interrupt_event = self.interrupt_event
+        # app_copy.__title = self.__title
+        app_copy._setUp = copy.deepcopy(self._setUp)
+        app_copy._tearDown = copy.deepcopy(self._tearDown)
+        return app_copy
+
+    def inherit(self,app,*args):
+        if not isinstance(app,Application):
+            raise IOError('app class error!')
+        if not args:
+            args = ('rc','settings','params','tags')
+        for attr in args:
+            if hasattr(self,attr):
+                value=copy.deepcopy(getattr(app,attr))
+                setattr(self,attr,value)
+            else:
+                raise IOError('no attr : %s' %attr)
+        return self
 
     @staticmethod
     def plot(fig, data):
@@ -304,8 +339,8 @@ class DataCollector:
             settings=self.app.settings,
             tags=self.app.tags,
             params=self.app.params,
-            setup=self._setUp
-            teardown=self._tearDown
+            # setup=self._setUp,
+            # teardown=self._tearDown,
             rc=rc,
             hidden=False if self.app.parent is None else True,
             app=self.app.__DBDocument__,
