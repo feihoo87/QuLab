@@ -8,6 +8,8 @@ class QuerySet():
     def __init__(self, query_set):
         self.query_set = query_set
         self.ui = QuerySetUI(self)
+        self.__count = self.count()
+        self.__index = 0
 
     @functools.lru_cache(maxsize=32)
     def __getitem__(self, i):
@@ -15,14 +17,15 @@ class QuerySet():
         return self.query_set[i]
 
     def __iter__(self):
-        self.__count = self.count()
-        self.__index = 0
         return self
 
     def __next__(self):
         if self.__index < self.__count:
-            return self.__getitem__(self.__index)
+            item = self.__getitem__(self.__index)
+            self.__index += 1
+            return item
         else:
+            self.__index = 0
             raise StopIteration
 
     @functools.lru_cache(maxsize=1)
