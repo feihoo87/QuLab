@@ -262,7 +262,10 @@ class Application(HasSource):
             args = ('rc','settings','params','tags')
         for attr in args:
             if hasattr(self,attr):
-                value=copy.deepcopy(getattr(app,attr))
+                try:
+                    value=copy.deepcopy(getattr(app,attr))
+                except:
+                    value=getattr(app,attr)
                 setattr(self,attr,value)
             else:
                 raise IOError('no attr : %s' %attr)

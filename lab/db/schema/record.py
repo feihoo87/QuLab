@@ -1,4 +1,6 @@
 import functools
+import importlib
+import matplotlib.pyplot as plt
 
 from .app import Application, getApplication
 from .base import *
@@ -43,6 +45,15 @@ class Record(Document):
             self.datafield.replace(
                 to_pickle(obj), content_type='application/octet-stream')
         # self.save()
+
+    def image(self,fig=None):
+        if self.app is None:
+            return
+        if fig is None:
+            fig=plt.figure()
+        mod = importlib.import_module(self.app.module.fullname)
+        app_cls = getattr(mod, self.app.name)
+        app_cls.plot(fig,self.data)
 
 def newRecord(**kwds):
     return Record(**kwds)
