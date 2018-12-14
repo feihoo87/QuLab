@@ -273,7 +273,16 @@ class Application(HasSource):
 
     @staticmethod
     def plot(fig, data):
+        '''用于App中即时画图'''
         pass
+
+    @classmethod
+    def image(cls, fig, data, option=0):
+        '''快速画图的方法：用于数据处理阶段，事先定义，格式化输出图片；
+        很有必要！在数据库record类里定义调用的方法;
+        option: 选项参数'''
+        # 默认使用上面的 plot
+        cls.plot(fig, data)
 
     @classmethod
     def save(cls, version=None, package=''):
@@ -496,7 +505,7 @@ def exportApps(dist_path):
         path = os.path.join(dist_path, *app.package.split('.'),
                             app.name + '.py')
         beforeSaveFile(path)
-        with open(path, 'wt') as f:
+        with open(path, 'wt', encoding='utf-8') as f:
             f.write(app.source)
 
 
@@ -509,7 +518,7 @@ def importApps(sour_path, package=''):
                 path,
                 package=fname if package == '' else package + '.' + fname)
         else:
-            with open(path, 'rt') as f:
+            with open(path, 'rt', encoding='utf-8') as f:
                 source = f.read()
             namespace = {}
             exec(source, namespace)
