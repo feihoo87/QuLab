@@ -56,7 +56,7 @@ class Record(Document):
         app_cls = getattr(mod, self.app.name)
         app_cls.plot(fig,self.data)
 
-    def image(self, fig=None, option=0):
+    def image(self, option=0, fig=None):
         '''调用App中的image方法，格式化快速画图'''
         if self.app is None:
             return
