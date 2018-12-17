@@ -314,7 +314,7 @@ def _open_visa_resource(rm, addr):
     # 对于非常旧的仪器，不支持IDN查询命令
     try:
         IDN = ins.query("*IDN?").split(',')
-    except VisaIOError:
+    except:
         return dict(ins=ins, addr=addr)
     else:
         company = IDN[0].strip()

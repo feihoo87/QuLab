@@ -9,7 +9,7 @@ from .base import *
 @update_modified.apply
 @delete_children.apply
 class Record(Document):
-    title = StringField(max_length=50)
+    title = StringField(max_length=100)
     comment = StringField()
     created_time = ComplexDateTimeField(default=now)
     finished_time = ComplexDateTimeField(default=now)

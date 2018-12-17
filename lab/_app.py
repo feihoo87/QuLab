@@ -282,7 +282,8 @@ class Application(HasSource):
         很有必要！在数据库record类里定义调用的方法;
         option: 选项参数'''
         # 默认使用上面的 plot
-        cls.plot(fig, data)
+        if option == 0:
+            cls.plot(fig, data)
 
     @classmethod
     def save(cls, version=None, package=''):
@@ -416,7 +417,7 @@ class SweepIter:
         self.setter = sweep.setter
         self.name = sweep.name
         self.unit = sweep.unit
-        self.lenght = len(sweep)
+        self.length = len(sweep)
 
     def fetch_data(self):
         try:
@@ -448,8 +449,8 @@ class SweepIter:
             self.app.status['current_params'][self.name] = [
                 float(data), self.unit
             ]
-            if self.lenght is not None:
-                self.app.processToChange(100.0 / self.lenght)
+            if self.length is not None:
+                self.app.processToChange(100.0 / self.length)
         return data
 
 
