@@ -13,6 +13,8 @@ class QuerySet():
 
     @functools.lru_cache(maxsize=32)
     def __getitem__(self, i):
+        if self.count() == 0:
+            raise Exception("No records found.")
         i = i % self.count()
         return self.query_set[i]
 
