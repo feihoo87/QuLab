@@ -199,6 +199,10 @@ class Driver(BaseDriver):
             self.write('WLIS:WAV:DEL "%s"; *WAI;' % name)
             self.waveform_list = self.get_waveform_list()
 
+    def get_waveform_length(self,name):
+        size = int(self.query('WLIS:WAV:LENGTH? "%s"' % name))
+        return size
+
     def use_waveform(self, name, ch=1, type=None):
         '''type: I or Q'''
         if type is not None:
