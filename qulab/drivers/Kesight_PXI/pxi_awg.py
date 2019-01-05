@@ -43,7 +43,7 @@ class Driver(BaseDriver):
                                        ('noSyncIN',  (1,0)),
                                        ('SyncIN',    (1,1))]),
 
-        QOption('triggerMode', value='External', ch=0,
+        QOption('triggerMode', value='ExternalCycle', ch=0,
                              options = [('Auto',         0),
                                         ('SWtri',        1),
                                         ('SWtriCycle',   5),
@@ -68,7 +68,7 @@ class Driver(BaseDriver):
         # Defines the delay between the trigger and the waveform launch in tens of ns
         QInteger('startDelay', value=0, unit='ns', ch=0, ),
         # Number of times the waveform is repeated once launched (negative means infinite)
-        QInteger('cycles', value=1, ch=0,),
+        QInteger('cycles', value=0, ch=0,),
         # Waveform prescaler value, to reduce the effective sampling rate
         QInteger('prescaler', value=0, ch=0,),
 
@@ -118,11 +118,11 @@ class Driver(BaseDriver):
     def performOpen(self):
         #SD_AOU module
         self.AWG = keysightSD1.SD_AOU()
-        self.product = self.AWG.getProductNameBySlot(self.chassis,self.slot)
-        moduleID = self.AWG.openWithSlot(self.product, self.chassis, self.slot)
+        self.model = self.AWG.getProductNameBySlot(self.chassis,self.slot)
+        moduleID = self.AWG.openWithSlot(self.model, self.chassis, self.slot)
         if moduleID < 0:
         	print("Module open error:", moduleID)
-        self.caches_file = caches_dir() / (self.product+'_config_caches.yaml')
+        self.caches_file = caches_dir() / (self.model+'_config_caches.yaml')
         try:
             self.loadcfg()
         except Exception:
@@ -184,7 +184,7 @@ class Driver(BaseDriver):
         elif quant.name == 'Output':
             if value=='Stop':
                 self.AWG.AWGstop(ch)
-            elif value=='Start':
+            elif value=='Run':
                 self.AWG.AWGstart(ch)
             elif value=='Pause':
                 self.AWG.AWGpause(ch)
@@ -261,6 +261,13 @@ class Driver(BaseDriver):
         and flushes all the AWG queues'''
         self.AWG.waveformFlush()
         self.config['WList'][0]['value']=[]
+        self.config['SList'][0]['value']=[]
+
+    def AWGflush(self,ch=0):
+        '''This function empties the queue of the selected Arbitrary Waveform Generator,
+        Waveforms are not removed from the module onboard RAM.'''
+        self.AWG.AWGflush(ch)
+        self.config['SList'][0]['value']=[]
 
     def _getParams(self, ch):
         triggerModeIndex = self.getValue('triggerMode',ch=ch)

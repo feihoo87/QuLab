@@ -374,7 +374,7 @@ class AlazarTechDigitizer():
                               samplesPerRecord,
                               recordsPerBuffer,
                               recordsPerAcquisition,
-                              ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT)
+                              ADMA_EXTERNAL_STARTCAPTURE | ADMA_NPT | ADMA_INTERLEAVE_SAMPLES)
         # Post DMA buffers to board
         for buf in self.buffers:
             self.AlazarPostAsyncBuffer(buf.addr, buf.size_bytes)
@@ -453,8 +453,9 @@ class AlazarTechDigitizer():
         time_out_ms = int(1000*timeout)
 
         self.AlazarSetParameter(0, SET_DATA_FORMAT, DATA_FORMAT_UNSIGNED)
+        self.AlazarSetRecordSize(preTriggerSamples, postTriggerSamples)
         self.AlazarBeforeAsyncRead(CHANNEL_A | CHANNEL_B,
-                                   -preTriggerSamples, samplesPerRecord, recordsPerBuffer,
+                                   -preTriggerSamples, samplesPerRecord, recordsPerBuffer//2,
                                    recordsPerAcquisition,
                                    uFlags)
         self.check_errors()

@@ -1,4 +1,6 @@
 import functools
+import importlib
+import matplotlib.pyplot as plt
 
 from .app import Application, getApplication
 from .base import *
@@ -7,7 +9,7 @@ from .base import *
 @update_modified.apply
 @delete_children.apply
 class Record(Document):
-    title = StringField(max_length=50)
+    title = StringField(max_length=100)
     comment = StringField()
     created_time = ComplexDateTimeField(default=now)
     finished_time = ComplexDateTimeField(default=now)
@@ -43,6 +45,26 @@ class Record(Document):
             self.datafield.replace(
                 to_pickle(obj), content_type='application/octet-stream')
         # self.save()
+
+    def plot(self,fig=None):
+        '''调用App中的plot方法画图'''
+        if self.app is None:
+            return
+        if fig is None:
+            fig=plt.figure()
+        mod = importlib.import_module(self.app.module.fullname)
+        app_cls = getattr(mod, self.app.name)
+        app_cls.plot(fig,self.data)
+
+    def image(self, option=0, fig=None):
+        '''调用App中的image方法，格式化快速画图'''
+        if self.app is None:
+            return
+        if fig is None:
+            fig=plt.figure()
+        mod = importlib.import_module(self.app.module.fullname)
+        app_cls = getattr(mod, self.app.name)
+        app_cls.image(fig, self.data, option)
 
 def newRecord(**kwds):
     return Record(**kwds)

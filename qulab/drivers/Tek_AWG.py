@@ -84,7 +84,7 @@ class Driver(BaseDriver):
             ret = []
             wlist_size = int(self.query("WLIS:SIZE?"))
             for i in range(wlist_size):
-                ret.append(self.query("WLIS:NAME? %d" % (i+1)).strip("\"\n '"))
+                ret.append(self.query("WLIS:NAME? %d" % i).strip("\"\n '"))
             return ret
         else:
             return []

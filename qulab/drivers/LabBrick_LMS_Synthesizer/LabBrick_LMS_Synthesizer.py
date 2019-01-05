@@ -6,13 +6,16 @@ from . import LabBrick_LMS_Wrapper
 class Driver(BaseDriver):
     """ This class implements a Lab Brick generator"""
 
-    support_models = ['LMS-103', ]
+    support_models = [  'LMS-103', 'LMS-123', 'LMS-203', 'LMS-802', 'LMS-163', 'LMS-232D',
+                        'LMS-402D', 'LMS-602D', 'LMS-451D', 'LMS-322D', 'LMS-271D', 'LMS-152D',
+                        'LMS-751D', 'LMS-252D', 'LMS-6123LH', 'LMS-163LH', 'LMS-802LH',
+                        'LMS-802DX', 'LMS-183DX']
 
     quants = [
-
         QReal('Frequency', unit='Hz',),
         QReal('Power', unit='dBm',),
-        QOption('Output',options=[('OFF', False), ('ON', True)])
+        QOption('Output',options=[('OFF', False), ('ON', True)]),
+        QOption('Reference',options=[('Internal', True), ('External', False)])
         ]
 
     def __init__(self, **kw):
@@ -51,8 +54,10 @@ class Driver(BaseDriver):
             # self.SG.setRFOn(bool(value))
             options=dict(quant.options)
             self.SG.setRFOn(bool(options[value]))
-        # elif quant.name == 'Use internal reference':
-        #     self.SG.setUseInternalRef(bool(value))
+        elif quant.name == 'Reference':
+            # self.SG.setUseInternalRef(bool(value))
+            options=dict(quant.options)
+            self.SG.setUseInternalRef(bool(options[value]))
         # elif quant.name == 'External pulse modulation':
         #     self.SG.setExternalPulseMod(bool(value))
         # elif quant.name in ('Internal pulse modulation', 'Pulse time', 'Pulse period'):
@@ -73,8 +78,8 @@ class Driver(BaseDriver):
             value = self.SG.getPowerLevel()
         elif quant.name == 'Output':
             value = self.SG.getRFOn()
-        # elif quant.name == 'Use internal reference':
-        #     value = self.SG.getUseInternalRef()
+        elif quant.name == 'Reference':
+            value = self.SG.getUseInternalRef()
         # elif quant.name == 'Internal pulse modulation':
         #     value = self.SG.getInternalPulseMod()
         # elif quant.name == 'Pulse time':
