@@ -232,7 +232,7 @@ p_addr = re.compile(r'^([a-zA-Z]+)[0-9]*::.+$')
 zi_addr = re.compile(r'^(ZI)::([a-zA-Z]+[0-9]*)::([a-zA-Z-]+[0-9]*)(|::INSTR)$')
 pxi_addr = re.compile(r'^(PXI)[0-9]?::CHASSIS([0-9]*)::SLOT([0-9]*)::FUNC([0-9]*)::INSTR$')
 #其他类型 (OTHER)::(Key):(Value)::INSTR
-other_addr = re.compile(r'^(OTHER)::([a-zA-Z-]+):([a-zA-Z-]*[0-9]*)::INSTR$')
+other_addr = re.compile(r'^(OTHER)::([a-zA-Z-]+):(.*)::INSTR$')
 
 def parse_resource_name(addr):
     m = p_addr.search(addr)

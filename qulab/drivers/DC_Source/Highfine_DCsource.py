@@ -14,9 +14,9 @@ gVolMax = 10
 gVolMin = -10
 
 class UDPSocketClient:
-    def __init__(self):
-        self.mHost = '192.168.1.6'
-        #self.mHost = '127.0.0.1'
+    def __init__(self, ip=None):
+        self.mHost = '192.168.1.6' if ip is None else ip
+        
         self.mPort = 6000
         self.mBufsize = 8 + 16
         self.mAddress = (self.mHost, self.mPort)
@@ -39,14 +39,9 @@ class Voltage():
     """
     Class documentation goes here.
     """
-    def __init__(self):
-        """
-        Constructor
+    def __init__(self, ip = None):
 
-        @param parent reference to the parent widget
-        @type QWidget
-        """
-        self.udpSocketClient = UDPSocketClient()
+        self.udpSocketClient = UDPSocketClient(ip)
         # self.dValue = 0.0
         self.volValue = 1.0
 
@@ -93,13 +88,6 @@ class Voltage():
         # set back the data length to 8
         self.udpSocketClient.setBufSize(8+ 16);
 
-def setvol(vol=0,ch=0):
-    a=Voltage()
-    a.sendCmdChnnelNum(ch)
-    a.writeReg(vol)
-
-if __name__ == '__main__':
-    a=Voltage()
-    a.sendCmdChnnelNum(1)
-    a.writeReg(0.5)
-    # b =
+    def setVoltage(self,voltage=0,ch=0):
+        self.sendCmdChnnelNum(ch)
+        self.writeReg(voltage)
