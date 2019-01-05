@@ -12,12 +12,6 @@ class Driver(BaseDriver):
         QReal('Offset', value=0, ch=0),
 
 
-        # QOption('Channel', value = '0',
-        #     options = [
-        #         ('1',   2 ),   ('2',    4),
-        #         ('3',   4),
-        #     ])
-
             ]
     #
     # def __init__(self, **kw):

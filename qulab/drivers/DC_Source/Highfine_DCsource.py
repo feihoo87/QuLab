@@ -6,7 +6,7 @@ Module implementing VoltageSettingDialog.
 import sys
 import struct
 from socket import *
-
+import numpy as np
 
 gDMax = 2**20-1
 gDMin = 0
@@ -75,7 +75,7 @@ class Voltage():
     def writeReg(self,value):
        # hex(int("0x0001", 16)),hex(self.dValue )
         # cmdData  =  struct.pack('L', htonl(1))  + struct.pack('L', htonl(self.dValue))
-        dValue=round((value-gVolMin)*(2**20-1)/(gVolMax-gVolMin))
+        dValue=int(np.around((value-gVolMin)*(2**20-1)/(gVolMax-gVolMin)))
         cmdData  =  struct.pack('L', htonl(1))  + struct.pack('L', htonl(dValue))
         self.sendcommand(0x5a02,0x0000,0x5a02,0x0008,0x0000,0x0000,0x00,0x00,0x0000, cmdData)
 
