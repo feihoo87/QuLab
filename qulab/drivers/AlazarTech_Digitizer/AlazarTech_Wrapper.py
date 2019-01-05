@@ -468,8 +468,7 @@ class AlazarTechDigitizer():
                 self.AlazarWaitNextAsyncBufferComplete(
                     Buffer, bytesPerBuffer, time_out_ms)
                 self.check_errors(ignores=[RETURN_CODE.ApiTransferComplete])
-                # _Buffer = Buffer >> bitShift
-                _Buffer = Buffer
+                _Buffer = Buffer >> bitShift
                 data = np.array(_Buffer, dtype=np.float)
                 data -= codeZero
                 ch1, ch2 = scaleA * data[:samplesPerRecord],\
