@@ -7,7 +7,7 @@ from  .AWGboard import AWGBoard
 
 
 class Driver(BaseDriver):
-    support_models = ['']
+    support_models = ['PG_AWG']
 
     quants = [
         QReal('Offset',unit='V',ch=1,),
@@ -16,6 +16,7 @@ class Driver(BaseDriver):
 
     def __init__(self, **kw):
         BaseDriver.__init__(self, **kw)
+        self.model='PG_AWG'
         self.ip=kw['IP']
 
     def performOpen(self):
