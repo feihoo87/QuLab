@@ -285,6 +285,18 @@ class Wavedata(object):
         self.data = self.data/max(abs(self.data))
         return self
 
+    def process(self,func):
+        '''处理，传入一个处理函数func, 输入输出都是(data,sRate)格式'''
+        data,sRate = func(self.data,self.sRate)
+        return Wavedata(data,sRate)
+
+    def filter(self,filter):
+        '''调用filter的process函数处理；
+        一般filter是本模块里的Filter类'''
+        assert hasattr(filter,'process')
+        w = self.process(filter.process)
+        return w
+
     def plot(self, *arg, isfft=False, **kw):
         '''对于FFT变换后的波形数据，包含0频成分，x从0开始；
         使用isfft=True会去除了x的偏移，画出的频谱更准确'''
