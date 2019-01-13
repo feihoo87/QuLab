@@ -28,6 +28,8 @@ class QuerySetUI():
             lambda i,r: '<td style="text-align:left">%s</td>' % r.user.fullname],
         'Tags': ['<th>Tags</th>',
             lambda i,r: '<td>%s</td>' % ''.join(['<div class="tag %s">%s</div>' % ('tag-red' if tag[-1]=='!' else 'tag-blue', tag) for tag in r.tags])],
+        'Settings': ['<th>Settings</th>',
+            lambda i,r: '<td>%s</td>' % ''.join(['<div class="tag tag-border">%s = %r</div>' % (k, v) for k,v in r.settings.items()])],
         'Parameters': ['<th>Parameters</th>',
             lambda i,r: '<td>%s</td>' % ''.join(['<div class="tag tag-border">%s = %g %s</div>' % (k, v[0], v[1]) for k,v in r.params.items()])],
         'Image': ['<th>Image</th>', None]

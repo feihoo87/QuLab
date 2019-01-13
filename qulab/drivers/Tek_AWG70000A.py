@@ -8,8 +8,10 @@ class Driver(BaseDriver):
     support_models = ['AWG70001A', 'AWG70002A']
 
     quants = [
+        # Sample Rate set_cmd is block cmd
+        #
         QReal('Sample Rate', unit='S/s',
-          set_cmd='CLOC:SRAT %(value).10e',
+          set_cmd='CLOC:SRAT %(value).10e; *WAI;',
           get_cmd='CLOC:SRAT?'),
 
         QOption('Run Mode', value='CONT', ch=1,
@@ -184,18 +186,22 @@ class Driver(BaseDriver):
         '''format: REAL or IQ'''
         if name in self.waveform_list:
             return
-        self.write('WLIS:WAV:NEW "%s",%d,%s;' % (name, length, format))
+        self.write('WLIS:WAV:NEW "%s",%d,%s;*WAI;' % (name, length, format))
         self.waveform_list = self.get_waveform_list()
 
     def remove_waveform(self, name=None, all=False):
         if all:
-            self.write('WLIS:WAV:DEL ALL; *CLS')
+            self.write('WLIS:WAV:DEL ALL; *WAI;')
             self.waveform_list.clear()
         elif name not in self.waveform_list:
             return
         else:
-            self.write('WLIS:WAV:DEL "%s"; *CLS' % name)
+            self.write('WLIS:WAV:DEL "%s"; *WAI;' % name)
             self.waveform_list = self.get_waveform_list()
+
+    def get_waveform_length(self,name):
+        size = int(self.query('WLIS:WAV:LENGTH? "%s"' % name))
+        return size
 
     def use_waveform(self, name, ch=1, type=None):
         '''type: I or Q'''
@@ -203,6 +209,7 @@ class Driver(BaseDriver):
             self.write('SOUR%d:CASS:WAV "%s",%s' % (ch, name, type))
         else:
             self.write('SOUR%d:CASS:WAV "%s"' % (ch, name))
+        self.write('*WAI;')
 
     # 关于RUN的设置和状态询问，建议使用Quantity：Run的方法
     def run_state(self):
@@ -234,6 +241,7 @@ class Driver(BaseDriver):
         elif w_type == 'IQ':
             self._update_waveform_float(points[0], name, 'I', start, size)
             self._update_waveform_float(points[1], name, 'Q', start, size)
+        self.write('*WAI;')
         # else:
         #     self._update_waveform_int(points, name, start, size)
 
@@ -282,17 +290,17 @@ class Driver(BaseDriver):
     def create_sequence(self, name, steps, tracks=1):
         if name in self.sequence_list:
             return
-        self.write('SLIS:SEQ:NEW "%s", %d, %d' % (name, steps, tracks))
+        self.write('SLIS:SEQ:NEW "%s", %d, %d; *WAI;' % (name, steps, tracks))
         self.sequence_list = self.get_sequence_list()
 
     def remove_sequence(self, name=None, all=False):
         if all:
-            self.write('SLIS:SEQ:DEL ALL; *CLS')
+            self.write('SLIS:SEQ:DEL ALL; *WAI;')
             self.sequence_list.clear()
         elif name not in self.sequence_list:
             return
         else:
-            self.write('SLIS:SEQ:DEL "%s"' % name)
+            self.write('SLIS:SEQ:DEL "%s"; *WAI;' % name)
             self.sequence_list = self.get_sequence_list()
 
     #
@@ -326,3 +334,4 @@ class Driver(BaseDriver):
             self.write('SOUR%d:CASS:SEQ "%s", %d, %s' % (ch, name, track, type))
         else:
             self.write('SOUR%d:CASS:SEQ "%s", %d' % (ch, name, track))
+        self.write('*WAI;')
