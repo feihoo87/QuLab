@@ -191,7 +191,7 @@ class Driver(BaseDriver):
     def update_marker(self, name, mk1, mk2=None, mk3=None, mk4=None, start=0, size=None):
         def format_marker_data(markers, bits):
             values = 0
-            for i, v in markers:
+            for i, v in enumerate(markers):
                 v = 0 if v is None else np.asarray(v)
                 values += v << bits[i]
             return values
