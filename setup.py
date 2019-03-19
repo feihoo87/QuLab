@@ -19,7 +19,8 @@ requirements = [
     'numpy>=1.13.3',
     'scipy>=1.0.0',
     'matplotlib>=2.1.0',
-    'jupyter>=1.0.0',
+    'ipython>=7.3.0',
+    'notebook>=5.5.0',
     'requests>=2.18.4',
     'tornado>=5.0.1',
     'motor>=1.2.1',
@@ -27,7 +28,7 @@ requirements = [
     'blinker>=1.4',
     'pyvisa>=1.8',
     'pyvisa-py>=0.2',
-    'PyYAML>=3.12',
+    'PyYAML>=5.1',
     'quantities>=0.12.1',
 ]
 
