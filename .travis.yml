@@ -15,13 +15,16 @@ matrix:
     - name: "Python on Windows"
       os: windows
       language: shell
-      before_install: choco install python
-      env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
+      before_install:
+        - choco install python
+        - pip3 install --user coveralls
+        - pip3 install --user pytest
+      env: PATH=/c/Python37:/c/Python37/Scripts:/c/Users/travis/AppData/Roaming/Python/Python37/Scripts:$PATH
 install:
-  - pip3 install --user -r requirements.txt
-  - pip3 install --user -r requirements-dev.txt
-  - pip3 install --user pytest-cov
-  - pip3 install --user coveralls
+  - pip3 install -r requirements.txt
+  - pip3 install -r requirements-dev.txt
+  - pip3 install pytest-cov
+  - pip3 install coveralls
   - pip3 install -e .
 script:
   - pytest
