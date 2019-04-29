@@ -14,6 +14,10 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 exec(open('qulab/_version.py').read())
 
 requirements = [
+    'cryptography>=2.6.1',
+    'numpy>=1.13.3',
+    'scipy>=1.0.0',
+    'PyYAML>=5.1',
 ]
 
 if platform.system() == 'Windows':
