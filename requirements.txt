@@ -1,7 +1,7 @@
 aiohttp==3.5.4
 numpy==1.15.4
 scipy==1.2.0
-matplotlib==3.0.2
+matplotlib==3.0.3
 jupyter==1.0.0
 requests==2.21.0
 tornado==5.1.1
