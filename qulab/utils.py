@@ -19,9 +19,8 @@ def get_unit_prefix(value):
     u => 1e-6        M => 1e6
     m => 1e-3        k => 1e3
 
-    Returns
-    -------
-    (prefix, multiple)
+    Returns:
+        (prefix, multiple)
     '''
     prefixs = [
         'y', 'z', 'a', 'f', 'p', 'n', 'u', 'm', '', 'k', 'M', 'G', 'T', 'P',
@@ -53,15 +52,13 @@ def get_probility(x, N, a=0.05):
     '''
     计算 N 此重复实验，事件 A 发生 x 次时，事件 A 的发生概率
 
-    Parameters
-    ----------
-    x : 事件发生次数
-    N : 总实验次数
-    a : 设置显著性水平 1-a，默认 0.05
+    Args:
+        x : 事件发生次数
+        N : 总实验次数
+        a : 设置显著性水平 1-a，默认 0.05
 
-    Returns
-    -------
-    P, E, std, (low, high)
+    Returns:
+        P, E, std, (low, high)
         事件 A 发生概率 P 的最概然取值、期望、以及其置信区间
     '''
     P = 1.0 * x / N
@@ -76,10 +73,9 @@ def threshold(data, delta=1e-7):
     '''
     给定一组成双峰分布的数据 data 计算双峰之间的分界值
 
-    Parameters
-    ----------
-    data : 数据类型 numpy.array
-    delta: 精确度，默认 delta = 1e-7
+    Args:
+        data : 数据类型 numpy.array
+        delta: 精确度，默认 delta = 1e-7
     '''
     threshold = m1 = m2 = data.mean()
     while True:
@@ -127,15 +123,13 @@ def IEEE_488_2_BinBlock(datalist, dtype="int16", is_big_endian=True):
     """
     将一组数据打包成 IEEE 488.2 标准二进制块
 
-    Parameters
-    ----------
-    datalist : 要打包的数字列表
-    dtype    : 数据类型
-    endian   : 字节序
+    Args:
+        datalist : 要打包的数字列表
+        dtype    : 数据类型
+        endian   : 字节序
 
-    Returns
-    -------
-    binblock, header
+    Returns:
+        binblock, header
         二进制块, 以及其 'header'
     """
     types = {"b"      : (  int, 'b'), "B"      : (  int, 'B'),
