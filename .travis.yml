@@ -1,12 +1,33 @@
 language: python
-python:
-  - '3.6'
-services:
-  - mongodb
+matrix:
+  include:
+    - name: "Python 3.6 on Linux"
+      os: linux
+      python: 3.6
+    - name: "Python 3.7 on Xenial Linux"
+      os: linux
+      python: 3.7
+      dist: xenial
+    - name: "Python 3.7.2 on macOS"
+      os: osx
+      osx_image: xcode10.2
+      language: shell
+    - name: "Python 3.7 on Windows"
+      os: windows
+      language: shell
+      before_install: choco install python
+      env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
 install:
-  - python setup.py install
+  - pip3 install --upgrade pip
+  - pip3 install -r requirements.txt
+  - pip3 install -r requirements-dev.txt
+  - pip3 install pytest-cov
+  - pip3 install coveralls
+  - pip3 install -e .
 script:
   - pytest
+after_success:
+  - coveralls
 deploy:
   provider: pypi
   user: feihoo87
@@ -15,4 +36,5 @@ deploy:
   on:
     branch: master
     tags: true
+  skip_existing: true
   distributions: "sdist bdist_wheel"
