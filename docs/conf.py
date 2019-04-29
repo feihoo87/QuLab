@@ -10,9 +10,9 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.insert(0, os.path.abspath('..'))
 
 
 # -- Project information -----------------------------------------------------
@@ -22,7 +22,8 @@ copyright = '2019, feihoo87'
 author = 'feihoo87'
 
 # The full version, including alpha/beta/rc tags
-release = 'v1.0'
+import qulab
+release = qulab.__version__
 
 
 # -- General configuration ---------------------------------------------------
@@ -31,6 +32,11 @@ release = 'v1.0'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.todo',
+    'sphinx.ext.viewcode',
+    'sphinxcontrib.napoleon',
+    'sphinxcontrib.zopeext.autointerface'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
