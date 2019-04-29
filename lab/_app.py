@@ -407,10 +407,15 @@ class Sweep:
 
     def __aiter__(self):
         return SweepIter(self)
+    
+    def enum(self):
+        return SweepIter(self, return_index=True)
 
 
 class SweepIter:
-    def __init__(self, sweep):
+    def __init__(self, sweep, return_index=False):
+        self.return_index = return_index
+        self.index = 0
         self.iter = sweep._generator.__iter__() if isinstance(
             sweep._generator, Iterable) else sweep._generator
         self.app = sweep.parent.app
@@ -427,7 +432,12 @@ class SweepIter:
         return data
 
     def __next__(self):
-        return next(self.iter)
+        i, data = self.index, next(self.iter)
+        self.index += 1
+        if self.return_index:
+            return i, data
+        else:
+            return data
 
     async def set_data(self, data):
         if self.setter is not None:
@@ -443,7 +453,8 @@ class SweepIter:
     async def __anext__(self):
         if self.app is not None:
             self.app.increaseProcess()
-        data = self.fetch_data()
+        i, data = self.index, self.fetch_data()
+        self.index += 1
         await self.set_data(data)
         if self.app is not None:
             self.app.status['current_params'][self.name] = [
@@ -451,7 +462,10 @@ class SweepIter:
             ]
             if self.length is not None:
                 self.app.processToChange(100.0 / self.length)
-        return data
+        if self.return_index:
+            return i, data
+        else:
+            return data
 
 
 class SweepSet:
