@@ -40,7 +40,12 @@ setup(
     #data_files=[('QuLab/Drivers', driverFiles)],
     install_requires=requirements,
     extras_require={
-        'test': ['pytest'],
+        'test': [
+            'pytest>=4.4.0',
+        ],
+        'docs': [
+            'Sphinx==2.0.1',
+        ],
     },
     python_requires='>=3.6',
     classifiers=[
