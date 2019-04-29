@@ -8,7 +8,7 @@ Welcome to QuLab's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :titlesonly:
 
    source/modules
 
