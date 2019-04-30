@@ -44,7 +44,9 @@ setup(
             'pytest>=4.4.0',
         ],
         'docs': [
-            'Sphinx==2.0.1',
+            'Sphinx',
+            'sphinxcontrib-napoleon',
+            'sphinxcontrib-zopeext',
         ],
     },
     python_requires='>=3.6',

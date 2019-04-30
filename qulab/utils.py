@@ -10,14 +10,15 @@ def get_unit_prefix(value):
     '''
     获取 value 合适的单位前缀，以及相应的倍数
 
-    y => 1e-24       Y => 1e24
-    z => 1e-21       Z => 1e21
-    a => 1e-18       E => 1e18
-    f => 1e-15       P => 1e15
-    p => 1e-12       T => 1e12
-    n => 1e-9        G => 1e9
-    u => 1e-6        M => 1e6
-    m => 1e-3        k => 1e3
+    >>>
+        y => 1e-24       Y => 1e24
+        z => 1e-21       Z => 1e21
+        a => 1e-18       E => 1e18
+        f => 1e-15       P => 1e15
+        p => 1e-12       T => 1e12
+        n => 1e-9        G => 1e9
+        u => 1e-6        M => 1e6
+        m => 1e-3        k => 1e3
 
     Returns:
         (prefix, multiple)

@@ -35,6 +35,8 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
+    'sphinxcontrib.napoleon',
+    'sphinxcontrib.zopeext.autointerface',
 ]
 
 # The suffix of source filenames.

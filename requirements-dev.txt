@@ -1,2 +1,4 @@
 pytest==4.4.0
 Sphinx==2.0.1
+sphinxcontrib-napoleon==0.7
+sphinxcontrib-zopeext==0.2.1
