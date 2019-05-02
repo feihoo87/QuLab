@@ -19,6 +19,7 @@ requirements = [
     'scipy>=1.0.0',
     'PyYAML>=5.1',
     'pyzmq>=18.0.1',
+    'u-msgpack-python>=2.5.1',
 ]
 
 if platform.system() == 'Windows':

@@ -1,8 +1,8 @@
 import asyncio
 import functools
-import pickle
 from collections.abc import Awaitable
 
+import umsgpack
 import zmq
 import zmq.asyncio
 
@@ -43,11 +43,11 @@ class Server:
                 asyncio.ensure_future(self.handle(sock, obj, addr, msg), loop=self.loop)
 
     async def handle(self, sock, obj, addr, msg):
-        method, args, kw = pickle.loads(msg)
+        method, args, kw = umsgpack.unpackb(msg)
         result = getattr(obj, method)(*args, **kw)
         if isinstance(result, Awaitable):
             result = await result
-        result = pickle.dumps(result)
+        result = umsgpack.packb(result)
         await sock.send_multipart([addr, result])
 
 
@@ -73,7 +73,7 @@ class Client:
         return RPCCallable(name, self)
 
     async def performMethod(self, name, *args, **kw):
-        msg = pickle.dumps((name, args, kw))
+        msg = umsgpack.packb((name, args, kw))
         await self.sock.send_multipart([msg])
         result, = await self.sock.recv_multipart()
-        return pickle.loads(result)
+        return umsgpack.unpackb(result)
