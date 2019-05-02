@@ -18,6 +18,7 @@ requirements = [
     'numpy>=1.13.3',
     'scipy>=1.0.0',
     'PyYAML>=5.1',
+    'pyzmq>=18.0.1',
 ]
 
 if platform.system() == 'Windows':
@@ -42,6 +43,7 @@ setup(
     extras_require={
         'test': [
             'pytest>=4.4.0',
+            'pytest-asyncio>=0.10.0',
         ],
         'docs': [
             'Sphinx',

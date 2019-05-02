@@ -1,6 +1,7 @@
 cryptography==2.6.1
-numpy>=1.13.3
-scipy>=1.0.0
+numpy==1.13.3
+scipy==1.0.0
 PyYAML==5.1
+pyzmq==18.0.1
 
 pywin32==224; platform_system=="Windows"
