@@ -2,9 +2,9 @@ import asyncio
 import functools
 from collections.abc import Awaitable
 
-import umsgpack
 import zmq
 import zmq.asyncio
+from qulab.serialize import pack, unpack
 
 
 class Server:
@@ -40,14 +40,15 @@ class Server:
             self.__port = sock.bind_to_random_port('tcp://*')
             while True:
                 addr, msg = await sock.recv_multipart()
-                asyncio.ensure_future(self.handle(sock, obj, addr, msg), loop=self.loop)
+                asyncio.ensure_future(self.handle(sock, obj, addr, msg),
+                                      loop=self.loop)
 
     async def handle(self, sock, obj, addr, msg):
-        method, args, kw = umsgpack.unpackb(msg)
+        method, args, kw = unpack(msg)
         result = getattr(obj, method)(*args, **kw)
         if isinstance(result, Awaitable):
             result = await result
-        result = umsgpack.packb(result)
+        result = pack(result)
         await sock.send_multipart([addr, result])
 
 
@@ -73,7 +74,7 @@ class Client:
         return RPCCallable(name, self)
 
     async def performMethod(self, name, *args, **kw):
-        msg = umsgpack.packb((name, args, kw))
+        msg = pack((name, args, kw))
         await self.sock.send_multipart([msg])
         result, = await self.sock.recv_multipart()
-        return umsgpack.unpackb(result)
+        return unpack(result)
