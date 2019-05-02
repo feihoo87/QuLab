@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import functools
+import socket
 import struct
+import uuid
 
 import numpy as np
 from scipy.special import sici
@@ -65,8 +68,8 @@ def get_probility(x, N, a=0.05):
     P = 1.0 * x / N
     E = (x + 1.0) / (N + 2.0)
     std = np.sqrt(E * (1 - E) / (N + 3))
-    low, high = beta.ppf(0.5 * a, x + 1, N - x + 1), beta.ppf(
-        1 - 0.5 * a, x + 1, N - x + 1)
+    low = beta.ppf(0.5 * a, x + 1, N - x + 1)
+    high = beta.ppf(1 - 0.5 * a, x + 1, N - x + 1)
     return P, E, std, (low, high)
 
 
@@ -75,7 +78,7 @@ def threshold(data, delta=1e-7):
     给定一组成双峰分布的数据 data 计算双峰之间的分界值
 
     Args:
-        data : 数据类型 numpy.array
+        data : numpy.array
         delta: 精确度，默认 delta = 1e-7
     '''
     threshold = m1 = m2 = data.mean()
@@ -94,6 +97,16 @@ def threshold(data, delta=1e-7):
 def get_threshold_visibility(data1, data2):
     '''
     给定两组数据，寻找区分两组数据的临界值，并计算可见度及矫正系数
+
+    Returns:
+        tuple:
+        visibility : float 可见度
+        threshold : float 临界值
+        corr : tuple 矫正系数
+    
+    >>> threshold, visibility, (a, b) = get_threshold_visibility(state0, state1)
+    >>> P, E, std, (low, high) = get_probility(np.count_nonzero(data<threshold), len(data))
+    >>> P1 = (P - a) / (a + b)
     '''
     lims = [min(data1.min(), data2.min()), max(data1.max(), data2.max())]
     bins = np.linspace(lims[0], lims[1], min(len(data1) + len(data2), 1000))
@@ -143,7 +156,8 @@ def IEEE_488_2_BinBlock(datalist, dtype="int16", is_big_endian=True):
              "int32"  : (  int, 'i'), "uint32" : (  int, 'I'),
              "int64"  : (  int, 'q'), "uint64" : (  int, 'Q'),
              "float"  : (float, 'f'), "double" : (float, 'd'),
-             "float32": (float, 'f'), "float64": (float, 'd')}
+             "float32": (float, 'f'), "float64": (float, 'd')
+    } # yapf: disable
 
     datalist = np.asarray(datalist)
     datalist.astype(types[dtype][0])
@@ -151,8 +165,48 @@ def IEEE_488_2_BinBlock(datalist, dtype="int16", is_big_endian=True):
         endianc = '>'
     else:
         endianc = '<'
-    datablock = struct.pack('%s%d%s' % (endianc, len(datalist), types[dtype][1]), *datalist)
+    datablock = struct.pack(
+        '%s%d%s' % (endianc, len(datalist), types[dtype][1]), *datalist)
     size = '%d' % len(datablock)
-    header = '#%d%s' % (len(size),size)
+    header = '#%d%s' % (len(size), size)
 
-    return header.encode()+datablock, header
+    return header.encode() + datablock, header
+
+
+@functools.lru_cache(maxsize=1)
+def getHostIP():
+    """
+    获取本机 ip 地址
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+    return ip
+
+
+@functools.lru_cache(maxsize=1)
+def getHostIPv6():
+    """
+    获取本机 ipv6 地址
+    """
+    try:
+        s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+        s.connect(('2001:4860:4860::8888', 80, 0, 0))
+        ip = s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+    return ip
+
+
+@functools.lru_cache(maxsize=1)
+def getHostMac():
+    """
+    获取本机 mac 地址
+    """
+    mac = uuid.UUID(int=uuid.getnode()).hex[-12:]
+    return ":".join([mac[e:e + 2] for e in range(0, 11, 2)])
