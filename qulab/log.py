@@ -2,35 +2,46 @@ import logging
 
 import zmq
 from qulab._config import config
-from qulab.serialize import pack
+from qulab.serialize import pack, unpack
 from qulab.utils import getHostIP
 
 cfg = config.get('log', dict())
 
 
-class Handler(logging.Handler):
+def level():
+    """
+    Get default log level
+    """
+    return {
+        'notset': logging.NOTSET,
+        'debug': logging.DEBUG,
+        'info': logging.INFO,
+        'warning': logging.WARNING,
+        'error': logging.ERROR,
+        'critical': logging.CRITICAL
+    }[cfg.get('level', 'info')] # yapf: disable
+
+
+class BaseHandler(logging.Handler):
+    """
+    BaseHandler
+    """
+
     def __init__(self):
         super().__init__()
-        self.ctx = zmq.Context.instance()
-        self.socket = self.ctx.socket(zmq.PUB)
-        self.logserver = cfg.get('server', None)
-        if self.logserver is not None:
-            self.socket.connect(self.logserver)
         self.host = getHostIP()
-
-    def __del__(self):
-        self.socket.close()
 
     def emit(self, record):
         """Emit a log message."""
-        if self.logserver is None:
-            return
         try:
             bmsg = self.serialize(record)
         except Exception:
             self.handleError(record)
             return
-        self.socket.send_multipart([bmsg])
+        self.send_bytes(bmsg)
+
+    def send_bytes(self, bmsg):
+        raise NotImplementedError
 
     def serialize(self, record):
         """
@@ -56,3 +67,42 @@ class Handler(logging.Handler):
             d['name'] = '%s.%s' % (self.host, d['name'])
         s = pack(d)
         return s
+
+
+class ZMQHandler(BaseHandler):
+    """
+    Publish log by zmq socket
+    """
+
+    def __init__(self, socket: zmq.Socket):
+        """
+        Args:
+            socket: A :class:`~zmq.Socket` instance.
+        """
+        super().__init__()
+        self.socket = socket
+
+    def send_bytes(self, bmsg):
+        btopic = self.host.encode()
+        self.socket.send_multipart([btopic, bmsg])
+
+
+class RedisHandler(BaseHandler):
+    """
+    Publish log by redis
+    """
+
+    def __init__(self, conn, channel='log'):
+        """
+        Args:
+            conn : :class:`~redis.Redis`
+                redis connection
+            channle : str
+                channel name
+        """
+        super().__init__()
+        self.conn = conn
+        self.channel = channel
+
+    def send_bytes(self, bmsg):
+        self.conn.publish(self.channel, bmsg)
