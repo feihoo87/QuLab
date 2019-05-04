@@ -37,6 +37,7 @@ setup(
     keywords="experiment laboratory",
     description="contral instruments and manage data",
     long_description=long_description,
+    long_description_content_type='text/markdown',
     packages = find_packages(),
     include_package_data = True,
     #data_files=[('QuLab/Drivers', driverFiles)],
