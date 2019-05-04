@@ -15,7 +15,7 @@ DEFAULT_CONFIG = {
         'level' : 'info',
         'server' : 'tcp://127.0.0.1:16872',
     },
-    'router': {
+    'dht': {
         'default_port' : 8987,
         'bootstrap_nodes': ['127.0.0.1:8987'],
         'white_list': [],
