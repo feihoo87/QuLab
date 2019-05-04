@@ -6,7 +6,22 @@ import yaml
 
 CONFIG_DIRNAME = 'QuLab'
 CONFIG_FILENAME = 'config.yaml'
-DEFAULT_CONFIG = {'db': {'db': 'lab', 'host': 'localhost'}}
+DEFAULT_CONFIG = {
+    'db': {
+        'db': 'lab',
+        'host': 'localhost'
+    },
+    'log': {
+        'level' : 'info',
+        'server' : 'tcp://127.0.0.1:16872',
+    },
+    'router': {
+        'default_port' : 8987,
+        'bootstrap_nodes': ['127.0.0.1:8987'],
+        'white_list': [],
+        'black_list': [],
+    }
+} # yapf : disable
 
 
 def load_config(path):
