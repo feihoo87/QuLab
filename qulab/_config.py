@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 
 CONFIG_DIRNAME = 'QuLab'
-CONFIG_FILENAME = 'config.yaml'
+CONFIG_FILENAME = 'config.yml'
 DEFAULT_CONFIG = {
     'db': {
         'db': 'lab',

@@ -35,7 +35,7 @@ def test_config_dir():
 
 
 def test_config_file():
-    assert config_file() == config_dir() / 'config.yaml'
+    assert config_file() == config_dir() / 'config.yml'
 
 
 def test_load_config(tmp_config_file):
