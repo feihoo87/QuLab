@@ -1,17 +1,20 @@
 """
 Package for interacting on the network at a high level.
 """
-import random
-import pickle
 import asyncio
 import logging
+import pickle
+import random
 
-from qulab.dht.protocol import KademliaProtocol
-from qulab.dht.utils import digest
-from qulab.dht.storage import ForgetfulStorage
+from qulab._config import config
+from qulab.dht.crawling import NodeSpiderCrawl, ValueSpiderCrawl
 from qulab.dht.node import Node
-from qulab.dht.crawling import ValueSpiderCrawl
-from qulab.dht.crawling import NodeSpiderCrawl
+from qulab.dht.protocol import KademliaProtocol
+from qulab.dht.storage import ForgetfulStorage
+from qulab.dht.utils import digest
+
+cfg = config.get('dht', dict())
+DEFALT_PORT = cfg.get('default_port', 8987)
 
 log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
@@ -65,11 +68,53 @@ class Server:
         loop = asyncio.get_event_loop()
         listen = loop.create_datagram_endpoint(self._create_protocol,
                                                local_addr=(interface, port))
-        log.info("Node %i listening on %s:%i",
-                 self.node.long_id, interface, port)
+        log.info("Node %i listening on %s:%i", self.node.long_id, interface,
+                 port)
         self.transport, self.protocol = await listen
         # finally, schedule refreshing table
         self.refresh_table()
+
+    async def listen_on_random_port(self,
+                                    interface='0.0.0.0',
+                                    min_port=49152,
+                                    max_port=65536,
+                                    max_tries=100):
+        """Bind socket to a random port in a range.
+        If the port range is unspecified, the system will choose the port.
+
+        Args:
+            addr : str
+                The address string without the port to pass to ``Socket.bind()``.
+            min_port : int, optional
+                The minimum port in the range of ports to try (inclusive).
+            max_port : int, optional
+                The maximum port in the range of ports to try (exclusive).
+            max_tries : int, optional
+                The maximum number of bind attempts to make.
+
+        Returns:
+            port : int
+                The port the socket was bound to.
+    
+        Raises:
+            OSError
+                if `max_tries` reached before successful bind
+        """
+        ports = random.sample(range(min_port, max_port), max_tries)
+        ports.insert(0, DEFALT_PORT)
+        for port in ports:
+            try:
+                await self.listen(port, interface)
+            except OSError as exception:
+                en = exception.errno
+                if en == 48:
+                    continue
+                else:
+                    raise
+            break
+        else:
+            raise OSError("Could not bind socket to random port. %d" % port)
+        return port
 
     def refresh_table(self):
         log.debug("Refreshing routing table")
@@ -86,8 +131,8 @@ class Server:
         for node_id in self.protocol.get_refresh_ids():
             node = Node(node_id)
             nearest = self.protocol.router.find_neighbors(node, self.alpha)
-            spider = NodeSpiderCrawl(self.protocol, node, nearest,
-                                     self.ksize, self.alpha)
+            spider = NodeSpiderCrawl(self.protocol, node, nearest, self.ksize,
+                                     self.alpha)
             results.append(spider.find())
 
         # do our crawling
@@ -121,8 +166,8 @@ class Server:
         cos = list(map(self.bootstrap_node, addrs))
         gathered = await asyncio.gather(*cos)
         nodes = [node for node in gathered if node is not None]
-        spider = NodeSpiderCrawl(self.protocol, self.node, nodes,
-                                 self.ksize, self.alpha)
+        spider = NodeSpiderCrawl(self.protocol, self.node, nodes, self.ksize,
+                                 self.alpha)
         return await spider.find()
 
     async def bootstrap_node(self, addr):
@@ -145,8 +190,8 @@ class Server:
         if not nearest:
             log.warning("There are no known neighbors to get key %s", key)
             return None
-        spider = ValueSpiderCrawl(self.protocol, node, nearest,
-                                  self.ksize, self.alpha)
+        spider = ValueSpiderCrawl(self.protocol, node, nearest, self.ksize,
+                                  self.alpha)
         return await spider.find()
 
     async def set(self, key, value):
@@ -155,8 +200,7 @@ class Server:
         """
         if not check_dht_value_type(value):
             raise TypeError(
-                "Value must be of type int, float, bool, str, or bytes"
-            )
+                "Value must be of type int, float, bool, str, or bytes")
         log.info("setting '%s' = '%s' on network", key, value)
         dkey = digest(key)
         return await self.set_digest(dkey, value)
@@ -174,8 +218,8 @@ class Server:
                         dkey.hex())
             return False
 
-        spider = NodeSpiderCrawl(self.protocol, node, nearest,
-                                 self.ksize, self.alpha)
+        spider = NodeSpiderCrawl(self.protocol, node, nearest, self.ksize,
+                                 self.alpha)
         nodes = await spider.find()
         log.info("setting '%s' on %s", dkey.hex(), list(map(str, nodes)))
 
@@ -232,8 +276,7 @@ class Server:
         loop = asyncio.get_event_loop()
         self.save_state_loop = loop.call_later(frequency,
                                                self.save_state_regularly,
-                                               fname,
-                                               frequency)
+                                               fname, frequency)
 
 
 def check_dht_value_type(value):
@@ -241,11 +284,5 @@ def check_dht_value_type(value):
     Checks to see if the type of the value is a valid type for
     placing in the dht.
     """
-    typeset = [
-        int,
-        float,
-        bool,
-        str,
-        bytes
-    ]
+    typeset = [int, float, bool, str, bytes]
     return type(value) in typeset  # pylint: disable=unidiomatic-typecheck

@@ -10,7 +10,7 @@ from qulab.dht.protocol import KademliaProtocol
 @pytest.mark.asyncio
 async def test_storing(bootstrap_node):
     server = Server()
-    await server.listen(bootstrap_node[1] + 1)
+    port = await server.listen_on_random_port()
     await server.bootstrap([bootstrap_node])
     await server.set('key', 'value')
     result = await server.get('key')
