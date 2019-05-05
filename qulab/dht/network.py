@@ -2,9 +2,11 @@
 Package for interacting on the network at a high level.
 """
 import asyncio
+import errno
 import logging
 import pickle
 import random
+import sys
 
 from qulab._config import config
 from qulab.dht.crawling import NodeSpiderCrawl, ValueSpiderCrawl
@@ -107,7 +109,9 @@ class Server:
                 await self.listen(port, interface)
             except OSError as exception:
                 en = exception.errno
-                if en == 48:
+                if en == errno.EADDRINUSE:
+                    continue
+                elif sys.platform == 'win32' and en == errno.EACCES:
                     continue
                 else:
                     raise
