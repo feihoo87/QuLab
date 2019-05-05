@@ -182,6 +182,14 @@ class Server:
         """
         log.info("Looking up key %s", key)
         dkey = digest(key)
+        return await self.get_digest(dkey)
+
+    async def get_digest(self, dkey):
+        """
+        Get a given SHA1 digest key (bytes) if the network has it.
+        Returns:
+            :class:`None` if not found, the value otherwise.
+        """
         # if this node has it, return it
         if self.storage.get(dkey) is not None:
             return self.storage.get(dkey)

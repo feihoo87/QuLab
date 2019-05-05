@@ -1,9 +1,9 @@
-import unittest
 import asyncio
+import os
+import unittest
 
 import pytest
-
-from qulab.dht.network import Server
+from qulab.dht.network import Server, digest
 from qulab.dht.protocol import KademliaProtocol
 
 
@@ -12,12 +12,31 @@ async def test_storing(bootstrap_node):
     server = Server()
     port = await server.listen_on_random_port()
     await server.bootstrap([bootstrap_node])
+    server.save_state_regularly('state.dat')
     await server.set('key', 'value')
     result = await server.get('key')
 
     assert result == 'value'
 
+    await server.set_digest(digest('hello'), 'world')
+    result = await server.get('hello')
+    assert result == 'world'
+    result = await server.get_digest(digest('hello'))
+    assert result == 'world'
+
     server.stop()
+
+    server = Server.load_state('state.dat')
+    port = await server.listen_on_random_port()
+    await server.bootstrap([bootstrap_node])
+    result = await server.get('key')
+    assert result == 'value'
+    result = await server.get('hello')
+    assert result == 'world'
+    
+    server.stop()
+
+    os.unlink('state.dat')
 
 
 class SwappableProtocolTests(unittest.TestCase):
