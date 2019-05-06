@@ -28,6 +28,7 @@ def server(main_class, event_loop):
     s = Server(main_class, loop=event_loop)
     s.start()
     yield s
+    s.stop()
     s.close()
 
 
