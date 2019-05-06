@@ -48,6 +48,16 @@ class Server:
         self.protocol = None
         self.refresh_loop = None
         self.save_state_loop = None
+        self.port = None
+
+    async def start(self, bootstrap_nodes=None, port=None):
+        if port is None:
+            self.port = await self.listen_on_random_port()
+        else:
+            await self.listen(port)
+            self.port = port
+        if bootstrap_nodes is not None:
+            await self.bootstrap(bootstrap_nodes)
 
     def stop(self):
         if self.transport is not None:
@@ -200,7 +210,7 @@ class Server:
         node = Node(dkey)
         nearest = self.protocol.router.find_neighbors(node)
         if not nearest:
-            log.warning("There are no known neighbors to get key %s", key)
+            log.warning("There are no known neighbors to get dkey %s", dkey)
             return None
         spider = ValueSpiderCrawl(self.protocol, node, nearest, self.ksize,
                                   self.alpha)
@@ -272,7 +282,8 @@ class Server:
             data = pickle.load(file)
         svr = Server(data['ksize'], data['alpha'], data['id'])
         if data['neighbors']:
-            svr.bootstrap(data['neighbors'])
+            asyncio.ensure_future(svr.start(data['neighbors']))
+            #asyncio.ensure_future(svr.bootstrap(data['neighbors']))
         return svr
 
     def save_state_regularly(self, fname, frequency=600):

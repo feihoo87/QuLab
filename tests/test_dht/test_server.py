@@ -1,6 +1,7 @@
 import asyncio
 import os
 import unittest
+import pickle
 
 import pytest
 from qulab.dht.network import Server, digest
@@ -13,6 +14,9 @@ async def test_storing(bootstrap_node):
     port = await server.listen_on_random_port()
     await server.bootstrap([bootstrap_node])
     server.save_state_regularly('state.dat')
+    data = pickle.load(open('state.dat', 'rb'))
+    assert data['id'] == server.node.id
+    assert data['neighbors'] == [bootstrap_node]
     await server.set('key', 'value')
     result = await server.get('key')
 
@@ -27,8 +31,8 @@ async def test_storing(bootstrap_node):
     server.stop()
 
     server = Server.load_state('state.dat')
-    port = await server.listen_on_random_port()
-    await server.bootstrap([bootstrap_node])
+    await asyncio.sleep(0.1)
+    assert server.bootstrappable_neighbors() == [bootstrap_node]
     result = await server.get('key')
     assert result == 'value'
     result = await server.get('hello')
