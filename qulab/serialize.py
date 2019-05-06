@@ -49,3 +49,9 @@ def unpack(buff: bytes) -> Any:
 
 
 register(np.ndarray)
+
+def encode_excepion(e: Exception) -> bytes:
+    e.__traceback__ = None
+    return pickle.dumps(e)
+
+register(Exception, encode_excepion)

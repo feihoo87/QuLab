@@ -45,9 +45,12 @@ class Server:
 
     async def handle(self, sock, obj, addr, msg):
         method, args, kw = unpack(msg)
-        result = getattr(obj, method)(*args, **kw)
-        if isinstance(result, Awaitable):
-            result = await result
+        try:
+            result = getattr(obj, method)(*args, **kw)
+            if isinstance(result, Awaitable):
+                result = await result
+        except Exception as e:
+            result = e
         result = pack(result)
         await sock.send_multipart([addr, result])
 
@@ -76,5 +79,9 @@ class Client:
     async def performMethod(self, name, *args, **kw):
         msg = pack((name, args, kw))
         await self.sock.send_multipart([msg])
-        result, = await self.sock.recv_multipart()
-        return unpack(result)
+        bmsg, = await self.sock.recv_multipart()
+        result = unpack(bmsg)
+        if isinstance(result, Exception):
+            raise result
+        else:
+            return result

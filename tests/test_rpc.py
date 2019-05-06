@@ -1,6 +1,8 @@
 import pytest
 from qulab.rpc import *
 
+class Error(Exception):
+    pass
 
 @pytest.fixture()
 def main_class():
@@ -14,6 +16,9 @@ def main_class():
         async def add_async(self, a, b):
             await asyncio.sleep(1)
             return a + b
+
+        def error(self):
+            raise Error('error')
 
     yield MySrv
 
@@ -39,3 +44,5 @@ async def test_Client(server, event_loop):
     assert server.port != 0
     assert 8 == await c.add(3, 5)
     assert 9 == await c.add_async(4, 5)
+    with pytest.raises(Error):
+        await c.error()
