@@ -1,6 +1,6 @@
 cryptography==2.6.1
 numpy==1.16.3
-scipy==1.2.0
+scipy==1.2.1
 PyYAML==5.1
 pyzmq==18.0.1
 u-msgpack-python==2.5.1
