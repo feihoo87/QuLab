@@ -54,6 +54,8 @@ def test_zmq_handler():
         else:
             assert False, "ZMQ time out."
 
+
+@pytest.mark.not_on_windows
 @pytest.mark.asyncio
 async def test_redis_handler(event_loop):
     import redis
@@ -63,7 +65,7 @@ async def test_redis_handler(event_loop):
     handler = RedisHandler(r)
     handler.setLevel(logging.DEBUG)
     logger.addHandler(handler)
-    
+
     sub = await aioredis.create_redis('redis://localhost')
     logChannel, = await sub.subscribe('log')
 

@@ -15,6 +15,11 @@ matrix:
       os: osx
       osx_image: xcode10.2
       language: shell
+      before_install:
+        - brew install redis
+        - brew install mongodb
+        - brew services start redis
+        - brew services start mongodb
     - name: "Python on Windows"
       os: windows
       language: shell
