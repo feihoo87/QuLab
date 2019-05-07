@@ -1,3 +1,10 @@
 label_prs: deps-update
 
 schedule: every week
+
+requirements:
+  - requirements.txt:
+    update: all
+    pin: True
+  - requirements-dev.txt:
+    pin: False
