@@ -47,3 +47,4 @@ async def test_Client(server, event_loop):
     assert 9 == await c.add_async(4, 5)
     with pytest.raises(Error):
         await c.error()
+    del c
