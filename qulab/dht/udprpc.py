@@ -32,9 +32,8 @@ class RPCProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data, addr):
         log.debug("received datagram from %s", addr)
-        asyncio.ensure_future(self._solveDatagram(data, addr))
+        self._solveDatagram(data, addr)
 
-    @asyncio.coroutine
     def _solveDatagram(self, datagram, address):
         if len(datagram) < 22:
             log.warning("received datagram too small from %s,"
