@@ -55,7 +55,6 @@ def test_zmq_handler():
             assert False, "ZMQ time out."
 
 
-@pytest.mark.not_on_windows
 @pytest.mark.asyncio
 async def test_redis_handler(event_loop):
     import redis
