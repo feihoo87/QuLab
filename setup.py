@@ -14,11 +14,13 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 exec(open('qulab/_version.py').read())
 
 requirements = [
+    'aioredis>=1.2.0',
     'cryptography>=2.6.1',
     'numpy>=1.13.3',
     'scipy>=1.0.0',
     'PyYAML>=5.1',
     'pyzmq>=18.0.1',
+    'redis>=3.2.1',
     'u-msgpack-python>=2.5.1',
 ]
 

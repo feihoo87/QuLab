@@ -1,6 +1,7 @@
 import logging
 import time
 
+import aioredis
 import pytest
 import zmq
 from qulab.log import *
@@ -26,7 +27,7 @@ def test_BaseHandler():
         hdlr.send_bytes(b'')
 
 
-def test_logger():
+def test_zmq_handler():
     ctx = zmq.Context()
     interface = "tcp://127.0.0.1"
     with ctx.socket(zmq.PUB) as pub, ctx.socket(zmq.SUB) as sub:
@@ -52,3 +53,24 @@ def test_logger():
             assert record.msg == 'hello'
         else:
             assert False, "ZMQ time out."
+
+@pytest.mark.asyncio
+async def test_redis_handler(event_loop):
+    import redis
+    r = redis.Redis()
+    logger = logging.getLogger('qulabtest2')
+    logger.setLevel(logging.DEBUG)
+    handler = RedisHandler(r)
+    handler.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+    
+    sub = await aioredis.create_redis('redis://localhost')
+    logChannel, = await sub.subscribe('log')
+
+    logger.debug('hello')
+
+    if await logChannel.wait_message():
+        bmsg = await logChannel.get()
+        record = logging.makeLogRecord(unpack(bmsg))
+        assert record.msg == 'hello'
+    pass

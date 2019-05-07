@@ -1,4 +1,7 @@
 language: python
+services:
+  - mongodb
+  - redis-server
 matrix:
   include:
     - name: "Python 3.6 on Linux"
@@ -26,6 +29,8 @@ install:
   - pip3 install pytest-cov
   - pip3 install coveralls
   - pip3 install -e .
+before_script:
+  - sleep 15
 script:
   - pytest --cov=qulab
 after_success:

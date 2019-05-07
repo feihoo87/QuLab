@@ -33,11 +33,7 @@ class BaseHandler(logging.Handler):
 
     def emit(self, record):
         """Emit a log message."""
-        try:
-            bmsg = self.serialize(record)
-        except Exception:
-            self.handleError(record)
-            return
+        bmsg = self.serialize(record)
         self.send_bytes(bmsg)
 
     def send_bytes(self, bmsg):
