@@ -31,6 +31,8 @@ matrix:
         - pip3 install --user coveralls
         - pip3 install --user pytest
       env: PATH=/c/Python37:/c/Python37/Scripts:/c/Users/travis/AppData/Roaming/Python/Python37/Scripts:/c/ProgramData/chocolatey/lib/redis-64:$PATH
+      after_script:
+        - redis-cli shutdown
 install:
   - pip3 install -r requirements.txt
   - pip3 install -r requirements-dev.txt
