@@ -53,7 +53,7 @@ async def test_Client(server, event_loop):
                timeout=0.7,
                loop=event_loop)
     assert server.port != 0
-    assert await c.rpc_is_alive()
+    assert await c.rpc_ping()
     assert 8 == await c.add(3, 5)
     assert 9 == await c.add_async(4, 5)
     with pytest.raises(RPCTimeout):

@@ -64,7 +64,7 @@ class Server:
 
     async def handle(self, sock, obj, addr, msgID, msg):
         method, args, kw = unpack(msg)
-        if method == 'rpc_is_alive':
+        if method == 'rpc_ping':
             result = True
         else:
             try:
@@ -145,5 +145,5 @@ class Client:
         self.pending[msgID] = (fut, timeout)
         return fut
 
-    def rpc_is_alive(self, **kw):
-        return self.performMethod('rpc_is_alive', **kw)
+    def rpc_ping(self, **kw):
+        return self.performMethod('rpc_ping', **kw)
