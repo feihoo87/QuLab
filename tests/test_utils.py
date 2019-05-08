@@ -8,3 +8,9 @@ def test_utils():
     assert isinstance(getHostIP(), str)
     assert getHostIPv6() is None or isinstance(getHostIPv6(), str)
     assert isinstance(getHostMac(), str)
+
+
+def test_randomID():
+    msgID = randomID()
+    assert isinstance(msgID, bytes)
+    assert len(msgID) == 20

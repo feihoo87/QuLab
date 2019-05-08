@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import functools
+import os
 import socket
 import struct
 import uuid
+from hashlib import sha1
 
 import numpy as np
+
 
 def IEEE_488_2_BinBlock(datalist, dtype="int16", is_big_endian=True):
     """
@@ -83,3 +86,11 @@ def getHostMac():
     """
     mac = uuid.UUID(int=uuid.getnode()).hex[-12:]
     return ":".join([mac[e:e + 2] for e in range(0, 11, 2)])
+
+
+def randomID():
+    """
+    Generate a random msg ID.
+    """
+    msgID = sha1(os.urandom(32)).digest()
+    return msgID
