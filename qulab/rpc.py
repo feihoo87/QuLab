@@ -5,6 +5,19 @@ from collections.abc import Awaitable
 import zmq
 import zmq.asyncio
 from qulab.serialize import pack, unpack
+from qulab.utils import randomID
+
+
+class RPCException(Exception):
+    """
+    Base exception.
+    """
+
+
+class RPCTimeout(RPCException):
+    """
+    Timeout.
+    """
 
 
 class Server:
@@ -39,20 +52,20 @@ class Server:
         with self._ctx.socket(zmq.ROUTER) as sock:
             self.__port = sock.bind_to_random_port('tcp://*')
             while True:
-                addr, msg = await sock.recv_multipart()
-                asyncio.ensure_future(self.handle(sock, obj, addr, msg),
+                addr, msgID, msg = await sock.recv_multipart()
+                asyncio.ensure_future(self.handle(sock, obj, addr, msgID, msg),
                                       loop=self.loop)
 
-    async def handle(self, sock, obj, addr, msg):
+    async def handle(self, sock, obj, addr, msgID, msg):
         method, args, kw = unpack(msg)
         try:
             result = getattr(obj, method)(*args, **kw)
             if isinstance(result, Awaitable):
                 result = await result
-        except Exception as e:
+        except RPCException as e:
             result = e
         result = pack(result)
-        await sock.send_multipart([addr, result])
+        await sock.send_multipart([addr, msgID, result])
 
 
 class RPCCallable:
@@ -65,23 +78,54 @@ class RPCCallable:
 
 
 class Client:
-    def __init__(self, address):
+    def __init__(self, address, timeout=1, loop=None):
         self._ctx = zmq.asyncio.Context.instance()
         self.sock = self._ctx.socket(zmq.DEALER)
         self.sock.connect(address)
+        self._timeout = timeout
+        self.loop = asyncio.get_event_loop() if loop is None else loop
+        self.pending = {}
+        self._main_task = asyncio.ensure_future(self._listen(), loop=self.loop)
 
     def __del__(self):
         self.sock.close()
+        for fut, timeout in self.pending.values():
+            timeout.cancel()
+            fut.cancel()
+        self._main_task.cancel()
 
     def __getattr__(self, name):
         return RPCCallable(name, self)
 
-    async def performMethod(self, name, *args, **kw):
-        msg = pack((name, args, kw))
-        await self.sock.send_multipart([msg])
-        bmsg, = await self.sock.recv_multipart()
+    async def _listen(self):
+        while True:
+            msgID, bmsg = await self.sock.recv_multipart()
+            self.on_bmsg(msgID, bmsg)
+
+    def on_bmsg(self, msgID, bmsg):
+        if msgID not in self.pending:
+            return
+        fut, timeout = self.pending[msgID]
         result = unpack(bmsg)
+        timeout.cancel()
         if isinstance(result, Exception):
-            raise result
+            fut.set_exception(result)
         else:
-            return result
+            fut.set_result(result)
+        del self.pending[msgID]
+
+    def _cancel_when_timeout(self, msgID):
+        fut, timeout = self.pending[msgID]
+        fut.set_exception(RPCTimeout('Time out.'))
+        del self.pending[msgID]
+
+    def performMethod(self, name, *args, **kw):
+        msg = pack((name, args, kw))
+        msgID = randomID()
+        asyncio.ensure_future(self.sock.send_multipart([msgID, msg]),
+                              loop=self.loop)
+        fut = self.loop.create_future()
+        timeout = self.loop.call_later(self._timeout,
+                                       self._cancel_when_timeout, msgID)
+        self.pending[msgID] = (fut, timeout)
+        return fut

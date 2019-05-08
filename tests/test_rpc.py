@@ -1,8 +1,10 @@
 import pytest
 from qulab.rpc import *
 
-class Error(Exception):
+
+class Error(RPCException):
     pass
+
 
 @pytest.fixture()
 def main_class():
@@ -16,6 +18,10 @@ def main_class():
         async def add_async(self, a, b):
             await asyncio.sleep(1)
             return a + b
+
+        async def timeout(self):
+            await asyncio.sleep(2)
+            return 1
 
         def error(self):
             raise Error('error')
@@ -41,10 +47,14 @@ async def test_Server(server, event_loop):
 
 @pytest.mark.asyncio
 async def test_Client(server, event_loop):
-    c = Client('tcp://127.0.0.1:%d' % server.port)
+    c = Client('tcp://127.0.0.1:%d' % server.port,
+               timeout=1.5,
+               loop=event_loop)
     assert server.port != 0
     assert 8 == await c.add(3, 5)
     assert 9 == await c.add_async(4, 5)
+    with pytest.raises(RPCTimeout):
+        await c.timeout()
     with pytest.raises(Error):
         await c.error()
     del c
