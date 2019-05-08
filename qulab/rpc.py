@@ -64,14 +64,17 @@ class Server:
 
     async def handle(self, sock, obj, addr, msgID, msg):
         method, args, kw = unpack(msg)
-        try:
-            result = getattr(obj, method)(*args, **kw)
-            if isinstance(result, Awaitable):
-                result = await result
-        except RPCException as e:
-            result = e
-        except Exception as e:
-            result = RPCServerError(*e.args)
+        if method == 'rpc_is_alive':
+            result = True
+        else:
+            try:
+                result = getattr(obj, method)(*args, **kw)
+                if isinstance(result, Awaitable):
+                    result = await result
+            except RPCException as e:
+                result = e
+            except Exception as e:
+                result = RPCServerError(*e.args)
         result = pack(result)
         await sock.send_multipart([addr, msgID, result])
 
@@ -141,3 +144,6 @@ class Client:
         timeout = self.loop.call_later(delay, self._cancel_when_timeout, msgID)
         self.pending[msgID] = (fut, timeout)
         return fut
+
+    def rpc_is_alive(self, **kw):
+        return self.performMethod('rpc_is_alive', **kw)
