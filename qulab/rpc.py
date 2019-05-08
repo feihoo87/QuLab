@@ -14,6 +14,12 @@ class RPCException(Exception):
     """
 
 
+class RPCServerError(RPCException):
+    """
+    Server side error.
+    """
+
+
 class RPCTimeout(RPCException):
     """
     Timeout.
@@ -64,6 +70,8 @@ class Server:
                 result = await result
         except RPCException as e:
             result = e
+        except Exception as e:
+            result = RPCServerError(*e.args)
         result = pack(result)
         await sock.send_multipart([addr, msgID, result])
 
@@ -120,12 +128,16 @@ class Client:
         del self.pending[msgID]
 
     def performMethod(self, name, *args, **kw):
+        if 'timeout' in kw:
+            delay = kw['timeout']
+            del kw['timeout']
+        else:
+            delay = self._timeout
         msg = pack((name, args, kw))
         msgID = randomID()
         asyncio.ensure_future(self.sock.send_multipart([msgID, msg]),
                               loop=self.loop)
         fut = self.loop.create_future()
-        timeout = self.loop.call_later(self._timeout,
-                                       self._cancel_when_timeout, msgID)
+        timeout = self.loop.call_later(delay, self._cancel_when_timeout, msgID)
         self.pending[msgID] = (fut, timeout)
         return fut
