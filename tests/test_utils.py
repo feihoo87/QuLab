@@ -14,3 +14,31 @@ def test_randomID():
     msgID = randomID()
     assert isinstance(msgID, bytes)
     assert len(msgID) == 20
+
+
+def test_acceptArg():
+    def f1():
+        pass
+
+    assert not acceptArg(f1, 'x')
+
+    def f2(x):
+        pass
+
+    assert acceptArg(f2, 'x')
+
+    def f3(*args):
+        pass
+
+    assert not acceptArg(f3, 'x')
+    assert acceptArg(f3, 'x', keyword=False)
+
+    def f4(*x):
+        pass
+
+    assert not acceptArg(f4, 'x')
+
+    def f5(**kw):
+        pass
+
+    assert acceptArg(f5, 'x')
