@@ -67,7 +67,7 @@ async def test_zmqclient(server, event_loop):
     assert "hello, world" == await c.sub.hello()
     with pytest.raises(QuLabRPCTimeout):
         await c.timeout()
-    ret = await c.timeout(rpc_timeout=2)
+    ret = await c.timeout(timeout=2)
     assert ret is None
     with pytest.raises(Error):
         await c.error()

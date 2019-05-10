@@ -82,8 +82,8 @@ class RPCClientMixin(RPCMixin):
         if self.loop is None:
             raise QuLabRPCError("Event loop not set.")
 
-        if 'rpc_timeout' in kw:
-            delay = kw['rpc_timeout']
+        if 'timeout' in kw:
+            delay = kw['timeout']
         else:
             delay = self._client_defualt_timeout
         msg = pack((name, args, kw))
@@ -150,7 +150,7 @@ class RPCServerMixin(RPCMixin):
             del self.tasks[msgID]
 
     @abstractmethod
-    def getHandler(self, name):
+    def getHandler(self, name, source, msgID):
         pass
 
     def send_result(self, addr, msgID, result):
@@ -175,7 +175,7 @@ class RPCServerMixin(RPCMixin):
                 self.create_task(msgID,
                                  self.handle(source, msgID, method, *args,
                                              **kw),
-                                 timeout=kw.get('rpc_timeout', 0))
+                                 timeout=kw.get('timeout', 0))
         except Exception as e:
             self.send_result(source, msgID, QuLabRPCServerError(*e.args))
 
@@ -184,9 +184,9 @@ class RPCServerMixin(RPCMixin):
         Handle a request from source.
         """
         try:
-            func = self.getHandler(method)
-            if 'rpc_timeout' in kw and not acceptArg(func, 'rpc_timeout'):
-                del kw['rpc_timeout']
+            func = self.getHandler(method, source=source, msgID=msgID)
+            if 'timeout' in kw and not acceptArg(func, 'timeout'):
+                del kw['timeout']
             result = func(*args, **kw)
             if isinstance(result, Awaitable):
                 result = await result
@@ -213,7 +213,7 @@ class ZMQServer(RPCServerMixin):
     async def send_msg(self, address, mtype, msgID, msg):
         self.zmq_socket.send_multipart([address, mtype, msgID, msg])
 
-    def getHandler(self, name):
+    def getHandler(self, name, **kw):
         path = name.split('.')
         ret = getattr(self._module, path[0])
         for n in path[1:]:
