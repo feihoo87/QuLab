@@ -7,6 +7,7 @@ from qulab.dht.node import Node
 from qulab.dht.routing import RoutingTable
 from qulab.dht.utils import digest
 from qulab.rpc import RPC_REQUEST, RPC_RESPONSE, RPCClientMixin, RPCServerMixin
+from qulab.serialize import pack, unpack
 
 log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
@@ -33,10 +34,11 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
         self.transport = transport
 
     def unpack_datagram(self, data):
-        return data[:1], data[1:21], data[21:]
+        mtype, msgID, msg = unpack(data)
+        return mtype, msgID, msg
 
     def pack_datagram(self, mtype, msgID, msg):
-        return mtype + msgID + msg
+        return pack([mtype, msgID, msg])
 
     def datagram_received(self, data, addr):
         log.debug("received datagram from %s", addr)
