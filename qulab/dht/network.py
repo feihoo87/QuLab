@@ -79,12 +79,15 @@ class Server:
         """
         loop = asyncio.get_event_loop()
         listen = loop.create_datagram_endpoint(self._create_protocol,
-                                               local_addr=(interface, port))
-        log.info("Node %i try to listen on %s:%i", self.node.long_id, interface,
-                 port)
+                                               local_addr=(interface, port),
+                                               reuse_address=False,
+                                               reuse_port=False,
+                                               allow_broadcast=False)
+        log.info("Node %i try to listen on %s:%i", self.node.long_id,
+                 interface, port)
         self.transport, self.protocol = await listen
-        log.info("Node %i listening on %s:%i succeed.", self.node.long_id, interface,
-                 port)
+        log.info("Node %i listening on %s:%i succeed.", self.node.long_id,
+                 interface, port)
         # finally, schedule refreshing table
         self.refresh_table()
 
@@ -212,7 +215,8 @@ class Server:
         node = Node(dkey)
         nearest = self.protocol.router.find_neighbors(node)
         if not nearest:
-            log.warning("There are no known neighbors to get dkey %s", dkey.hex())
+            log.warning("There are no known neighbors to get dkey %s",
+                        dkey.hex())
             return None
         spider = ValueSpiderCrawl(self.protocol, node, nearest, self.ksize,
                                   self.alpha)
