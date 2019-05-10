@@ -1,6 +1,6 @@
 import unittest
 
-from qulab.dht.storage import ForgetfulStorage
+from qulab.storage import ForgetfulStorage
 
 
 class ForgetfulStorageTest(unittest.TestCase):
