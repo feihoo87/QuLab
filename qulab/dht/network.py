@@ -80,9 +80,11 @@ class Server:
         loop = asyncio.get_event_loop()
         listen = loop.create_datagram_endpoint(self._create_protocol,
                                                local_addr=(interface, port))
-        log.info("Node %i listening on %s:%i", self.node.long_id, interface,
+        log.info("Node %i try to listen on %s:%i", self.node.long_id, interface,
                  port)
         self.transport, self.protocol = await listen
+        log.info("Node %i listening on %s:%i succeed.", self.node.long_id, interface,
+                 port)
         # finally, schedule refreshing table
         self.refresh_table()
 
@@ -210,7 +212,7 @@ class Server:
         node = Node(dkey)
         nearest = self.protocol.router.find_neighbors(node)
         if not nearest:
-            log.warning("There are no known neighbors to get dkey %s", dkey)
+            log.warning("There are no known neighbors to get dkey %s", dkey.hex())
             return None
         spider = ValueSpiderCrawl(self.protocol, node, nearest, self.ksize,
                                   self.alpha)
@@ -236,7 +238,7 @@ class Server:
 
         nearest = self.protocol.router.find_neighbors(node)
         if not nearest:
-            log.warning("There are no known neighbors to set key %s",
+            log.warning("There are no known neighbors to set dkey %s",
                         dkey.hex())
             return False
 
@@ -283,7 +285,6 @@ class Server:
         svr = Server(data['ksize'], data['alpha'], data['id'])
         if data['neighbors']:
             asyncio.ensure_future(svr.start(data['neighbors']))
-            #asyncio.ensure_future(svr.bootstrap(data['neighbors']))
         return svr
 
     def save_state_regularly(self, fname, frequency=600):

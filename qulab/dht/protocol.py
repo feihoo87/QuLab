@@ -49,6 +49,7 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
             self.on_response(msgID, msg)
 
     async def send_msg(self, address, mtype, msgID, msg):
+        log.debug(f'send message to {address}.')
         data = self.pack_datagram(mtype, msgID, msg)
         self.transport.sendto(data, address)
 
@@ -116,6 +117,7 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
         if name in ['find_node', 'find_value']:
             node_to_find, = args
             args = (node_to_find.id, )
+        log.debug(f'call_{name}, {address}, {args}')
         result = await self._remoteCall(address,
                                         self.source_node.id,
                                         *args,
@@ -126,6 +128,7 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
         """
         Call `rpc_{name}` method on `addr`. Return `received response` and result.
         """
+        log.debug(f"call remote `{name}` {addr}, {args}")
         try:
             return (True, await self.callRemoteMethod(addr, name, *args))
         except:

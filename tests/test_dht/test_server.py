@@ -12,7 +12,9 @@ async def test_save_state(bootstrap_node, tmp_path):
     server = Server()
     state_file = tmp_path / 'state.dat'
     port = await server.listen_on_random_port()
+    assert port != bootstrap_node[1]
     await server.bootstrap([bootstrap_node])
+    assert server.bootstrappable_neighbors() == [bootstrap_node]
     server.save_state_regularly(state_file)
     assert state_file.exists()
     data = pickle.loads(state_file.read_bytes())

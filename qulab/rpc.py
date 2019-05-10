@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable
 
@@ -10,12 +11,15 @@ from qulab.exceptions import (QuLabRPCError, QuLabRPCServerError,
 from qulab.serialize import pack, unpack
 from qulab.utils import acceptArg, randomID
 
+log = logging.getLogger(__name__)  # pylint: disable=invalid-name
+
 # message type
 
 RPC_REQUEST = b'\x01'
 RPC_RESPONSE = b'\x02'
 RPC_PING = b'\x03'
 PRC_PONG = b'\x04'
+
 
 class RPCMixin(ABC):
     @property
@@ -67,7 +71,8 @@ class RPCClientMixin(RPCMixin):
 
     def cancelRemoteTask(self, addr, msgID):
         msg = pack(('rpc.cancelTask', (msgID, ), {}))
-        asyncio.ensure_future(self.send_msg(addr, RPC_REQUEST, msgID, msg), loop=self.loop)
+        asyncio.ensure_future(self.send_msg(addr, RPC_REQUEST, msgID, msg),
+                              loop=self.loop)
 
     async def ping(self, addr, timeout=1):
         try:
@@ -88,7 +93,8 @@ class RPCClientMixin(RPCMixin):
             delay = self._client_defualt_timeout
         msg = pack((name, args, kw))
         msgID = randomID()
-        asyncio.ensure_future(self.send_msg(addr, RPC_REQUEST, msgID, msg), loop=self.loop)
+        asyncio.ensure_future(self.send_msg(addr, RPC_REQUEST, msgID, msg),
+                              loop=self.loop)
         fut = self.loop.create_future()
         timeout = self.loop.call_later(delay, self.cancelWhenTimeout, addr,
                                        msgID)
@@ -158,7 +164,8 @@ class RPCServerMixin(RPCMixin):
         Send result to client on addr.
         """
         msg = pack(result)
-        return asyncio.ensure_future(self.send_msg(addr, RPC_RESPONSE, msgID, msg),
+        return asyncio.ensure_future(self.send_msg(addr, RPC_RESPONSE, msgID,
+                                                   msg),
                                      loop=self.loop)
 
     def on_request(self, source, msgID, msg):
