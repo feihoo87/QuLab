@@ -42,7 +42,7 @@ install:
 before_script:
   - sleep 15
 script:
-  - pytest --cov=qulab
+  - pytest --cov=qulab --verbose
 after_success:
   - coveralls
 deploy:
