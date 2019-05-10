@@ -1,21 +1,64 @@
 import asyncio
+import functools
 import logging
 import random
 
 from qulab.dht.node import Node
 from qulab.dht.routing import RoutingTable
-from qulab.dht.udprpc import RPCProtocol
 from qulab.dht.utils import digest
+from qulab.rpc import RPC_REQUEST, RPC_RESPONSE, RPCClientMixin, RPCServerMixin
 
 log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
-class KademliaProtocol(RPCProtocol):
-    def __init__(self, source_node, storage, ksize, waitTimeout=1):
-        RPCProtocol.__init__(self, waitTimeout=waitTimeout)
+class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
+                       RPCServerMixin):
+    def __init__(self, source_node, storage, ksize, waitTimeout=1, loop=None):
+        """
+        @param waitTimeout: Consider it a connetion failure if no response
+        within this time window.
+        """
+        self.set_timeout(waitTimeout)
+        self.transport = None
+        self._loop = asyncio.get_event_loop() if loop is None else loop
         self.router = RoutingTable(self, ksize, source_node)
         self.storage = storage
         self.source_node = source_node
+
+    @property
+    def loop(self):
+        return self._loop
+
+    def connection_made(self, transport):
+        self.transport = transport
+
+    def unpack_datagram(self, data):
+        return data[:1], data[1:21], data[21:]
+
+    def pack_datagram(self, mtype, msgID, msg):
+        return mtype + msgID + msg
+
+    def datagram_received(self, data, addr):
+        log.debug("received datagram from %s", addr)
+        mtype, msgID, msg = self.unpack_datagram(data)
+        if mtype == RPC_REQUEST:
+            self.on_request(addr, msgID, msg)
+        elif mtype == RPC_RESPONSE:
+            self.on_response(msgID, msg)
+
+    async def send_msg(self, address, mtype, msgID, msg):
+        data = self.pack_datagram(mtype, msgID, msg)
+        self.transport.sendto(data, address)
+
+    def getHandler(self, name, source, msgID):
+        f = getattr(self, "rpc_%s" % name, None)
+        if f is None or not callable(f):
+            msgargs = (self.__class__.__name__, name)
+            log.warning(
+                "%s has no callable method "
+                "rpc_%s; ignoring request", *msgargs)
+            return
+        return functools.partial(f, source)
 
     def get_refresh_ids(self):
         """
@@ -38,8 +81,8 @@ class KademliaProtocol(RPCProtocol):
     def rpc_store(self, sender, nodeid, key, value):
         source = Node(nodeid, sender[0], sender[1])
         self.welcome_if_new(source)
-        log.debug("got a store request from %s, storing '%s'='%s'",
-                  sender, key.hex(), value)
+        log.debug("got a store request from %s, storing '%s'='%s'", sender,
+                  key.hex(), value)
         self.storage[key] = value
         return True
 
@@ -60,27 +103,37 @@ class KademliaProtocol(RPCProtocol):
             return self.rpc_find_node(sender, nodeid, key)
         return {'value': value}
 
-    async def call_find_node(self, node_to_ask, node_to_find):
+    async def ping(self, addr, nodeid):
+        """
+        Overwrite ping.
+        """
+        return await self._remoteCall(addr, nodeid, name='ping')
+
+    async def _call(self, node_to_ask, *args, name=None):
         address = (node_to_ask.ip, node_to_ask.port)
-        result = await self.find_node(address, self.source_node.id,
-                                      node_to_find.id)
+        if name in ['find_node', 'find_value']:
+            node_to_find, = args
+            args = (node_to_find.id, )
+        result = await self._remoteCall(address,
+                                        self.source_node.id,
+                                        *args,
+                                        name=name)
         return self.handle_call_response(result, node_to_ask)
 
-    async def call_find_value(self, node_to_ask, node_to_find):
-        address = (node_to_ask.ip, node_to_ask.port)
-        result = await self.find_value(address, self.source_node.id,
-                                       node_to_find.id)
-        return self.handle_call_response(result, node_to_ask)
+    async def _remoteCall(self, addr, *args, name=None):
+        """
+        Call `rpc_{name}` method on `addr`. Return `received response` and result.
+        """
+        try:
+            return (True, await self.callRemoteMethod(addr, name, *args))
+        except:
+            return (False, None)
 
-    async def call_ping(self, node_to_ask):
-        address = (node_to_ask.ip, node_to_ask.port)
-        result = await self.ping(address, self.source_node.id)
-        return self.handle_call_response(result, node_to_ask)
-
-    async def call_store(self, node_to_ask, key, value):
-        address = (node_to_ask.ip, node_to_ask.port)
-        result = await self.store(address, self.source_node.id, key, value)
-        return self.handle_call_response(result, node_to_ask)
+    def __getattr__(self, name):
+        if name.startswith('call_'):
+            return functools.partial(self._call, name=name[5:])
+        else:
+            return functools.partial(self._remoteCall, name=name)
 
     def welcome_if_new(self, node):
         """

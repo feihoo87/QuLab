@@ -9,7 +9,7 @@ from qulab.dht.protocol import KademliaProtocol
 
 
 @pytest.mark.asyncio
-async def test_storing(bootstrap_node):
+async def test_save_state(bootstrap_node):
     server = Server()
     port = await server.listen_on_random_port()
     await server.bootstrap([bootstrap_node])
@@ -17,6 +17,16 @@ async def test_storing(bootstrap_node):
     data = pickle.load(open('state.dat', 'rb'))
     assert data['id'] == server.node.id
     assert data['neighbors'] == [bootstrap_node]
+    server.stop()
+    os.unlink('state.dat')
+
+@pytest.mark.asyncio
+async def test_storing(bootstrap_node):
+    server = Server()
+    port = await server.listen_on_random_port()
+    await server.bootstrap([bootstrap_node])
+    server.save_state_regularly('state.dat')
+
     await server.set('key', 'value')
     result = await server.get('key')
 

@@ -12,10 +12,10 @@ from qulab.utils import acceptArg, randomID
 
 # message type
 
-RPC_REQUEST = b'0x01'
-RPC_RESPONSE = b'0x02'
-RPC_PING = b'0x03'
-PRC_PONG = b'0x04'
+RPC_REQUEST = b'\x01'
+RPC_RESPONSE = b'\x02'
+RPC_PING = b'\x03'
+PRC_PONG = b'\x04'
 
 class RPCMixin(ABC):
     @property
@@ -233,7 +233,7 @@ class ZMQServer(RPCServerMixin):
 
     def start(self):
         self.zmq_ctx = zmq.asyncio.Context.instance()
-        self.zmq_main_task = asyncio.ensure_future(self.run(), loop=self._loop)
+        self.zmq_main_task = asyncio.ensure_future(self.run(), loop=self.loop)
         self.zmq_tasks = {}
 
     def stop(self):

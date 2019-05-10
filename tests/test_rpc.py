@@ -34,15 +34,6 @@ class MySrv:
 
 @pytest.fixture()
 def server(event_loop):
-    s = Server(MySrv, loop=event_loop)
-    s.start()
-    yield s
-    s.stop()
-    s.close()
-
-
-@pytest.fixture()
-def server(event_loop):
     s = ZMQServer(loop=event_loop)
     s.set_module(MySrv())
     s.start()
