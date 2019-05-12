@@ -18,37 +18,13 @@ log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 RPC_REQUEST = b'\x01'
 RPC_RESPONSE = b'\x02'
 RPC_PING = b'\x03'
-PRC_PONG = b'\x04'
+RPC_PONG = b'\x04'
+RPC_CANCEL = b'\x05'
 
 
 class RPCMixin(ABC):
-    @property
-    @abstractmethod
-    def loop(self):
-        """
-        Event loop.
-        """
-
-    @abstractmethod
-    async def send_msg(self, address, mtype, msgID, msg):
-        """
-        Send message to address.
-        """
-
-    def unpack(self, msg):
-        try:
-            method, args, kw = unpack(msg)
-        except:
-            raise QuLabRPCError("Could not read packet: %r" % msg)
-        return method, args, kw
-
-
-class RPCClientMixin(RPCMixin):
     __pending = None
-    _client_defualt_timeout = 1
-
-    def set_timeout(self, timeout=1):
-        self._client_timeout = timeout
+    __tasks = None
 
     @property
     def pending(self):
@@ -56,84 +32,33 @@ class RPCClientMixin(RPCMixin):
             self.__pending = {}
         return self.__pending
 
-    def close(self):
-        for fut in self.pending.values():
-            try:
-                fut.cancel()
-            finally:
-                pass
-
-    def cancelWhenTimeout(self, addr, msgID):
-        fut, timeout = self.pending[msgID]
-        self.cancelRemoteTask(addr, msgID)
-        fut.set_exception(QuLabRPCTimeout('Time out.'))
-        del self.pending[msgID]
-
-    def cancelRemoteTask(self, addr, msgID):
-        msg = pack(('rpc.cancelTask', (msgID, ), {}))
-        asyncio.ensure_future(self.send_msg(addr, RPC_REQUEST, msgID, msg),
-                              loop=self.loop)
-
-    async def ping(self, addr, timeout=1):
-        try:
-            await asyncio.wait_for(self.callRemoteMethod(addr, 'rpc.ping'),
-                                   timeout,
-                                   loop=self.loop)
-            return True
-        except asyncio.TimeoutError:
-            raise QuLabRPCTimeout('Ping %r timeout.' % addr)
-
-    def callRemoteMethod(self, addr, name, *args, **kw):
-        if self.loop is None:
-            raise QuLabRPCError("Event loop not set.")
-
-        if 'timeout' in kw:
-            delay = kw['timeout']
-        else:
-            delay = self._client_defualt_timeout
-        msg = pack((name, args, kw))
-        msgID = randomID()
-        asyncio.ensure_future(self.send_msg(addr, RPC_REQUEST, msgID, msg),
-                              loop=self.loop)
-        fut = self.loop.create_future()
-        timeout = self.loop.call_later(delay, self.cancelWhenTimeout, addr,
-                                       msgID)
-        self.pending[msgID] = (fut, timeout)
-        return fut
-
-    def on_response(self, msgID, msg):
-        """
-        Client side.
-        """
-        if msgID not in self.pending:
-            return
-        fut, timeout = self.pending[msgID]
-        result = unpack(msg)
-        timeout.cancel()
-        if isinstance(result, Exception):
-            fut.set_exception(result)
-        else:
-            fut.set_result(result)
-        del self.pending[msgID]
-
-
-class RPCServerMixin(RPCMixin):
-    __tasks = None
-
     @property
     def tasks(self):
         if self.__tasks is None:
             self.__tasks = {}
         return self.__tasks
 
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
     def close(self):
+        self.stop()
         for task in self.tasks.values():
             try:
                 task.cancel()
             finally:
                 pass
+        for fut, timeout in self.pending.values():
+            try:
+                fut.cancel()
+                timeout.cancel()
+            finally:
+                pass
 
-    def create_task(self, msgID, coro, timeout=0):
+    def createTask(self, msgID, coro, timeout=0):
         """
         Create a new task for msgID.
         """
@@ -155,43 +80,186 @@ class RPCServerMixin(RPCMixin):
             self.tasks[msgID].cancel()
             del self.tasks[msgID]
 
+    def createPending(self, addr, msgID, timeout=1, cancelRemote=True):
+        """
+        Create a future for request, wait response before timeout.
+        """
+        fut = self.loop.create_future()
+        self.pending[msgID] = (fut,
+                               self.loop.call_later(timeout,
+                                                    self.cancelPending, addr,
+                                                    msgID, cancelRemote))
+        return fut
+
+    def cancelPending(self, addr, msgID, cancelRemote):
+        """
+        Give up when request timeout and try to cancel remote task.
+        """
+        fut, timeout = self.pending[msgID]
+        if cancelRemote:
+            self.cancelRemoteTask(addr, msgID)
+        fut.set_exception(QuLabRPCTimeout('Time out.'))
+        del self.pending[msgID]
+
+    def cancelRemoteTask(self, addr, msgID):
+        """
+        Try to cancel remote task.
+        """
+        asyncio.ensure_future(self.sendto(RPC_CANCEL + msgID, addr),
+                              loop=self.loop)
+
+    @property
     @abstractmethod
-    def getHandler(self, name, source, msgID):
-        pass
-
-    def send_result(self, addr, msgID, result):
+    def loop(self):
         """
-        Send result to client on addr.
+        Event loop.
         """
-        msg = pack(result)
-        return asyncio.ensure_future(self.send_msg(addr, RPC_RESPONSE, msgID,
-                                                   msg),
-                                     loop=self.loop)
 
-    def on_request(self, source, msgID, msg):
+    @abstractmethod
+    async def sendto(self, data, address):
+        """
+        Send message to address.
+        """
+
+    __rpc_handlers = {
+        RPC_PING: 'on_ping',
+        RPC_PONG: 'on_pong',
+        RPC_REQUEST: 'on_request',
+        RPC_RESPONSE: 'on_response',
+        RPC_CANCEL: 'on_cancel',
+    }
+
+    def handle(self, source, data):
+        """
+        Handle received data.
+
+        Should be called whenever received data from outside.
+        """
+        msg_type, data = data[:1], data[1:]
+        log.debug(f'received request {msg_type} from {source}')
+        handler = self.__rpc_handlers.get(msg_type, None)
+        if handler is not None:
+            getattr(self, handler)(source, data)
+
+    async def ping(self, addr, timeout=1):
+        await self.sendto(RPC_PING, addr)
+        fut = self.createPending(addr, addr, timeout, False)
+        try:
+            return await fut
+        except QuLabRPCTimeout:
+            return False
+
+    async def pong(self, addr):
+        await self.sendto(RPC_PONG, addr)
+
+    async def request(self, address, msgID, msg):
+        log.debug(f'send request {address}, {msgID.hex()}, {msg}')
+        await self.sendto(RPC_REQUEST + msgID + msg, address)
+
+    async def response(self, address, msgID, msg):
+        log.debug(f'send response {address}, {msgID.hex()}, {msg}')
+        await self.sendto(RPC_RESPONSE + msgID + msg, address)
+
+    def on_request(self, source, data):
+        """
+        Handle request.
+
+        Overwrite this method on server.
+        """
+
+    def on_response(self, source, data):
+        """
+        Handle response.
+
+        Overwrite this method on client.
+        """
+
+    def on_ping(self, source, data):
+        log.debug(f"received ping from {source}")
+        asyncio.ensure_future(self.pong(source), loop=self.loop)
+
+    def on_pong(self, source, data):
+        log.debug(f"received pong from {source}")
+        if source in self.pending:
+            fut, timeout = self.pending[source]
+            timeout.cancel()
+            fut.set_result(True)
+            del self.pending[msgID]
+
+    def on_cancel(self, source, data):
+        msgID = data[:20]
+        self.cancelTask(msgID)
+
+
+class RPCClientMixin(RPCMixin):
+    _client_defualt_timeout = 1
+
+    def set_timeout(self, timeout=1):
+        self._client_defualt_timeout = timeout
+
+    def remoteCall(self, addr, name, *args, **kw):
+        if 'timeout' in kw:
+            timeout = kw['timeout']
+        else:
+            timeout = self._client_defualt_timeout
+        msg = pack((name, args, kw))
+        msgID = randomID()
+        asyncio.ensure_future(self.request(addr, msgID, msg), loop=self.loop)
+        return self.createPending(addr, msgID, timeout)
+
+    def on_response(self, source, data):
+        """
+        Client side.
+        """
+        msgID, msg = data[:20], data[20:]
+        if msgID not in self.pending:
+            return
+        fut, timeout = self.pending[msgID]
+        result = unpack(msg)
+        timeout.cancel()
+        if isinstance(result, Exception):
+            fut.set_exception(result)
+        else:
+            fut.set_result(result)
+        del self.pending[msgID]
+
+
+class RPCServerMixin(RPCMixin):
+    def _unpack_request(self, msg):
+        try:
+            method, args, kw = unpack(msg)
+        except:
+            raise QuLabRPCError("Could not read packet: %r" % msg)
+        return method, args, kw
+
+    @abstractmethod
+    def getRequestHandler(self, name, source, msgID):
+        """
+        Get suitable handler for request.
+
+        You should implement this method yourself.
+        """
+
+    def on_request(self, source, data):
         """
         Received a request from source.
         """
+        msgID, msg = data[:20], data[20:]
         try:
-            method, args, kw = self.unpack(msg)
-            if method == 'rpc.cancelTask':
-                self.cancelTask(*args)
-            elif method == 'rpc.ping':
-                self.send_result(source, msgID, True)
-            else:
-                self.create_task(msgID,
-                                 self.handle(source, msgID, method, *args,
-                                             **kw),
-                                 timeout=kw.get('timeout', 0))
+            method, args, kw = self._unpack_request(msg)
+            self.createTask(msgID,
+                            self.handle_request(source, msgID, method, *args,
+                                                **kw),
+                            timeout=kw.get('timeout', 0))
         except Exception as e:
-            self.send_result(source, msgID, QuLabRPCServerError(*e.args))
+            self.response(source, msgID, pack(QuLabRPCServerError(*e.args)))
 
-    async def handle(self, source, msgID, method, *args, **kw):
+    async def handle_request(self, source, msgID, method, *args, **kw):
         """
         Handle a request from source.
         """
         try:
-            func = self.getHandler(method, source=source, msgID=msgID)
+            func = self.getRequestHandler(method, source=source, msgID=msgID)
             if 'timeout' in kw and not acceptArg(func, 'timeout'):
                 del kw['timeout']
             result = func(*args, **kw)
@@ -202,7 +270,7 @@ class RPCServerMixin(RPCMixin):
         except Exception as e:
             result = QuLabRPCServerError(*e.args)
         msg = pack(result)
-        await self.send_msg(source, RPC_RESPONSE, msgID, msg)
+        await self.response(source, msgID, msg)
 
 
 class ZMQServer(RPCServerMixin):
@@ -217,10 +285,10 @@ class ZMQServer(RPCServerMixin):
     def set_module(self, mod):
         self._module = mod
 
-    async def send_msg(self, address, mtype, msgID, msg):
-        self.zmq_socket.send_multipart([address, mtype, msgID, msg])
+    async def sendto(self, data, address):
+        self.zmq_socket.send_multipart([address, data])
 
-    def getHandler(self, name, **kw):
+    def getRequestHandler(self, name, **kw):
         path = name.split('.')
         ret = getattr(self._module, path[0])
         for n in path[1:]:
@@ -239,24 +307,24 @@ class ZMQServer(RPCServerMixin):
         self.zmq_socket = sock
 
     def start(self):
+        super().start()
         self.zmq_ctx = zmq.asyncio.Context.instance()
         self.zmq_main_task = asyncio.ensure_future(self.run(), loop=self.loop)
-        self.zmq_tasks = {}
 
     def stop(self):
         if self.zmq_main_task is not None and not self.zmq_main_task.done():
             self.zmq_main_task.cancel()
-        for task in self.zmq_tasks.values():
-            task.cancel()
+        super().stop()
 
     async def run(self):
-        with self.zmq_ctx.socket(zmq.ROUTER) as sock:
+        with self.zmq_ctx.socket(zmq.ROUTER, io_loop=self._loop) as sock:
+            sock.setsockopt(zmq.LINGER, 0)
             self._port = sock.bind_to_random_port('tcp://*')
             self.set_socket(sock)
             while True:
-                addr, mtype, msgID, msg = await sock.recv_multipart()
-                if mtype == RPC_REQUEST:
-                    self.on_request(addr, msgID, msg)
+                addr, data = await sock.recv_multipart()
+                log.debug('received data from %r' % addr.hex())
+                self.handle(addr, data)
 
 
 class ZMQRPCCallable:
@@ -277,14 +345,15 @@ class ZMQClient(RPCClientMixin):
         self.set_timeout(timeout)
         self.addr = addr
         self._ctx = zmq.asyncio.Context.instance()
-        self.zmq_socket = self._ctx.socket(zmq.DEALER)
+        self.zmq_socket = self._ctx.socket(zmq.DEALER, io_loop=self._loop)
+        self.zmq_socket.setsockopt(zmq.LINGER, 0)
         self.zmq_socket.connect(self.addr)
-        self.main_task = asyncio.ensure_future(self.run(), loop=self.loop)
+        self.zmq_main_task = asyncio.ensure_future(self.run(), loop=self.loop)
 
     def __del__(self):
         self.zmq_socket.close()
         self.close()
-        self.main_task.cancel()
+        self.zmq_main_task.cancel()
 
     @property
     def loop(self):
@@ -293,17 +362,16 @@ class ZMQClient(RPCClientMixin):
     async def ping(self, timeout=1):
         return await super().ping(self.addr, timeout=timeout)
 
-    async def send_msg(self, addr, mtype, msgID, msg):
-        await self.zmq_socket.send_multipart([mtype, msgID, msg])
+    async def sendto(self, data, addr):
+        await self.zmq_socket.send_multipart([data])
 
     async def run(self):
         while True:
-            mtype, msgID, msg = await self.zmq_socket.recv_multipart()
-            if mtype == RPC_RESPONSE:
-                self.on_response(msgID, msg)
+            data, = await self.zmq_socket.recv_multipart()
+            self.handle(self.addr, data)
 
     def performMethod(self, name, *args, **kw):
-        return self.callRemoteMethod(self.addr, name, *args, **kw)
+        return self.remoteCall(self.addr, name, *args, **kw)
 
     def __getattr__(self, name):
         return ZMQRPCCallable(name, self)

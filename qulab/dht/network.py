@@ -13,7 +13,7 @@ from qulab.dht.crawling import NodeSpiderCrawl, ValueSpiderCrawl
 from qulab.dht.node import Node
 from qulab.dht.protocol import KademliaProtocol
 from qulab.dht.utils import digest
-from qulab.storage import ForgetfulStorage
+from qulab.storage.memstorage import ForgetfulStorage
 
 cfg = config.get('dht', dict())
 DEFALT_PORT = cfg.get('default_port', 8987)

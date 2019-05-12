@@ -33,27 +33,15 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
     def connection_made(self, transport):
         self.transport = transport
 
-    def unpack_datagram(self, data):
-        mtype, msgID, msg = unpack(data)
-        return mtype, msgID, msg
-
-    def pack_datagram(self, mtype, msgID, msg):
-        return pack([mtype, msgID, msg])
-
     def datagram_received(self, data, addr):
         log.debug("received datagram from %s", addr)
-        mtype, msgID, msg = self.unpack_datagram(data)
-        if mtype == RPC_REQUEST:
-            self.on_request(addr, msgID, msg)
-        elif mtype == RPC_RESPONSE:
-            self.on_response(msgID, msg)
+        self.handle(addr, data)
 
-    async def send_msg(self, address, mtype, msgID, msg):
-        log.debug(f'send message to {address}.')
-        data = self.pack_datagram(mtype, msgID, msg)
+    async def sendto(self, data, address):
+        log.debug(f'send data to {address}.')
         self.transport.sendto(data, address)
 
-    def getHandler(self, name, source, msgID):
+    def getRequestHandler(self, name, source, msgID):
         f = getattr(self, "rpc_%s" % name, None)
         if f is None or not callable(f):
             msgargs = (self.__class__.__name__, name)
@@ -130,7 +118,7 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
         """
         log.debug(f"call remote `{name}` {addr}, {args}")
         try:
-            return (True, await self.callRemoteMethod(addr, name, *args))
+            return (True, await self.remoteCall(addr, name, *args))
         except:
             return (False, None)
 
