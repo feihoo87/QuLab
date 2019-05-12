@@ -1,11 +1,5 @@
-import logging
-
 import pytest
 from qulab.dht.network import Server
-
-log = logging.getLogger()
-log.setLevel(logging.DEBUG)
-log.addHandler(logging.StreamHandler())
 
 
 @pytest.fixture

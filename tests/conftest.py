@@ -1,9 +1,13 @@
+import logging
 import os
 import platform
 import tempfile
 from pathlib import Path
 
 import pytest
+
+log = logging.getLogger()
+log.setLevel(logging.DEBUG)
 
 
 def pytest_collection_modifyitems(config, items):
