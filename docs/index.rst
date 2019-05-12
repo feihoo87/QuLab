@@ -10,6 +10,7 @@ Welcome to QuLab's documentation!
    :maxdepth: 2
    :titlesonly:
 
+   introduction
    source/modules
 
 
