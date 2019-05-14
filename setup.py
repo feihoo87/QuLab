@@ -18,6 +18,8 @@ requirements = [
     'cryptography>=2.6.1',
     'numpy>=1.13.3',
     'scipy>=1.0.0',
+    'PyVISA>=1.9.1',
+    'PyVISA-py>=0.3.1',
     'PyYAML>=5.1',
     'pyzmq>=18.0.1',
     'redis>=3.2.1',
@@ -48,6 +50,7 @@ setup(
         'test': [
             'pytest>=4.4.0',
             'pytest-asyncio>=0.10.0',
+            'pyvisa-sim>=0.3',
         ],
         'docs': [
             'Sphinx',

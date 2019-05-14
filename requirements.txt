@@ -2,6 +2,8 @@ aioredis==1.2.0
 cryptography==2.6.1
 numpy==1.16.3
 scipy==1.2.1
+PyVISA==1.9.1
+PyVISA-py==0.3.1
 PyYAML==5.1
 pyzmq==18.0.1
 redis==3.2.1
