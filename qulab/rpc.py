@@ -344,7 +344,7 @@ class ZMQClient(RPCClientMixin):
         self._loop = asyncio.get_event_loop() if loop is None else loop
         self.set_timeout(timeout)
         self.addr = addr
-        self._ctx = zmq.asyncio.Context.instance()
+        self._ctx = zmq.asyncio.Context()
         self.zmq_socket = self._ctx.socket(zmq.DEALER, io_loop=self._loop)
         self.zmq_socket.setsockopt(zmq.LINGER, 0)
         self.zmq_socket.connect(self.addr)
