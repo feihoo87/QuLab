@@ -473,5 +473,5 @@ class BaseDriver:
 
 __all__ = [
     'QReal', 'QInteger', 'QString', 'QOption', 'QBool', 'QVector', 'QList',
-    'BaseDriver', 'DriverManager'
+    'BaseDriver'
 ]
