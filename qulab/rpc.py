@@ -20,6 +20,7 @@ RPC_RESPONSE = b'\x02'
 RPC_PING = b'\x03'
 RPC_PONG = b'\x04'
 RPC_CANCEL = b'\x05'
+RPC_SHUTDOWN = b'\x06'
 
 
 class RPCMixin(ABC):
@@ -127,6 +128,7 @@ class RPCMixin(ABC):
         RPC_REQUEST: 'on_request',
         RPC_RESPONSE: 'on_response',
         RPC_CANCEL: 'on_cancel',
+        RPC_SHUTDOWN: 'on_shutdown',
     }
 
     def handle(self, source, data):
@@ -160,6 +162,9 @@ class RPCMixin(ABC):
         log.debug(f'send response {address}, {msgID.hex()}, {msg}')
         await self.sendto(RPC_RESPONSE + msgID + msg, address)
 
+    async def shutdown(self, address):
+        await self.sendto(RPC_SHUTDOWN, address)
+
     def on_request(self, source, data):
         """
         Handle request.
@@ -189,6 +194,13 @@ class RPCMixin(ABC):
     def on_cancel(self, source, data):
         msgID = data[:20]
         self.cancelTask(msgID)
+
+    def on_shutdown(self, source, data):
+        if self.is_admin(source, data):
+            raise SystemExit(0)
+
+    def is_admin(self, source, data):
+        return True
 
 
 class RPCClientMixin(RPCMixin):
