@@ -17,7 +17,7 @@ DEFAULT_CONFIG = {
     },
     'dht': {
         'default_port' : 8987,
-        'bootstrap_nodes': ['127.0.0.1:8987'],
+        'bootstrap_nodes': ['kad://127.0.0.1:8987'],
         'white_list': [],
         'black_list': [],
     }
