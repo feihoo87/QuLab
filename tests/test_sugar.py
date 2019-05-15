@@ -1,6 +1,6 @@
-import pytest
 #from qulab.sugar import connect, create_server
 import numpy as np
+import pytest
 from qulab.sugar import *
 
 
@@ -63,10 +63,18 @@ async def test_mount(server, event_loop):
     addr = await dht.get('qubit')
     assert addr == ('tcp://%s:%d' % (getHostIP(), s1.port))
 
+
 @pytest.mark.asyncio
 async def test_node(server, event_loop):
     c = await connect('qubit', loop=event_loop)
-    await c.set_tlist(np.linspace(0,100,11))
+    await c.set_tlist(np.linspace(0, 100, 11))
     await c.set_x_channel('ch1')
-    x,y = await c.getT1()
+    x, y = await c.getT1()
     assert len(x) == 11
+    wav = await c.x_channel.get_wav()
+    x = np.linspace(-5000, 5000, 10001)
+    def f(x, sigma):
+        return np.exp(-(x / sigma)**2)
+    y = f(x - 100, sigma=20)
+    assert len(wav) == 10001
+    assert np.all(y==wav)
