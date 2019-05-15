@@ -1,6 +1,7 @@
 import asyncio
+from urllib.parse import urlparse
 
-from qulab._config import config
+from qulab._config import config, config_dir
 from qulab.dht.network import Server as DHT
 from qulab.dht.network import cfg as DHT_config
 from qulab.dht.utils import digest
@@ -28,11 +29,43 @@ root = Node('')
 __dht = None
 
 
+def getBootstrapNodes():
+    kad = config_dir() / 'kad.dat'
+    if kad.exists():
+        with kad.open() as f:
+            bootstrap_nodes = f.readlines()
+    else:
+        bootstrap_nodes = []
+    bootstrap_nodes.extend(DHT_config.get('bootstrap_nodes', []))
+
+    def parse(s):
+        x = urlparse(s)
+        return x.hostname, x.port
+
+    bootstrap_nodes = set(map(parse, bootstrap_nodes))
+    return list(bootstrap_nodes)
+
+
+def saveDHTNodes():
+    if __dht is None:
+        return
+    if not config_dir().exists():
+        config_dir().mkdir(parents=True)
+    kad = config_dir() / 'kad.dat'
+    nodes = __dht.bootstrappable_neighbors()
+    nodes.append((getHostIP(), __dht.port))
+    kad.write_text('\n'.join(
+        ["%s:%d" % (node[0], node[1]) for node in set(nodes)]))
+    loop = asyncio.get_event_loop()
+    loop.call_later(600, saveDHTNodes)
+
+
 async def getDHT():
     global __dht
     if __dht is None:
         __dht = DHT()
-        await __dht.start()
+        await __dht.start(getBootstrapNodes())
+        saveDHTNodes()
     return __dht
 
 
