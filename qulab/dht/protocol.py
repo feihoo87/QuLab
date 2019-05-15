@@ -118,7 +118,7 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
         """
         log.debug(f"call remote `{name}` {addr}, {args}")
         try:
-            return (True, await self.remoteCall(addr, name, *args))
+            return (True, await self.remoteCall(addr, name, args))
         except:
             return (False, None)
 
