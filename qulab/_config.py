@@ -3,25 +3,11 @@ import platform
 from pathlib import Path
 
 import yaml
+from qulab.utils import getHostIP
 
 CONFIG_DIRNAME = 'QuLab'
 CONFIG_FILENAME = 'config.yml'
-DEFAULT_CONFIG = {
-    'db': {
-        'db': 'lab',
-        'host': 'localhost'
-    },
-    'log': {
-        'level' : 'info',
-        'server' : 'tcp://127.0.0.1:16872',
-    },
-    'dht': {
-        'default_port' : 8987,
-        'bootstrap_nodes': ['kad://127.0.0.1:8987'],
-        'white_list': [],
-        'black_list': [],
-    }
-} # yapf : disable
+CONFIG_DRIVERDIRNAME = 'drivers'
 
 
 def load_config(path):
@@ -34,7 +20,7 @@ def config_dir():
     elif platform.system() == 'Windows':
         home = os.getenv('ProgramData')
     else:
-        home = os.getcwd()
+        home = Path.home()
     return Path(home) / CONFIG_DIRNAME
 
 
@@ -42,7 +28,27 @@ def config_file():
     return config_dir() / CONFIG_FILENAME
 
 
+def default_config():
+    return {
+        'db': {
+            'db': 'lab',
+            'host': 'localhost'
+        },
+        'log': {
+            'level': 'info',
+            'server': 'tcp://127.0.0.1:16872',
+        },
+        'dht': {
+            'default_port': 8987,
+            'bootstrap_nodes': [f'kad://{getHostIP()}:8987'],
+            'white_list': [],
+            'black_list': [],
+        },
+        'drivers': [str(config_dir() / CONFIG_DRIVERDIRNAME)],
+    }  # yapf : disable
+
+
 if config_file().exists():
     config = load_config(config_file())
 else:
-    config = DEFAULT_CONFIG
+    config = default_config()
