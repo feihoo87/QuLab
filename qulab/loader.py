@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 
 def find_location(name):
     for path in config.get('drivers', []):
-        p = Path(path) / name+'.py'
+        p = Path(path) / (name+'.py')
         if p.exists() and p.is_file():
             return p
         p = Path(path) / name
