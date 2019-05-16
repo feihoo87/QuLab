@@ -3,7 +3,7 @@ import struct
 from typing import Any, Callable, TypeVar
 
 import numpy as np
-import umsgpack
+from qulab import umsgpack
 
 __index = 0
 __pack_handlers = {}
