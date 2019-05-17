@@ -284,7 +284,6 @@ class BaseDriver:
         self.timeout = t
         if self.ins is not None:
             self.ins.timeout = t * 1000
-        return self
 
     def errors(self):
         e = []
@@ -376,7 +375,6 @@ class BaseDriver:
             raise
         if check_errors:
             self.check_errors_and_log(message)
-        return self
 
     def write_ascii_values(self,
                            message,
@@ -398,7 +396,6 @@ class BaseDriver:
             raise
         if check_errors:
             self.check_errors_and_log(log_msg)
-        return self
 
     def write_binary_values(self,
                             message,
@@ -422,7 +419,6 @@ class BaseDriver:
             raise
         if check_errors:
             self.check_errors_and_log(log_msg)
-        return self
 
     def getValue(self, name, **kw):
         if name in self.quantities:
@@ -441,7 +437,6 @@ class BaseDriver:
     def setValue(self, name, value, **kw):
         if name in self.quantities:
             self.performSetValue(self.quantities[name], value, **kw)
-        return self
 
     def performOpen(self, **kw):
         pass
@@ -463,7 +458,6 @@ class BaseDriver:
             else:
                 self.setValue(key, cfg[key])
         log.debug('Init instr ... Done')
-        return self
 
     def close(self):
         self.performClose()
