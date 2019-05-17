@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
+import contextlib
 import functools
 import inspect
 import os
 import socket
 import struct
+import time
 import uuid
+from ctypes import CFUNCTYPE, c_bool, c_uint, c_void_p, c_wchar_p, windll
 from hashlib import sha1
 
 import numpy as np
@@ -118,3 +121,47 @@ def acceptArg(f, name, keyword=True):
         elif param.kind == param.VAR_POSITIONAL and not keyword:
             return True
     return False
+
+
+@contextlib.contextmanager
+def WindowsShutdownBlocker(title='Python script'):
+    """
+    Block Windows shutdown when you do something important.
+    """
+    import win32con
+    import win32gui
+
+    def WndProc(hWnd, message, wParam, lParam):
+        if message == win32con.WM_QUERYENDSESSION:
+            return False
+        else:
+            return win32gui.DefWindowProc(hWnd, message, wParam, lParam)
+
+    CALLBACK = CFUNCTYPE(c_bool, c_void_p, c_uint, c_void_p, c_void_p)
+
+    wc = win32gui.WNDCLASS()
+    wc.style = win32con.CS_GLOBALCLASS | win32con.CS_VREDRAW | win32con.CS_HREDRAW
+    wc.lpfnWndProc = CALLBACK(WndProc)
+    wc.hbrBackground = win32con.COLOR_WINDOW + 1
+    wc.lpszClassName = "block_shutdown_class"
+    win32gui.RegisterClass(wc)
+
+    hwnd = win32gui.CreateWindow(wc.lpszClassName, title,
+                                 win32con.WS_OVERLAPPEDWINDOW, 50,
+                                 50, 100, 100, 0, 0,
+                                 win32gui.GetForegroundWindow(), None)
+
+    win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+
+    windll.user32.ShutdownBlockReasonCreate.argtypes = [c_void_p, c_wchar_p]
+    windll.user32.ShutdownBlockReasonCreate.restype = c_bool
+    windll.user32.ShutdownBlockReasonCreate(
+        hwnd, "Important work in processing, don't shutdown :-(")
+
+    yield
+
+    windll.user32.ShutdownBlockReasonDestroy.argtypes = [c_void_p]
+    windll.user32.ShutdownBlockReasonDestroy.restype = c_bool
+    windll.user32.ShutdownBlockReasonDestroy(hwnd)
+    win32gui.DestroyWindow(hwnd)
+    win32gui.UnregisterClass(wc.lpszClassName, None)
