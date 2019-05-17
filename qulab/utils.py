@@ -7,7 +7,6 @@ import socket
 import struct
 import time
 import uuid
-from ctypes import CFUNCTYPE, c_bool, c_uint, c_void_p, c_wchar_p, windll
 from hashlib import sha1
 
 import numpy as np
@@ -128,6 +127,7 @@ def WindowsShutdownBlocker(title='Python script'):
     """
     Block Windows shutdown when you do something important.
     """
+    from ctypes import CFUNCTYPE, c_bool, c_uint, c_void_p, c_wchar_p, windll
     import win32con
     import win32gui
 
