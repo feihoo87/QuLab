@@ -123,7 +123,7 @@ def acceptArg(f, name, keyword=True):
 
 
 @contextlib.contextmanager
-def WindowsShutdownBlocker(title='Python script'):
+def _WindowsShutdownBlocker(title='Python script'):
     """
     Block Windows shutdown when you do something important.
     """
@@ -165,3 +165,14 @@ def WindowsShutdownBlocker(title='Python script'):
     windll.user32.ShutdownBlockReasonDestroy(hwnd)
     win32gui.DestroyWindow(hwnd)
     win32gui.UnregisterClass(wc.lpszClassName, None)
+
+
+@contextlib.contextmanager
+def _FakeShutdownBlocker(title='Python script'):
+    yield
+
+
+if os.name == 'nt':
+    ShutdownBlocker = _WindowsShutdownBlocker
+else:
+    ShutdownBlocker = _FakeShutdownBlocker
