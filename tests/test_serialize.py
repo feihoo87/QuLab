@@ -26,3 +26,11 @@ class A:
 def test_register():
     register(A, pickle.dumps, pickle.loads)
     assert A(3, 5) == unpack(pack(A(3, 5)))
+
+
+def test_compress():
+    x = np.zeros(1000)
+    buff = pack(x)
+    cbuff = packz(x)
+    assert len(buff) > len(cbuff)
+    assert np.all(x == unpackz(cbuff))

@@ -1,3 +1,4 @@
+import lzma
 import pickle
 import struct
 from typing import Any, Callable, TypeVar
@@ -46,6 +47,20 @@ def unpack(buff: bytes) -> Any:
     Unserialize
     """
     return umsgpack.unpackb(buff, ext_handlers=__unpack_handlers)
+
+
+def packz(obj: Any) -> bytes:
+    """
+    Serialize and compress.
+    """
+    return lzma.compress(pack(obj), format=lzma.FORMAT_XZ)
+
+
+def unpackz(buff: bytes) -> Any:
+    """
+    Decompress and unserialize.
+    """
+    return unpack(lzma.decompress(buff, format=lzma.FORMAT_XZ))
 
 
 register(np.ndarray)
