@@ -45,6 +45,7 @@ def default_config():
             'black_list': [],
         },
         'drivers': [str(config_dir() / CONFIG_DRIVERDIRNAME)],
+        'data_path': str(Path.home() / 'QuLabData')
     }  # yapf : disable
 
 
