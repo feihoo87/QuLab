@@ -26,9 +26,7 @@ def getExpArray(f_list, numOfPoints, sampleRate=1e9):
 
 class Driver(BaseDriver):
     def __init__(self, systemID=1, boardID=1, **kw):
-        super().__init__(addr=f'ATS9870::SYS{systemID}::{boardID}::INSTR',
-                         model='ATS9870',
-                         **kw)
+        super().__init__(**kw)
         self.dig = AlazarTechDigitizer(systemID, boardID)
         self.config = dict(n=1024,
                            sampleRate=1e9,
