@@ -1,6 +1,9 @@
+import time
 import unittest
 
+import numpy as np
 from qulab.storage import ForgetfulStorage
+from qulab.storage.utils import save
 
 
 class ForgetfulStorageTest(unittest.TestCase):
@@ -27,3 +30,12 @@ class ForgetfulStorageTest(unittest.TestCase):
         for key, value in storage.iter_older_than(0):
             self.assertEqual(key, 'one')
             self.assertEqual(value, 'two')
+
+
+def test_save(tmpdir):
+    p1 = save('test', x=np.array([1, 2, 3]), base_path=tmpdir)
+    data = np.load(p1)
+    assert data['x'][1] == 2
+    time.sleep(1)
+    p2 = save('test', x=np.array([1, 2, 3]), base_path=tmpdir)
+    assert str(p1) != str(p2)
