@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from pathlib import Path
 
 scripts = [
     'dht.py',
@@ -9,9 +10,11 @@ scripts = [
     'instrument.py --name=EX --model=E8257D --driver=PSG --address=TCPIP0::192.168.2.102',
     'instrument.py --name=LO --model=D8257D --driver=PSG --address=TCPIP0::192.168.2.121',
     'instrument.py --name=NA --model=N5232A --driver=NetworkAnalyzer --address=TCPIP0::192.168.2.121',
-    'jupyter-notebook.py --notebook-dir=C:/WPy64-3720/notebooks',
+    'jupyter-notebook.py --notebook-dir=D:/notebooks',
 ]
 
+p = Path(__file__).parent.resolve()
+
 for cmd in scripts:
-    os.system('cmd /c start %s %s' % (sys.executable, cmd))
+    os.system('cmd /c start %s %s\\%s' % (sys.executable, p, cmd))
     time.sleep(1)
