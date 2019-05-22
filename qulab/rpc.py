@@ -69,7 +69,8 @@ class RPCMixin(ABC):
         self.tasks[msgID] = task
 
         def clean(fut, msgID=msgID):
-            del self.tasks[msgID]
+            if msgID in self.tasks:
+                del self.tasks[msgID]
 
         task.add_done_callback(clean)
 
