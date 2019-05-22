@@ -1,4 +1,3 @@
-import inspect
 import lzma
 import pickle
 import struct
@@ -67,49 +66,7 @@ def unpackz(buff: bytes) -> Any:
 register(np.ndarray)
 
 
-def parse_frame(frame):
-    ret = {}
-    ret['source'] = inspect.getsource(frame)
-    ret['name'] = frame.f_code.co_name
-    if ret['name'] != '<module>':
-        argnames = frame.f_code.co_varnames[:frame.f_code.co_argcount +
-                                            frame.f_code.co_kwonlyargcount]
-        ret['name'] += '(' + ', '.join(argnames) + ')'
-        ret['firstlineno'] = frame.f_code.co_firstlineno
-    else:
-        ret['firstlineno'] = 1
-    ret['filename'] = frame.f_code.co_filename
-    return ret
-
-
-def parse_traceback(err):
-    ret = []
-    tb = err.__traceback__
-    while tb is not None:
-        frame = parse_frame(tb.tb_frame)
-        frame['lineno'] = tb.tb_lineno
-        ret.append(frame)
-        tb = tb.tb_next
-    return ret
-
-
-def format_traceback(err):
-    lines = []
-    for frame in parse_traceback(err):
-        lines.append(f"{frame['filename']} in {frame['name']}")
-        for n, line in enumerate(frame['source'].split('\n')):
-            lno = n + frame['firstlineno']
-            lines.append(
-                f"{'->' if lno==frame['lineno'] else '  '}{lno:3d} {line}")
-    traceback_text = '\n'.join(lines)
-    args = list(err.args)
-    args.append(traceback_text)
-    err.args = tuple(args)
-    return err
-
-
 def encode_excepion(e: Exception) -> bytes:
-    e = format_traceback(e)
     e.__traceback__ = None
     return pickle.dumps(e)
 

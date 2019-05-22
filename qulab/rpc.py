@@ -267,7 +267,7 @@ class RPCServerMixin(RPCMixin):
                                                 **kw),
                             timeout=kw.get('timeout', 0))
         except Exception as e:
-            self.response(source, msgID, pack(QuLabRPCServerError(*e.args)))
+            self.response(source, msgID, pack(QuLabRPCServerError.make(e)))
 
     async def handle_request(self, source, msgID, method, *args, **kw):
         """
@@ -283,7 +283,7 @@ class RPCServerMixin(RPCMixin):
         except QuLabRPCError as e:
             result = e
         except Exception as e:
-            result = QuLabRPCServerError(*e.args)
+            result = QuLabRPCServerError.make(e)
         msg = pack(result)
         await self.response(source, msgID, msg)
 
