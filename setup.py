@@ -15,7 +15,9 @@ exec(open('qulab/_version.py').read())
 
 requirements = [
     'aioredis>=1.2.0',
+    'blinker>=1.4',
     'cryptography>=2.6.1',
+    'mongoengine>=0.17.0',
     'numpy>=1.13.3',
     'scipy>=1.0.0',
     'PyVISA>=1.9.1',
