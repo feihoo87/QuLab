@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import numpy as np
+
 from qulab import BaseDriver, QInteger, QOption, QReal, QVector
 
 
 class Driver(BaseDriver):
-    support_models = ['E8363B', 'E8363C', 'E5071C', 'ZNB20-2Port']
+    support_models = ['E8363B', 'E8363C', 'E5071C', 'ZNB20-2Port', 'N5232A']
 
     quants = [
         QReal('Power',
@@ -119,7 +120,7 @@ class Driver(BaseDriver):
         '''Select the measurement'''
         if self.model in ['E5071C']:
             return
-        if self.model in ['E8363C', 'E8363B']:
+        if self.model in ['E8363C', 'E8363B', 'N5232A']:
             quote = '" '
         elif self.model in ['ZNB20-2Port']:
             quote = "' "
@@ -135,7 +136,7 @@ class Driver(BaseDriver):
         if self.model == 'E8363C':
             cmd = 'CALC:X?'
             return np.asarray(self.query_ascii_values(cmd))
-        if self.model == 'E8363B':
+        if self.model in ['E8363B', 'N5232A']:
             freq_star = self.getValue('Frequency start')
             freq_stop = self.getValue('Frequency stop')
             num_of_point = self.getValue('Number of points')
