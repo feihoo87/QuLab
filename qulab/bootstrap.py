@@ -1,4 +1,5 @@
 import functools
+import sys
 
 from qulab.storage.connect import require_db
 from qulab.storage.schema import Notebook, createCodeSnippet

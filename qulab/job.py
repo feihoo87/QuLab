@@ -6,6 +6,7 @@ import numpy as np
 from qulab.bootstrap import (get_current_notebook, get_inputCells,
                              save_inputCells)
 from qulab.storage.connect import require_db
+from qulab.storage.schema import Record
 from qulab.ui.progressbar import ProgressBar
 
 
@@ -66,16 +67,15 @@ class DataCollector:
             self.__record = self.newRecord()
         self.__record.set_data(self.result())
         self.__record.save(signal_kwargs=dict(finished=True))
-        save_inputCells()
 
     @require_db
     def newRecord(self):
-        record = db.update.newRecord(
-            title=self.title,
-            tags=self.tags,
-            hidden=False if self.parent is None else True,
-            notebook=get_current_notebook(),
-            notebook_index=len(get_inputCells()))
+        save_inputCells()
+        record = Record(title=self.title,
+                        tags=self.tags,
+                        hidden=False if self.parent is None else True,
+                        notebook=get_current_notebook(),
+                        notebook_index=len(get_inputCells())-1)
         if self.parent is not None:
             self.parent.addSubRecord(record)
         return record
@@ -122,6 +122,7 @@ class Job:
             self._setUp()
             async for data in self.work(*self.args, **self.kw):
                 self.data.collect(data)
+                self.data.save()
                 self.bar.next()
             self._tearDown()
         return self.data.result()

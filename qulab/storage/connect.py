@@ -1,3 +1,5 @@
+import functools
+
 from mongoengine.connection import connect, disconnect
 
 from qulab._config import config

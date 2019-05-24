@@ -4,7 +4,7 @@ from mongoengine import (BooleanField, ComplexDateTimeField, Document,
                          FileField, IntField, ListField, ReferenceField,
                          StringField)
 
-from .base import delete_children, now, update_modified
+from .base import delete_children, from_pickle, now, to_pickle, update_modified
 
 
 @update_modified.apply
@@ -20,7 +20,7 @@ class Record(Document):
     tags = ListField(StringField(max_length=50))
     datafield = FileField(collection_name='data')
     imagefield = FileField(collection_name='images')
-    notebook = FileField(ReferenceField('Notebook'))
+    notebook = ReferenceField('Notebook')
     notebook_index = IntField(min_value=0)
 
     def __repr__(self):
