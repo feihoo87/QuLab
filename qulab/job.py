@@ -15,10 +15,11 @@ class DataCollector:
     Collect data and form a record.
     '''
 
-    def __init__(self, title, tags=None, parent=None):
+    def __init__(self, title, tags=None, comment='', job=None):
         self.title = title
         self.tags = [] if tags is None else tags
-        self.parent = parent
+        self.comment = comment
+        self.job = job
         self.clear()
 
     def clear(self):
@@ -73,30 +74,48 @@ class DataCollector:
         save_inputCells()
         record = Record(title=self.title,
                         tags=self.tags,
-                        hidden=False if self.parent is None else True,
+                        comment=self.comment,
+                        hidden=False if self.job.parent is None else True,
                         notebook=get_current_notebook(),
-                        notebook_index=len(get_inputCells())-1)
-        if self.parent is not None:
-            self.parent.addSubRecord(record)
+                        notebook_index=len(get_inputCells()) - 1)
+        if self.job.parent is not None:
+            self.job.parent.data.addSubRecord(record)
         return record
 
     @require_db
     def addSubRecord(self, record):
-        if self.__record is not None:
-            if record.id is None:
-                record.save(signal_kwargs=dict(finished=True))
-            self.__record.children.append(record)
-            self.__record.save(signal_kwargs=dict(finished=True))
+        if self.__record is None:
+            self.__record = self.newRecord()
+        if record.id is None:
+            record.save(signal_kwargs=dict(finished=True))
+        self.__record.children.append(record)
+        self.__record.save(signal_kwargs=dict(finished=True))
 
     def pre_save(self, *data):
         return data
 
 
 class Job:
-    def __init__(self, work, args=(), kw={}, max=100, title=None):
+    _running_jobs = []
+
+    def __init__(self,
+                 work,
+                 args=(),
+                 kw={},
+                 max=100,
+                 title=None,
+                 tags=None,
+                 comment='',
+                 auto_save=None,
+                 no_bar=False):
         title = work.__name__ if title is None else title
-        self.data = DataCollector(title)
-        self.bar = ProgressBar(max=max, description=title)
+        self.parent = Job.current_job()
+        if auto_save is None:
+            self.auto_save = True if self.parent is None else False
+        else:
+            self.auto_save = auto_save
+        self.data = DataCollector(title, tags=tags, comment=comment, job=self)
+        self.bar = ProgressBar(max=max, description=title, hiden=no_bar)
         self.out = widgets.Output()
         display(self.out)
         self.work_code = None
@@ -117,15 +136,30 @@ class Job:
         pass
 
     async def done(self):
+        Job._running_jobs.append(self)
         with self.out, self.bar:
             self.data.clear()
             self._setUp()
             async for data in self.work(*self.args, **self.kw):
                 self.data.collect(data)
-                self.data.save()
+                if self.auto_save:
+                    self.data.save()
                 self.bar.next()
             self._tearDown()
+        Job._running_jobs.remove(self)
+        if self.parent is not None:
+            self.out.close()
         return self.data.result()
 
     def __del__(self):
-        self.out.close()
+        try:
+            self.out.close()
+        except:
+            pass
+
+    @classmethod
+    def current_job(cls):
+        if len(cls._running_jobs) > 0:
+            return cls._running_jobs[-1]
+        else:
+            return None

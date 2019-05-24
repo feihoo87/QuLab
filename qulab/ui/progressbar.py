@@ -18,7 +18,12 @@ except:
 class ProgressBar:
     sma_window = 10  # Simple Moving Average window
 
-    def __init__(self, *, max=10, description='Progressing', loop=None):
+    def __init__(self,
+                 *,
+                 max=10,
+                 description='Progressing',
+                 loop=None,
+                 hiden=False):
         self.start_ts = monotonic()
         self.avg = 0
         self._avg_update_ts = self.start_ts
@@ -36,7 +41,7 @@ class ProgressBar:
             [self._ProgressWidget, self._elapsedTimeLabel, self._etaTimeLabel])
         self.loop = asyncio.get_event_loop() if loop is None else loop
         self._update_loop = None
-        self._displayed = False
+        self._displayed = False if not hiden else True
 
     @property
     def description(self):
