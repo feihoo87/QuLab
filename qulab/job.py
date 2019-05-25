@@ -2,6 +2,7 @@ import inspect
 
 import ipywidgets as widgets
 import numpy as np
+from IPython.display import display
 
 from qulab.bootstrap import (get_current_notebook, get_inputCells,
                              save_inputCells)
