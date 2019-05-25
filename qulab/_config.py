@@ -31,7 +31,7 @@ def config_file():
 def default_config():
     return {
         'db': {
-            'mongodb': 'mongodb://localhost:32768/lab',
+            'mongodb': 'mongodb://localhost:27017/lab',
             'redis': 'redis://localhost',
         },
         'log': {
