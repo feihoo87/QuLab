@@ -4,10 +4,12 @@ from pathlib import Path
 import numpy as np
 from qulab import config
 
+storage_cfg = config.get('storage', {})
+
 
 def save(title, *args, base_path=None, **kw):
     if base_path is None:
-        base_path = Path(config.get('data_path', Path.cwd()))
+        base_path = Path(storage_cfg.get('data_path', Path.cwd()))
     else:
         base_path = Path(base_path)
 

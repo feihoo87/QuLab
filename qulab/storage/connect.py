@@ -11,7 +11,8 @@ def _connect_db():
     global __connected
     if __connected:
         return
-    connect(**config['db'])
+    uri = config['db']['mongodb']
+    connect(host=uri)
     __connected = True
 
 

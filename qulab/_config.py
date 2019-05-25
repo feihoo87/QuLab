@@ -31,8 +31,8 @@ def config_file():
 def default_config():
     return {
         'db': {
-            'db': 'lab',
-            'host': 'localhost'
+            'mongodb': 'mongodb://localhost:32768/lab',
+            'redis': 'redis://localhost',
         },
         'log': {
             'level': 'info',
@@ -45,7 +45,10 @@ def default_config():
             'black_list': [],
         },
         'drivers': [str(config_dir() / CONFIG_DRIVERDIRNAME)],
-        'data_path': str(Path.home() / 'QuLabData')
+        'storage': {
+            'backend': 'file',
+            'data_path': str(Path.home() / 'QuLabData'),
+        }
     }  # yapf : disable
 
 
