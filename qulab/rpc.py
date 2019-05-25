@@ -190,7 +190,7 @@ class RPCMixin(ABC):
             fut, timeout = self.pending[source]
             timeout.cancel()
             fut.set_result(True)
-            del self.pending[msgID]
+            del self.pending[source]
 
     def on_cancel(self, source, data):
         msgID = data[:20]

@@ -63,7 +63,8 @@ async def test_ping(server, event_loop):
     c = ZMQClient('tcp://127.0.0.1:%d' % server.port,
                   timeout=0.7,
                   loop=event_loop)
-    assert await c.ping()
+    for i in range(4):
+        assert await c.ping()
     server.stop()
     assert not await c.ping()
     del c
