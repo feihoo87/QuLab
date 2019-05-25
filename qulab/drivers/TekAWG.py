@@ -1,4 +1,5 @@
 import numpy as np
+
 from qulab import BaseDriver, QList, QOption, QReal
 
 
@@ -288,4 +289,3 @@ class Driver(BaseDriver):
     def use_sequence(self, name, channels=[1, 2]):
         for i, ch in enumerate(channels):
             self.write('SOUR%d:CASS:SEQ "%s", %d' % (ch, name, i + 1))
-

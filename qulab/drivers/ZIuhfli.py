@@ -1,24 +1,25 @@
 import logging
-
-import numpy as np
 import os
 import time
+
+import numpy as np
+
 # need zhinst package
 import zhinst.utils
-
 from qulab import BaseDriver, QInteger, QOption, QReal, QString, QVector
-
 
 logger = logging.getLogger('qulab.drivers.ZI')
 
 
 class Driver(BaseDriver):
-    support_models = ['UHFLI', ]
+    support_models = [
+        'UHFLI',
+    ]
     quants = []
 
     def __init__(self, **kw):
         BaseDriver.__init__(self, **kw)
-        self.deviceID=kw['deviceID']
+        self.deviceID = kw['deviceID']
 
     def performOpen(self):
         # self.daq = zhinst.utils.autoConnect()
@@ -27,7 +28,8 @@ class Driver(BaseDriver):
         # - an API session `daq` in order to communicate with devices via the data server.
         # - the device ID string that specifies the device branch in the server's node hierarchy.
         # - the device's discovery properties.
-        (daq, device, props) = zhinst.utils.create_api_session(self.deviceID, apilevel)
+        (daq, device,
+         props) = zhinst.utils.create_api_session(self.deviceID, apilevel)
         zhinst.utils.api_server_version_check(daq)
         self.daq = daq
         self.device = device
@@ -44,8 +46,8 @@ class Driver(BaseDriver):
         if os.path.isabs(filename):
             zhinst.utils.load_settings(self.daq, self.device, filename)
         else:
-            path_default=zhinst.utils.get_default_settings_path(self.daq)
-            filename=os.path.normpath(os.path.join(path_default,filename))
+            path_default = zhinst.utils.get_default_settings_path(self.daq)
+            filename = os.path.normpath(os.path.join(path_default, filename))
             zhinst.utils.load_settings(self.daq, self.device, filename)
         time.sleeo(0.5)
         self.daq.sync()
@@ -54,9 +56,9 @@ class Driver(BaseDriver):
         if os.path.isabs(filename):
             zhinst.utils.save_settings(self.daq, self.device, filename)
         else:
-            path_default=zhinst.utils.get_default_settings_path(self.daq)
-            filename=os.path.normpath(os.path.join(path_default,filename))
-            dir=os.path.dirname(filename)
+            path_default = zhinst.utils.get_default_settings_path(self.daq)
+            filename = os.path.normpath(os.path.join(path_default, filename))
+            dir = os.path.dirname(filename)
             if not os.path.exists(dir):
                 os.makedirs(dir)
             zhinst.utils.save_settings(self.daq, self.device, filename)

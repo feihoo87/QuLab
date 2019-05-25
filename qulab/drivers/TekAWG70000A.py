@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-from qulab import BaseDriver, QOption, QReal, QList
+from qulab import BaseDriver, QList, QOption, QReal
 
 
 class Driver(BaseDriver):
@@ -10,147 +10,178 @@ class Driver(BaseDriver):
     quants = [
         # Sample Rate set_cmd is block cmd
         #
-        QReal('Sample Rate', unit='S/s',
-          set_cmd='CLOC:SRAT %(value).10e; *WAI;',
-          get_cmd='CLOC:SRAT?'),
-
-        QOption('Run Mode', value='CONT', ch=1,
-            set_cmd='SOUR%(ch)d:RMOD %(option)s', get_cmd='SOUR%(ch)d:RMOD?',
-            options = [
-                ('Continuous', 'CONT'),
-                ('Triggered',  'TRIG'),
-                ('TContinuous','TCON')]),
-
-        QOption('Clock Source', value='INT',
-            set_cmd='CLOC:SOUR %(option)s', get_cmd='CLOC:SOUR?',
-            options = [('Internal', 'INT'),
-                       ('External', 'EXT'),
-                       ('Efixed',   'EFIX'),
-                       ('Evariable','EVAR')]),
+        QReal('Sample Rate',
+              unit='S/s',
+              set_cmd='CLOC:SRAT %(value).10e; *WAI;',
+              get_cmd='CLOC:SRAT?'),
+        QOption('Run Mode',
+                value='CONT',
+                ch=1,
+                set_cmd='SOUR%(ch)d:RMOD %(option)s',
+                get_cmd='SOUR%(ch)d:RMOD?',
+                options=[('Continuous', 'CONT'), ('Triggered', 'TRIG'),
+                         ('TContinuous', 'TCON')]),
+        QOption('Clock Source',
+                value='INT',
+                set_cmd='CLOC:SOUR %(option)s',
+                get_cmd='CLOC:SOUR?',
+                options=[('Internal', 'INT'), ('External', 'EXT'),
+                         ('Efixed', 'EFIX'), ('Evariable', 'EVAR')]),
 
         # QOption('Reference Source', set_cmd='SOUR:ROSC:SOUR %(option)s', get_cmd='SOUR:ROSC:SOUR?',
         #   options = [('Internal', 'INT'), ('External', 'EXT')]),
-
-        QReal('Multiplier Rate ', value=1,
-          set_cmd='CLOC:EREF:MULT %(value)d',
-          get_cmd='CLOC:EREF:MULT?'),
-
-         QReal('Divider Rate ', value=1,
-           set_cmd='CLOC:EREF:DIV %(value)d',
-           get_cmd='CLOC:EREF:DIV?'),
+        QReal('Multiplier Rate ',
+              value=1,
+              set_cmd='CLOC:EREF:MULT %(value)d',
+              get_cmd='CLOC:EREF:MULT?'),
+        QReal('Divider Rate ',
+              value=1,
+              set_cmd='CLOC:EREF:DIV %(value)d',
+              get_cmd='CLOC:EREF:DIV?'),
 
         # 以下四种只在 output path 为 Direct 时有效
         # Vpp range: 250-500mVpp
-        QReal('Vpp', unit='Vpp', ch=1,
-          set_cmd='SOUR%(ch)d:VOLT %(value)f%(unit)s',
-          get_cmd='SOUR%(ch)d:VOLT?'),
-
-        QReal('Offset', unit='V', ch=1,
-          set_cmd='SOUR%(ch)d:VOLT:OFFS %(value)f%(unit)s',
-          get_cmd='SOUR%(ch)d:VOLT:OFFS?'),
-
-        QReal('Volt Low', unit='V', ch=1,
-          set_cmd='SOUR%(ch)d:VOLT:LOW %(value)f%(unit)s',
-          get_cmd='SOUR%(ch)d:VOLT:LOW?'),
-
-        QReal('Volt High', unit='V', ch=1,
-          set_cmd='SOUR%(ch)d:VOLT:HIGH %(value)f%(unit)s',
-          get_cmd='SOUR%(ch)d:VOLT:HIGH?'),
+        QReal('Vpp',
+              unit='Vpp',
+              ch=1,
+              set_cmd='SOUR%(ch)d:VOLT %(value)f%(unit)s',
+              get_cmd='SOUR%(ch)d:VOLT?'),
+        QReal('Offset',
+              unit='V',
+              ch=1,
+              set_cmd='SOUR%(ch)d:VOLT:OFFS %(value)f%(unit)s',
+              get_cmd='SOUR%(ch)d:VOLT:OFFS?'),
+        QReal('Volt Low',
+              unit='V',
+              ch=1,
+              set_cmd='SOUR%(ch)d:VOLT:LOW %(value)f%(unit)s',
+              get_cmd='SOUR%(ch)d:VOLT:LOW?'),
+        QReal('Volt High',
+              unit='V',
+              ch=1,
+              set_cmd='SOUR%(ch)d:VOLT:HIGH %(value)f%(unit)s',
+              get_cmd='SOUR%(ch)d:VOLT:HIGH?'),
 
         # output delay in time
-        QReal('timeDelay', unit='s', ch=1,
-          set_cmd='SOUR%(ch)d:DEL:ADJ %(value)f%(unit)s',
-          get_cmd='SOUR%(ch)d:DEL:ADJ?'),
+        QReal('timeDelay',
+              unit='s',
+              ch=1,
+              set_cmd='SOUR%(ch)d:DEL:ADJ %(value)f%(unit)s',
+              get_cmd='SOUR%(ch)d:DEL:ADJ?'),
         # output delay in point
-        QReal('timeDelay', unit='point', ch=1,
-          set_cmd='SOUR%(ch)d:DEL:POIN %(value)d',
-          get_cmd='SOUR%(ch)d:DELy:POIN?'),
-
-        QOption('Run', value = 'Play',
-            set_cmd='AWGC:%(option)s; *WAI;',
-            get_cmd='AWGC:RST?',
-            options = [('Play', 'RUN'), ('Stop', 'STOP')]),
-
-        QOption('Output', ch=1,
-            set_cmd='OUTP%(ch)d %(option)s',
-            get_cmd='OUTP%(ch)d?',
-            options = [('ON', 1), ('OFF', 0),
-                       (1, 'ON'), (0, 'OFF')]),
-
+        QReal('timeDelay',
+              unit='point',
+              ch=1,
+              set_cmd='SOUR%(ch)d:DEL:POIN %(value)d',
+              get_cmd='SOUR%(ch)d:DELy:POIN?'),
+        QOption('Run',
+                value='Play',
+                set_cmd='AWGC:%(option)s; *WAI;',
+                get_cmd='AWGC:RST?',
+                options=[('Play', 'RUN'), ('Stop', 'STOP')]),
+        QOption('Output',
+                ch=1,
+                set_cmd='OUTP%(ch)d %(option)s',
+                get_cmd='OUTP%(ch)d?',
+                options=[('ON', 1), ('OFF', 0), (1, 'ON'), (0, 'OFF')]),
         QList('WList'),
-
         QList('SList'),
 
         # INSTrument MODE : AWG or FG
-        QOption('instMode', value='AWG',
-            set_cmd = 'INST:MODE %(option)s',
-            get_cmd = 'INST:MODE?',
-            options = [('AWG','AWG'),
-                      ('FG','FGEN'),
+        QOption('instMode',
+                value='AWG',
+                set_cmd='INST:MODE %(option)s',
+                get_cmd='INST:MODE?',
+                options=[
+                    ('AWG', 'AWG'),
+                    ('FG', 'FGEN'),
                 ]),
-
-        QOption('FG Type', ch=1, value='Sin',
-            set_cmd = 'FGEN:CHAN%(ch)d:TYPE %(option)s',
-            get_cmd = 'FGEN:CHAN%(ch)d:TYPE?',
-            options = [('Sin','SINE'),
-                       ('Square','SQU'),
-                       ('Triangle','TRI'),
-                       ('Noise','NOIS'),
-                       ('DC','DC'),
-                       ('Gaussian','GAUS'),
-                       ('ExpRise','EXPR'),
-                       ('ExpDecay','EXPD'),
-                       ('None','NONE'),
+        QOption('FG Type',
+                ch=1,
+                value='Sin',
+                set_cmd='FGEN:CHAN%(ch)d:TYPE %(option)s',
+                get_cmd='FGEN:CHAN%(ch)d:TYPE?',
+                options=[
+                    ('Sin', 'SINE'),
+                    ('Square', 'SQU'),
+                    ('Triangle', 'TRI'),
+                    ('Noise', 'NOIS'),
+                    ('DC', 'DC'),
+                    ('Gaussian', 'GAUS'),
+                    ('ExpRise', 'EXPR'),
+                    ('ExpDecay', 'EXPD'),
+                    ('None', 'NONE'),
                 ]),
-
-        QReal('FG Amplitude', ch=1, value=0.5, unit='V',
-            set_cmd = 'FGEN:CHAN%(ch)d:AMPL:VOLT %(value)f%(unit)s',
-            get_cmd = 'FGEN:CHAN%(ch)d:AMPL:VOLT?'),
+        QReal('FG Amplitude',
+              ch=1,
+              value=0.5,
+              unit='V',
+              set_cmd='FGEN:CHAN%(ch)d:AMPL:VOLT %(value)f%(unit)s',
+              get_cmd='FGEN:CHAN%(ch)d:AMPL:VOLT?'),
 
         #FG Offset -150mV~150mV, min Unit 1mV
-        QReal('FG Offset', ch=1, value=0, unit='V',
-            set_cmd = 'FGEN:CHAN%(ch)d:OFFS %(value)f%(unit)s',
-            get_cmd = 'FGEN:CHAN%(ch)d:OFFS?'),
-
-        QReal('FG Phase', ch=1, value=0, unit='deg',
-            set_cmd = 'FGEN:CHAN%(ch)d:PHAS %(value)f',
-            get_cmd = 'FGEN:CHAN%(ch)d:PHAS?'),
-
-        QReal('FG Frequency', ch=1, value=1e6, unit='Hz',
-            set_cmd = 'FGEN:CHAN%(ch)d:FREQ %(value)f%(unit)s',
-            get_cmd = 'FGEN:CHAN%(ch)d:FREQ?'),
-
-        QReal('FG Period', ch=1, unit='s',
+        QReal('FG Offset',
+              ch=1,
+              value=0,
+              unit='V',
+              set_cmd='FGEN:CHAN%(ch)d:OFFS %(value)f%(unit)s',
+              get_cmd='FGEN:CHAN%(ch)d:OFFS?'),
+        QReal('FG Phase',
+              ch=1,
+              value=0,
+              unit='deg',
+              set_cmd='FGEN:CHAN%(ch)d:PHAS %(value)f',
+              get_cmd='FGEN:CHAN%(ch)d:PHAS?'),
+        QReal('FG Frequency',
+              ch=1,
+              value=1e6,
+              unit='Hz',
+              set_cmd='FGEN:CHAN%(ch)d:FREQ %(value)f%(unit)s',
+              get_cmd='FGEN:CHAN%(ch)d:FREQ?'),
+        QReal(
+            'FG Period',
+            ch=1,
+            unit='s',
             # 周期与频率绑定，无法设置周期，但可读
-            set_cmd ='',
-            get_cmd = 'FGEN:CHAN%(ch)d:PER?'),
+            set_cmd='',
+            get_cmd='FGEN:CHAN%(ch)d:PER?'),
 
         # DC Level Range: –250 mV to 250 mV
-        QReal('FG DC', ch=1, value=0, unit='V',
-            set_cmd = 'FGEN:CHAN%(ch)d:DCL %(value)f%(unit)s',
-            get_cmd = 'FGEN:CHAN%(ch)d:DCL?'),
-
-        QReal('FG High', ch=1, value=0.25, unit='V',
-            set_cmd = 'FGEN:CHAN%(ch)d:HIGH %(value)f%(unit)s',
-            get_cmd = 'FGEN:CHAN%(ch)d:HIGH?'),
-
-        QReal('FG Low', ch=1, value=-0.25, unit='V',
-            set_cmd = 'FGEN:CHAN%(ch)d:LOW %(value)f%(unit)s',
-            get_cmd = 'FGEN:CHAN%(ch)d:LOW?'),
+        QReal('FG DC',
+              ch=1,
+              value=0,
+              unit='V',
+              set_cmd='FGEN:CHAN%(ch)d:DCL %(value)f%(unit)s',
+              get_cmd='FGEN:CHAN%(ch)d:DCL?'),
+        QReal('FG High',
+              ch=1,
+              value=0.25,
+              unit='V',
+              set_cmd='FGEN:CHAN%(ch)d:HIGH %(value)f%(unit)s',
+              get_cmd='FGEN:CHAN%(ch)d:HIGH?'),
+        QReal('FG Low',
+              ch=1,
+              value=-0.25,
+              unit='V',
+              set_cmd='FGEN:CHAN%(ch)d:LOW %(value)f%(unit)s',
+              get_cmd='FGEN:CHAN%(ch)d:LOW?'),
 
         #coupling mode: DIR, DCAM, AC
-        QOption('FG Path', ch=1, value='Direct',
-            set_cmd = 'FGEN:CHAN%(ch)d:PATH %(option)s',
-            get_cmd = 'FGEN:CHAN%(ch)d:PATH?',
-            options = [('Direct','DIR'),
-                       ('DCAmplified','DCAM'),
-                       ('AC','AC'),
+        QOption('FG Path',
+                ch=1,
+                value='Direct',
+                set_cmd='FGEN:CHAN%(ch)d:PATH %(option)s',
+                get_cmd='FGEN:CHAN%(ch)d:PATH?',
+                options=[
+                    ('Direct', 'DIR'),
+                    ('DCAmplified', 'DCAM'),
+                    ('AC', 'AC'),
                 ]),
     ]
 
     def performOpen(self):
         self.waveform_list = self.get_waveform_list()
-        try: #没有sequence模块的仪器会产生一个错误
+        try:  #没有sequence模块的仪器会产生一个错误
             self.sequence_list = self.get_sequence_list()
         except:
             self.sequence_list = None
@@ -173,7 +204,6 @@ class Driver(BaseDriver):
 
     def get_waveform_list(self):
         return self.query('WLIS:LIST?').strip("\"\n' ").split(',')
-
 
     def get_sequence_list(self):
         ret = []
@@ -199,7 +229,7 @@ class Driver(BaseDriver):
             self.write('WLIS:WAV:DEL "%s"; *WAI;' % name)
             self.waveform_list = self.get_waveform_list()
 
-    def get_waveform_length(self,name):
+    def get_waveform_length(self, name):
         size = int(self.query('WLIS:WAV:LENGTH? "%s"' % name))
         return size
 
@@ -258,14 +288,22 @@ class Driver(BaseDriver):
     #                              is_big_endian=False,
     #                              termination=None, encoding=None)
 
-    def _update_waveform_float(self, points, name='ABS', IQ='I', start=0, size=None):
+    def _update_waveform_float(self,
+                               points,
+                               name='ABS',
+                               IQ='I',
+                               start=0,
+                               size=None):
         message = 'WLIST:WAVEFORM:DATA:%s "%s",%d,' % (IQ, name, start)
         if size is not None:
             message = message + ('%d,' % size)
-        values = points.clip(-1,1)
-        self.write_binary_values(message, values, datatype=u'f',
+        values = points.clip(-1, 1)
+        self.write_binary_values(message,
+                                 values,
+                                 datatype=u'f',
                                  is_big_endian=False,
-                                 termination=None, encoding=None)
+                                 termination=None,
+                                 encoding=None)
 
     # def update_marker(self, name, mk1, mk2=None, mk3=None, mk4=None, start=0, size=None):
     #     def format_marker_data(markers, bits):
@@ -331,7 +369,8 @@ class Driver(BaseDriver):
     def use_sequence(self, name, ch=1, track=1, type=None):
         '''type: I or Q'''
         if type is not None:
-            self.write('SOUR%d:CASS:SEQ "%s", %d, %s' % (ch, name, track, type))
+            self.write('SOUR%d:CASS:SEQ "%s", %d, %s' %
+                       (ch, name, track, type))
         else:
             self.write('SOUR%d:CASS:SEQ "%s", %d' % (ch, name, track))
         self.write('*WAI;')
