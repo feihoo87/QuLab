@@ -5,6 +5,7 @@ from qulab._config import config, config_dir
 from qulab.dht.network import Server as DHT
 from qulab.dht.network import cfg as DHT_config
 from qulab.dht.utils import digest
+from qulab.exceptions import QuLabRPCError, QuLabRPCTimeout
 from qulab.rpc import ZMQClient, ZMQServer
 from qulab.utils import getHostIP, getHostIPv6
 
@@ -84,7 +85,81 @@ def unmount(path):
     pass
 
 
+class RemoteMethod:
+    def __init__(self, name, connection):
+        self.name = name
+        self.connection = connection
+
+    def __call__(self, *args, **kw):
+        return self.connection._remoteCall(self.name, args, kw)
+
+    def __getattr__(self, name):
+        return RemoteMethod(f"{self.name}.{name}", self.connection)
+
+
+class Connection:
+    _zmq_client_table = {}
+
+    def __init__(self, path, loop):
+        self.path = path
+        self.loop = loop
+        self.zmq_client = None
+
+    def __getattr__(self, name):
+        return RemoteMethod(name, self)
+
+    async def _remoteCall(self, method, args, kw):
+        if self.zmq_client is None:
+            await self.connect()
+        try:
+            return await self.zmq_client.remoteCall(self.zmq_client.addr,
+                                                    method, args, kw)
+        except QuLabRPCTimeout:
+            await self.connect()
+            return await self.zmq_client.remoteCall(self.zmq_client.addr,
+                                                    method, args, kw)
+
+    async def _connect(self):
+        dht = await getDHT()
+        addr = await dht.get(self.path)
+        if addr is None:
+            raise QuLabRPCError(f"Unknow RPC path {self.path}.")
+        return ZMQClient(addr, loop=self.loop)
+
+    async def connect(self):
+        if self.path not in Connection._zmq_client_table:
+            Connection._zmq_client_table[self.path] = await self._connect()
+
+        retry = 0
+        while retry < 3:
+            if not await Connection._zmq_client_table[self.path].ping():
+                Connection._zmq_client_table[self.path] = await self._connect()
+            else:
+                break
+            retry += 1
+        else:
+            raise QuLabRPCError(f'Can not connect to {self.path}')
+
+        self.zmq_client = Connection._zmq_client_table[self.path]
+
+    def close(self):
+        self.zmq_client.__del__()
+        if self.path in Connection._zmq_client_table:
+            del Connection._zmq_client_table[self.path]
+
+    @classmethod
+    def close_all(cls):
+        for c in cls._zmq_client_table.values():
+            try:
+                c.close()
+            except:
+                pass
+        cls._zmq_client_table = {}
+
+
 async def connect(path, *, loop=None):
     dht = await getDHT()
     addr = await dht.get(path)
-    return ZMQClient(addr, loop=loop)
+    if addr is None:
+        raise QuLabRPCError(f'Unknow RPC path {path}.')
+    return Connection(path, loop=loop)

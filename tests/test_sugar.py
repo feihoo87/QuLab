@@ -66,15 +66,59 @@ async def test_mount(server, event_loop):
 
 @pytest.mark.asyncio
 async def test_node(server, event_loop):
+    dht = await getDHT()
     c = await connect('qubit', loop=event_loop)
+    await c.connect()
+    assert c.zmq_client.addr == await dht.get('qubit')
+    assert await c.zmq_client.ping()
     await c.set_tlist(np.linspace(0, 100, 11))
     await c.set_x_channel('ch1')
     x, y = await c.getT1()
     assert len(x) == 11
     wav = await c.x_channel.get_wav()
     x = np.linspace(-5000, 5000, 10001)
+
     def f(x, sigma):
         return np.exp(-(x / sigma)**2)
+
     y = f(x - 100, sigma=20)
     assert len(wav) == 10001
-    assert np.all(y==wav)
+    assert np.all(y == wav)
+    c.close_all()
+
+
+@pytest.mark.asyncio
+async def test_reconnect(server, event_loop):
+    s1, s2 = server
+
+    await asyncio.sleep(0.1)
+
+    c = await connect('qubit', loop=event_loop)
+    await c.set_x_channel('ch1')
+
+    await c.set_tlist(np.linspace(0, 100, 11))
+    await c.set_x_channel('ch1')
+    x, y = await c.getT1()
+    assert len(x) == 11
+    wav = await c.x_channel.get_wav()
+    x = np.linspace(-5000, 5000, 10001)
+
+    def f(x, sigma):
+        return np.exp(-(x / sigma)**2)
+
+    y = f(x - 100, sigma=20)
+    assert len(wav) == 10001
+    assert np.all(y == wav)
+
+    s1.close()
+
+    with pytest.raises(QuLabRPCError):
+        await c.set_x_channel('ch1')
+
+    s1 = await mount(Qubit(), 'qubit', loop=event_loop)
+    await asyncio.sleep(0.1)
+    await c.set_x_channel('ch1')
+    wav = await c.x_channel.get_wav()
+    assert np.all(y == wav)
+
+    c.close_all()
