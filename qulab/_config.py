@@ -52,9 +52,11 @@ def default_config():
     }  # yapf : disable
 
 
-def create_config_file():
+def create_config_file(config=None):
+    if config is None:
+        config = default_config()
     config_dir().mkdir(parents=True, exist_ok=True)
-    config_file().write_text(yaml.dump(default_config()))
+    config_file().write_text(yaml.dump(config))
 
 
 if config_file().exists():
