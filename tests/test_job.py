@@ -1,20 +1,22 @@
 import asyncio
+import inspect
 
 import numpy as np
 import pytest
 
+from qulab import config
 from qulab.job import Job
 from qulab.storage.schema import Record
-import inspect
 
 
 @pytest.fixture
 def mongo_db():
+    config['db']['mongodb'] = 'mongodb://localhost:27017/qulabtestdb'
     from qulab.storage.connect import get_connection
     conn = get_connection()
-    conn.drop_database('lab')
+    conn.drop_database('qulabtestdb')
     yield
-    conn.drop_database('lab')
+    conn.drop_database('qulabtestdb')
 
 
 async def mw(flist):
