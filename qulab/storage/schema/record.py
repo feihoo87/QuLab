@@ -20,6 +20,7 @@ class Record(Document):
     tags = ListField(StringField(max_length=50))
     datafield = FileField(collection_name='data')
     imagefield = FileField(collection_name='images')
+    work = ReferenceField('CodeSnippet')
     notebook = ReferenceField('Notebook')
     notebook_index = IntField(min_value=0)
 

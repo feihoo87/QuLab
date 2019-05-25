@@ -7,7 +7,7 @@ from IPython.display import display
 from qulab.bootstrap import (get_current_notebook, get_inputCells,
                              save_inputCells)
 from qulab.storage.connect import require_db
-from qulab.storage.schema import Record
+from qulab.storage.schema import Record, createCodeSnippet
 from qulab.ui.progressbar import ProgressBar
 
 
@@ -76,6 +76,8 @@ class DataCollector:
         record = Record(title=self.title,
                         tags=self.tags,
                         comment=self.comment,
+                        work=createCodeSnippet(inspect.getsource(
+                            self.job.work)),
                         hidden=False if self.job.parent is None else True,
                         notebook=get_current_notebook(),
                         notebook_index=len(get_inputCells()) - 1)
