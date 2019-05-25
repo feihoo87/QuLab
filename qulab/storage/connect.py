@@ -1,36 +1,37 @@
 import functools
 
-from mongoengine.connection import connect, disconnect
+from mongoengine.connection import connect as _connect
+from mongoengine.connection import disconnect as _disconnect
 
 from qulab._config import config
 
-__connected = False
+__connection = None
 
 
-def _connect_db():
-    global __connected
-    if __connected:
+def connect():
+    global __connection
+    if __connection is not None:
         return
     uri = config['db']['mongodb']
-    connect(host=uri)
-    __connected = True
+    __connection = _connect(host=uri)
 
 
-def _disconnect_db():
-    global __connected
-    if __connected:
-        disconnect()
-        __connected = False
+def disconnect():
+    global __connection
+    if __connection is not None:
+        _disconnect()
+        __connection = None
 
 
-def connect_db():
-    _connect_db()
+def get_connection():
+    connect()
+    return __connection
 
 
 def require_db(func):
     @functools.wraps(func)
     def wrapper(*args, **kwds):
-        _connect_db()
+        connect()
         return func(*args, **kwds)
 
     return wrapper
