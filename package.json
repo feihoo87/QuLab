@@ -1,0 +1,33 @@
+{
+  "name": "testts",
+  "version": "1.0.0",
+  "description": "test",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "feihoo87",
+  "license": "MIT",
+  "dependencies": {
+    "@types/plotly.js": "^1.43.1",
+    "@types/react": "^16.8.3",
+    "@types/react-dom": "^16.8.1",
+    "@types/react-plotly.js": "^2.2.2",
+    "@types/react-redux": "^7.0.1",
+    "plotly.js": "^1.44.4",
+    "react": "^16.8.2",
+    "react-dom": "^16.8.2",
+    "react-plotly.js": "^2.2.0",
+    "react-redux": "^6.0.1",
+    "redux": "^4.0.1"
+  },
+  "devDependencies": {
+    "awesome-typescript-loader": "^5.2.1",
+    "html-webpack-plugin": "^3.2.0",
+    "source-map-loader": "^0.2.4",
+    "typescript": "^3.3.3",
+    "webpack": "^4.32.2",
+    "webpack-cli": "^3.3.2",
+    "webpack-dev-server": "^3.1.14"
+  }
+}
