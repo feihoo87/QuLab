@@ -1,12 +1,16 @@
+import logging
 import time
 from collections import deque
 
 import numpy as np
+
 from qulab import BaseDriver
 
 from .AlazarTechWrapper import (AlazarTechDigitizer, AutoDMA, DMABufferArray,
                                 configure)
 from .exception import AlazarTechError
+
+log = logging.getLogger(__name__)
 
 
 def getSamplesPerRecode(numOfPoints):
@@ -85,7 +89,8 @@ class Driver(BaseDriver):
         queue = deque(maxlen=maxlen)
         n = e.shape[0]
 
-        while True:
+        retry = 0
+        while retry < 3:
             try:
                 for chA, chB in self._aquireData(samplesPerRecord,
                                                  repeats=repeats,
@@ -93,7 +98,8 @@ class Driver(BaseDriver):
                                                  recordsPerBuffer=1,
                                                  timeout=1):
                     if fft:
-                        queue.append([chA[:n].dot(e).T / n, chB[:n].dot(e).T / n])
+                        queue.append(
+                            [chA[:n].dot(e).T / n, chB[:n].dot(e).T / n])
                     else:
                         queue.append([chA[:n], chB[:n]])
                     if len(queue) >= queue.maxlen:
@@ -103,12 +109,15 @@ class Driver(BaseDriver):
                 else:
                     return np.asanyarray(queue)
             except AlazarTechError as err:
-                print('\n', err)
+                log.exception(err.msg)
                 if err.code == 518:
                     raise SystemExit(2)
                 else:
                     pass
             time.sleep(0.1)
+            retry += 1
+        else:
+            raise SystemExit(1)
 
     def getIQ(self, avg=False):
         return self.getData(True, avg)
