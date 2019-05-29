@@ -13,5 +13,5 @@ scripts = [
 ]
 
 for cmd in scripts:
-    os.system('cmd /c start %s %s\\%s' % (sys.executable, cmd))
+    os.system('cmd /c start %s -m %s' % (sys.executable, cmd))
     time.sleep(1)
