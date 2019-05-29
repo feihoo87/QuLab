@@ -35,6 +35,7 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     import subprocess
+    import sys
 
     parser = argparse.ArgumentParser(description='Run an instrument server.')
     parser.add_argument('--address', '-a', help='instrument address')
