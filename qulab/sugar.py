@@ -159,6 +159,8 @@ class Connection:
 
 async def connect(path, *, loop=None):
     dht = await getDHT()
+    if isinstance(path, Connection):
+        path = path.path
     addr = await dht.get(path)
     if addr is None:
         raise QuLabRPCError(f'Unknow RPC path {path}.')
