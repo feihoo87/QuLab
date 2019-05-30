@@ -20,11 +20,13 @@ def getSamplesPerRecode(numOfPoints):
     return samplesPerRecord
 
 
-def getExpArray(f_list, numOfPoints, sampleRate=1e9):
+def getExpArray(f_list, numOfPoints, weight=None, sampleRate=1e9):
     e = []
     t = np.arange(0, numOfPoints, 1) / sampleRate
+    if weight is None:
+        weight = np.ones(numOfPoints)
     for f in f_list:
-        e.append(np.exp(-1j * 2 * np.pi * f * t))
+        e.append(weight * np.exp(-1j * 2 * np.pi * f * t))
     return np.asarray(e).T
 
 
@@ -35,6 +37,7 @@ class Driver(BaseDriver):
         self.config = dict(n=1024,
                            sampleRate=1e9,
                            f_list=[50e6],
+                           weight=None,
                            repeats=512,
                            maxlen=512,
                            ARange=1.0,
@@ -44,8 +47,10 @@ class Driver(BaseDriver):
                            triggerTimeout=0,
                            bufferCount=512)
         self.config['e'] = getExpArray(self.config['f_list'], self.config['n'],
+                                       self.config['weight'],
                                        self.config['sampleRate'])
         self.config['samplesPerRecord'] = getSamplesPerRecode(self.config['n'])
+        configure(self.dig, **self.config)
 
     def set(self, **cmd):
         if 'n' in cmd:
@@ -53,9 +58,10 @@ class Driver(BaseDriver):
 
         self.config.update(cmd)
 
-        if any(key in ['f_list', 'n', 'sampleRate'] for key in cmd):
+        if any(key in ['f_list', 'n', 'weight', 'sampleRate'] for key in cmd):
             self.config['e'] = getExpArray(self.config['f_list'],
                                            self.config['n'],
+                                           self.config['weight'],
                                            self.config['sampleRate'])
 
         if any(key in [
