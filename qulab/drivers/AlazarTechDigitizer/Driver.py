@@ -31,7 +31,7 @@ def getExpArray(f_list, numOfPoints, weight=None, sampleRate=1e9):
 
 
 class Driver(BaseDriver):
-    def __init__(self, systemID=1, boardID=1, **kw):
+    def __init__(self, systemID=1, boardID=1, config=None, **kw):
         super().__init__(**kw)
         self.dig = AlazarTechDigitizer(systemID, boardID)
         self.config = dict(n=1024,
@@ -50,6 +50,8 @@ class Driver(BaseDriver):
                                        self.config['weight'],
                                        self.config['sampleRate'])
         self.config['samplesPerRecord'] = getSamplesPerRecode(self.config['n'])
+        if config is not None:
+            self.set(**config)
         configure(self.dig, **self.config)
 
     def set(self, **cmd):
