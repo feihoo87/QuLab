@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
                        RPCServerMixin):
-    def __init__(self, source_node, storage, ksize, waitTimeout=1, loop=None):
+    def __init__(self, source_node, storage, ksize, waitTimeout=0.1, loop=None):
         """
         @param waitTimeout: Consider it a connetion failure if no response
         within this time window.
