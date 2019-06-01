@@ -25,7 +25,9 @@ async def start(args):
         ins = rm.open_resource(args.address)
         info['ins'] = ins
     if args.store_config:
-        info['config'] = pickle.loads(await dht.get(args.name + '_config'))
+        buff = await dht.get(args.name + '_config')
+        if buff is not None:
+            info['config'] = pickle.loads(buff)
     dev = Driver(**info)
     if args.store_config:
         asyncio.ensure_future(save_config(dht, dev, args.name + '_config'))
