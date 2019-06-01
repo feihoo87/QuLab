@@ -247,6 +247,10 @@ class RPCServerMixin(RPCMixin):
             raise QuLabRPCError("Could not read packet: %r" % msg)
         return method, args, kw
 
+    @property
+    def executor(self):
+        return None
+
     @abstractmethod
     def getRequestHandler(self, methodNane, source, msgID):
         """
@@ -277,7 +281,8 @@ class RPCServerMixin(RPCMixin):
             func = self.getRequestHandler(method, source=source, msgID=msgID)
             if 'timeout' in kw and not acceptArg(func, 'timeout'):
                 del kw['timeout']
-            result = func(*args, **kw)
+            result = await self.loop.run_in_executor(
+                self.executor, functools.partial(func, *args, **kw))
             if isinstance(result, Awaitable):
                 result = await result
         except QuLabRPCError as e:
