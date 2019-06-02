@@ -8,32 +8,32 @@ from qulab.dht.protocol import KademliaProtocol
 
 
 @pytest.mark.asyncio
-async def test_save_state(bootstrap_node, tmp_path):
+async def test_save_state(bootstrap_nodes, tmp_path):
     server = Server()
     state_file = tmp_path / 'state.dat'
     port = await server.listen_on_random_port()
-    assert port != bootstrap_node[1]
-    await server.bootstrap([bootstrap_node])
-    assert server.bootstrappable_neighbors() == [bootstrap_node]
+    assert port != bootstrap_nodes[0][1]
+    await server.bootstrap(bootstrap_nodes)
+    assert server.bootstrappable_neighbors() == bootstrap_nodes
     server.save_state_regularly(state_file)
     assert state_file.exists()
     data = pickle.loads(state_file.read_bytes())
     assert data['id'] == server.node.id
-    assert data['neighbors'] == [bootstrap_node]
+    assert data['neighbors'] == bootstrap_nodes
     server.stop()
 
     server = Server.load_state(state_file)
     await asyncio.sleep(0.1)
-    assert server.bootstrappable_neighbors() == [bootstrap_node]
+    assert server.bootstrappable_neighbors() == bootstrap_nodes
     server.stop()
     state_file.unlink()
 
 
 @pytest.mark.asyncio
-async def test_storing(bootstrap_node):
+async def test_storing(bootstrap_nodes):
     server = Server()
     port = await server.listen_on_random_port()
-    await server.bootstrap([bootstrap_node])
+    await server.bootstrap(bootstrap_nodes)
 
     await server.set('key', 'value')
     result = await server.get('key')
@@ -50,7 +50,7 @@ async def test_storing(bootstrap_node):
 
     server = Server()
     port = await server.listen_on_random_port()
-    await server.bootstrap([bootstrap_node])
+    await server.bootstrap(bootstrap_nodes)
     result = await server.get('key')
     assert result == 'value'
     result = await server.get('hello')
