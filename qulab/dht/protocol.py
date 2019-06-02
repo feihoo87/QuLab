@@ -21,7 +21,7 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
         """
         self.set_timeout(waitTimeout)
         self.transport = None
-        self._loop = asyncio.get_event_loop() if loop is None else loop
+        self._loop = loop or asyncio.get_running_loop()
         self.router = RoutingTable(self, ksize, source_node)
         self.storage = storage
         self.source_node = source_node
