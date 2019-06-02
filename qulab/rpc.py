@@ -1,11 +1,14 @@
 import asyncio
 import functools
+import inspect
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable
+from concurrent.futures import ThreadPoolExecutor
 
 import zmq
 import zmq.asyncio
+
 from qulab.exceptions import (QuLabRPCError, QuLabRPCServerError,
                               QuLabRPCTimeout)
 from qulab.serialize import pack, unpack
@@ -281,8 +284,11 @@ class RPCServerMixin(RPCMixin):
             func = self.getRequestHandler(method, source=source, msgID=msgID)
             if 'timeout' in kw and not acceptArg(func, 'timeout'):
                 del kw['timeout']
-            result = await self.loop.run_in_executor(
-                self.executor, functools.partial(func, *args, **kw))
+            if inspect.iscoroutinefunction(func):
+                result = await func(*args, **kw)
+            else:
+                result = await self.loop.run_in_executor(
+                    self.executor, functools.partial(func, *args, **kw))
             if isinstance(result, Awaitable):
                 result = await result
         except QuLabRPCError as e:
@@ -301,6 +307,15 @@ class ZMQServer(RPCServerMixin):
         self._port = 0
         self._loop = loop or asyncio.get_running_loop()
         self._module = None
+        self._executor = None
+
+    @property
+    def executor(self):
+        #if self._executor is None:
+        #    self._executor = ThreadPoolExecutor(
+        #        initializer=lambda loop: asyncio.set_event_loop(loop),
+        #        initargs=(self.loop, ))
+        return self._executor
 
     def set_module(self, mod):
         self._module = mod
@@ -332,6 +347,8 @@ class ZMQServer(RPCServerMixin):
         self.zmq_main_task = asyncio.ensure_future(self.run(), loop=self.loop)
 
     def stop(self):
+        if self._executor is not None:
+            self._executor.shutdown()
         if self.zmq_main_task is not None and not self.zmq_main_task.done():
             self.zmq_main_task.cancel()
         super().stop()
