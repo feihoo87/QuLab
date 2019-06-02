@@ -57,7 +57,7 @@ def saveDHTNodes():
     nodes.append((getHostIP(), __dht.port))
     kad.write_text('\n'.join(
         ["kad://%s:%d" % (node[0], node[1]) for node in set(nodes)]))
-    loop = asyncio.get_running_loop()
+    loop = asyncio.get_event_loop()
     loop.call_later(600, saveDHTNodes)
 
 
