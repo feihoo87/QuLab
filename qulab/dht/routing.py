@@ -117,7 +117,7 @@ class TableTraverser:
 
 
 class RoutingTable:
-    def __init__(self, protocol, ksize, node):
+    def __init__(self, protocol, ksize, node, loop=None):
         """
         @param node: The node that represents this server.  It won't
         be added to the routing table, but will be needed later to
@@ -126,6 +126,7 @@ class RoutingTable:
         self.node = node
         self.protocol = protocol
         self.ksize = ksize
+        self.loop = loop
         self.flush()
 
     def flush(self):
@@ -166,7 +167,7 @@ class RoutingTable:
             self.split_bucket(index)
             self.add_contact(node)
         else:
-            asyncio.ensure_future(self.protocol.call_ping(bucket.head()))
+            asyncio.ensure_future(self.protocol.call_ping(bucket.head()), self.loop)
 
     def get_bucket_for(self, node):
         """

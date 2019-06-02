@@ -22,7 +22,7 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
         self.set_timeout(waitTimeout)
         self.transport = None
         self._loop = loop or asyncio.get_running_loop()
-        self.router = RoutingTable(self, ksize, source_node)
+        self.router = RoutingTable(self, ksize, source_node, loop=self._loop)
         self.storage = storage
         self.source_node = source_node
 
@@ -153,7 +153,7 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
                 first = neighbors[0].distance_to(keynode)
                 this_closest = self.source_node.distance_to(keynode) < first
             if not neighbors or (new_node_close and this_closest):
-                asyncio.ensure_future(self.call_store(node, key, value))
+                asyncio.ensure_future(self.call_store(node, key, value), loop=self.loop)
         self.router.add_contact(node)
 
     def handle_call_response(self, result, node):
