@@ -14,17 +14,17 @@ async def test_save_state(bootstrap_nodes, tmp_path):
     port = await server.listen_on_random_port()
     assert port != bootstrap_nodes[0][1]
     await server.bootstrap(bootstrap_nodes)
-    assert server.bootstrappable_neighbors() == bootstrap_nodes
+    assert set(server.bootstrappable_neighbors()) == set(bootstrap_nodes)
     server.save_state_regularly(state_file)
     assert state_file.exists()
     data = pickle.loads(state_file.read_bytes())
     assert data['id'] == server.node.id
-    assert data['neighbors'] == bootstrap_nodes
+    assert set(data['neighbors']) == set(bootstrap_nodes)
     server.stop()
 
     server = Server.load_state(state_file)
     await asyncio.sleep(0.1)
-    assert server.bootstrappable_neighbors() == bootstrap_nodes
+    assert set(server.bootstrappable_neighbors()) == set(bootstrap_nodes)
     server.stop()
     state_file.unlink()
 
