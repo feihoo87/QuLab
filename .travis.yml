@@ -20,6 +20,7 @@ matrix:
         - brew install mongodb
         - brew services start redis
         - brew services start mongodb
+        - pip3 install -U pip
     - name: "Python on Windows"
       os: windows
       language: shell
@@ -28,8 +29,10 @@ matrix:
         - choco install mongodb
         - choco install redis-64
         - start redis-server
+        - pip3 install --user -U pip
         - pip3 install --user coveralls
         - pip3 install --user pytest
+        - pip3 install --user setuptools twine wheel
       env: PATH=/c/Python37:/c/Python37/Scripts:/c/Users/travis/AppData/Roaming/Python/Python37/Scripts:/c/ProgramData/chocolatey/lib/redis-64:$PATH
       after_script:
         - redis-cli shutdown
