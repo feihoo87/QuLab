@@ -42,3 +42,17 @@ def test_acceptArg():
         pass
 
     assert acceptArg(f5, 'x')
+
+
+def test_retry():
+    n = 0
+
+    @retry(Exception)
+    def f():
+        nonlocal n
+        n += 1
+        if n < 2:
+            raise Exception('try more times')
+        return 1
+    
+    assert f() == 1
