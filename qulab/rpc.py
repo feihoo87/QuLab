@@ -305,7 +305,7 @@ class ZMQServer(RPCServerMixin):
         self.zmq_ctx = None
         self.zmq_socket = None
         self._port = 0
-        self._loop = loop or asyncio.get_running_loop()
+        self._loop = loop or asyncio.get_event_loop()
         self._module = None
         self._executor = None
 
@@ -378,7 +378,7 @@ class ZMQRPCCallable:
 
 class ZMQClient(RPCClientMixin):
     def __init__(self, addr, timeout=1, loop=None):
-        self._loop = loop or asyncio.get_running_loop()
+        self._loop = loop or asyncio.get_event_loop()
         self.set_timeout(timeout)
         self.addr = addr
         self._ctx = zmq.asyncio.Context()
