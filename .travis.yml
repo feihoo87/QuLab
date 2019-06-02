@@ -7,10 +7,12 @@ matrix:
     - name: "Python 3.6 on Linux"
       os: linux
       python: 3.6
+      env: DEPLOY=yes
     - name: "Python 3.7 on Xenial Linux"
       os: linux
       python: 3.7
       dist: xenial
+      env: DEPLOY=yes
     - name: "Python on macOS"
       os: osx
       osx_image: xcode10.2
@@ -32,7 +34,6 @@ matrix:
         - pip3 install --user -U pip
         - pip3 install --user coveralls
         - pip3 install --user pytest
-        - pip3 install --user setuptools twine wheel
       env: PATH=/c/Python37:/c/Python37/Scripts:/c/Users/travis/AppData/Roaming/Python/Python37/Scripts:/c/ProgramData/chocolatey/lib/redis-64:$PATH
       after_script:
         - redis-cli shutdown
@@ -56,6 +57,7 @@ deploy:
   on:
     branch: master
     tags: true
+    condition: $DEPLOY = yes
   skip_existing: true
   skip_cleanup: true
   distributions: "sdist bdist_wheel"
