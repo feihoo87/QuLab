@@ -27,6 +27,7 @@ requirements = [
     'PyYAML>=5.1',
     'pyzmq>=18.0.1',
     'redis>=3.2.1',
+    'contextvars;python_version<"3.7"',
 ]
 
 if platform.system() == 'Windows':

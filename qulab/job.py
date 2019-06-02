@@ -1,3 +1,4 @@
+import contextvars
 import inspect
 
 import ipywidgets as widgets
@@ -98,9 +99,10 @@ class DataCollector:
         return data
 
 
-class Job:
-    _running_jobs = []
+current_job = contextvars.ContextVar('current_job')
 
+
+class Job:
     def __init__(self,
                  work,
                  args=(),
@@ -112,7 +114,8 @@ class Job:
                  auto_save=None,
                  no_bar=False):
         title = work.__name__ if title is None else title
-        self.parent = Job.current_job()
+        self.ctx = contextvars.copy_context()
+        self.parent = self.ctx.get(current_job, None)
         if auto_save is None:
             self.auto_save = True if self.parent is None else False
         else:
@@ -139,7 +142,7 @@ class Job:
         pass
 
     async def done(self):
-        Job._running_jobs.append(self)
+        current_job.set(self)
         with self.out, self.bar:
             self.data.clear()
             self._setUp()
@@ -149,7 +152,7 @@ class Job:
                     self.data.save()
                 self.bar.next()
             self._tearDown()
-        Job._running_jobs.remove(self)
+            
         if self.parent is not None:
             self.out.close()
         return self.data.result()
@@ -159,10 +162,3 @@ class Job:
             self.out.close()
         except:
             pass
-
-    @classmethod
-    def current_job(cls):
-        if len(cls._running_jobs) > 0:
-            return cls._running_jobs[-1]
-        else:
-            return None
