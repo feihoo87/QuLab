@@ -114,6 +114,7 @@ class ContextMeta(type):
 class Context(metaclass=ContextMeta):
     def __init__(self):
         self._data = IMap()
+        self._name = None
 
     def copy(self):
         new = Context()
@@ -137,6 +138,7 @@ class Context(metaclass=ContextMeta):
             yield name, var
 
     async def save_as(self, key):
+        self._name = key
         dht = await getDHT()
         await dht.set(key, self._data._op_id)
 
@@ -144,6 +146,7 @@ class Context(metaclass=ContextMeta):
     async def load(key):
         dht = await getDHT()
         ctx = Context()
+        ctx._name = key
         ctx._data._op_id = await dht.get(key)
         set_context(ctx)
         return ctx
@@ -198,6 +201,8 @@ class ContextVar(metaclass=ContextVarMeta):
 
         updated_data = await data.set(self.name, value)
         ctx._data = updated_data
+        if ctx._name is not None:
+            await ctx.save_as(ctx._name)
         return Token(ctx, self, old_value)
 
     async def reset(self, token):
@@ -215,7 +220,8 @@ class ContextVar(metaclass=ContextVarMeta):
             ctx._data = await ctx._data.delete(token._var.name)
         else:
             ctx._data = await ctx._data.set(token._var.name, token._old_value)
-
+        if ctx._name is not None:
+            await ctx.save_as(ctx._name)
         token._used = True
 
     def __repr__(self):
