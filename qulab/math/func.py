@@ -125,3 +125,11 @@ def Std_of_norm_from_FWHM(FWHM):
     给定正态分布的半高宽，计算其标准差
     '''
     return FWHM / (2 * np.sqrt(2 * np.log(2)))
+
+
+def vonNeumannEntropy(rho):
+    '''
+    冯诺伊曼熵
+    '''
+    r = np.real(np.linalg.eigvals(rho))
+    return np.sum(-r * np.log(r + (r <= 0)))
