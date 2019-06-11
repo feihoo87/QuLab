@@ -1,3 +1,5 @@
+import typing
+from functools import reduce
 from itertools import product
 
 import numpy as np
@@ -75,16 +77,12 @@ def trace(rho, sub_mask=None):
     当给定 sub_mask 时，对指定对子系统求迹
     """
     N = int(np.log2(rho.shape[0]))
-    if sub_mask is None:
-        pass
-    elif isinstance(sub_mask, str):
+    if isinstance(sub_mask, str):
         sub_mask = int(sub_mask, 2)
     elif isinstance(sub_mask, int):
         pass
     elif isinstance(sub_mask, typing.Iterable):
-        sub_mask = int(np.sum(np.power(2, sub_mask)))
-    else:
-        pass
+        sub_mask = reduce(lambda a, b: (a << 1) + b, sub_mask)
 
     if sub_mask is None or sub_mask == (1 << N) - 1:
         return np.trace(rho)
