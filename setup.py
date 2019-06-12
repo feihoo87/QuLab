@@ -22,6 +22,7 @@ requirements = [
     'mongoengine>=0.17.0',
     'numpy>=1.13.3',
     'scipy>=1.0.0',
+    'portalocker>=1.4.0',
     'PyVISA>=1.9.1',
     'PyVISA-py>=0.3.1',
     'PyYAML>=5.1',
