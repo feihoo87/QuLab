@@ -1,6 +1,7 @@
 # QuLab
 [![View build status](https://travis-ci.org/feihoo87/QuLab.svg?branch=master)](https://travis-ci.org/feihoo87/QuLab)
 [![Coverage Status](https://coveralls.io/repos/github/feihoo87/QuLab/badge.svg)](https://coveralls.io/github/feihoo87/QuLab)
+[![Updates](https://pyup.io/repos/github/feihoo87/QuLab/shield.svg)](https://pyup.io/repos/github/feihoo87/QuLab/)
 [![Docs Status](https://readthedocs.org/projects/qulab/badge/?version=latest)](http://qulab.readthedocs.org)
 [![PyPI version](https://badge.fury.io/py/QuLab.svg)](https://badge.fury.io/py/QuLab)
 [![](https://img.shields.io/badge/python-3.6%2C%203.7-brightgreen.svg)]()
