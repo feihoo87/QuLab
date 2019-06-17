@@ -14,9 +14,9 @@ log = logging.getLogger(__name__)
 
 
 def getSamplesPerRecode(numOfPoints):
-    samplesPerRecord = 1
-    while samplesPerRecord < numOfPoints:
-        samplesPerRecord <<= 1
+    samplesPerRecord = (numOfPoints // 64) * 64
+    if samplesPerRecord < numOfPoints:
+        samplesPerRecord += 64
     return samplesPerRecord
 
 
