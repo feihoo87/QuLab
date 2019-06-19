@@ -218,7 +218,7 @@ class Driver(BaseDriver):
         def format_marker_data(markers, bits):
             values = 0
             for i, v in enumerate(markers):
-                v = 0 if v is None else np.asarray(v)
+                v = 0 if v is None else np.asarray(v, dtype=int)
                 values += v << bits[i]
             return values
 
