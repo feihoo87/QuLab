@@ -127,6 +127,9 @@ class Context(metaclass=ContextMeta):
                 "a ContextVar key was expected, got {!r}".format(var))
         return await self._data.get(var.name)
 
+    async def get_by_name(self, name):
+        return await self._data.get(name)
+
     async def has(self, var):
         if not isinstance(var, ContextVar):
             raise TypeError(
