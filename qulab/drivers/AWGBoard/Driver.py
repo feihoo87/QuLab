@@ -5,7 +5,7 @@ from . import AWGboard
 class Driver(BaseDriver):
     def __init__(self, **kw):
         super().__init__(**kw)
-        self.board = AWGboard.AWGboard()
+        self.board = AWGboard.AWGBoard()
         self.board.connect(kw.get('addr'))
         self.board.InitBoard()
         self._output_status = [0, 0, 0, 0]
@@ -31,7 +31,7 @@ class Driver(BaseDriver):
         self.board.wave_compile(ch, wlist, is_continue=is_continue)
         for index, on in enumerate(self._output_status):
             if on:
-                self.Start(index + 1)
+                self.board.Start(index + 1)
 
     def setVpp(self, vpp, ch=1):
         vpp = min(abs(vpp), 1.351)
