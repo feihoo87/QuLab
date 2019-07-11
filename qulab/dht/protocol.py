@@ -162,7 +162,7 @@ class KademliaProtocol(asyncio.DatagramProtocol, RPCClientMixin,
         we get no response, make sure it's removed from the routing table.
         """
         if not result[0]:
-            log.warning("no response from %s, removing from router", node)
+            #log.warning("no response from %s, removing from router", node)
             self.router.remove_contact(node)
             return result
 
