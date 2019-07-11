@@ -1,9 +1,18 @@
 import asyncio
+import logging
 import pickle
 
 from qulab.loader import loadDriver
 from qulab.sugar import getDHT, mount
 from qulab.utils import ShutdownBlocker
+
+
+def setLogger(level=logging.DEBUG):
+    log = logging.getLogger('qulab.driver')
+    log.setLevel(level)
+    ch = logging.StreamHandler()
+    ch.setLevel(level)
+    log.addHandler(ch)
 
 
 async def save_config(dht, dev, key):
@@ -37,6 +46,7 @@ async def start(args):
 
 
 def main(args):
+    setLogger(logging.DEBUG)
     loop = asyncio.get_event_loop()
     asyncio.ensure_future(start(args), loop=loop)
 
