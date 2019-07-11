@@ -61,8 +61,11 @@ def saveDHTNodes():
     loop.call_later(600, saveDHTNodes)
 
 
-async def getDHT():
+async def getDHT(reboot=False):
     global __dht
+    if reboot:
+        __dht.stop()
+        __dht = None
     if __dht is None:
         __dht = DHT()
         await __dht.start(getBootstrapNodes())
