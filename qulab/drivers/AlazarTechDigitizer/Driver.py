@@ -86,8 +86,7 @@ class Driver(BaseDriver):
                      buffers=buffers,
                      recordsPerBuffer=recordsPerBuffer,
                      timeout=timeout) as h:
-            for chA, chB in h.read():
-                yield chA, chB
+            yield from h.read()
 
     def getData(self, fft=False, avg=False):
         samplesPerRecord = self.config['samplesPerRecord']
@@ -115,7 +114,8 @@ class Driver(BaseDriver):
                 if avg:
                     return np.mean(np.asanyarray(queue), axis=0)
                 else:
-                    return np.asanyarray(queue)
+                    ret = np.asanyarray(queue)
+                    return np.asarray([ret[:, 0, :], ret[:, 1, :]])
             except AlazarTechError as err:
                 log.exception(err.msg)
                 if err.code == 518:
