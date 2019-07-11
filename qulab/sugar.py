@@ -115,9 +115,8 @@ class Connection:
             return await self.zmq_client.remoteCall(self.zmq_client.addr,
                                                     method, args, kw)
         except QuLabRPCTimeout:
-            await self.connect()
-            return await self.zmq_client.remoteCall(self.zmq_client.addr,
-                                                    method, args, kw)
+            self.zmq_client = None
+            raise
 
     async def _connect(self):
         dht = await getDHT()
