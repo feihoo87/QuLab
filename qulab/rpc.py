@@ -208,9 +208,9 @@ class RPCMixin(ABC):
 
 
 class RPCClientMixin(RPCMixin):
-    _client_defualt_timeout = 1
+    _client_defualt_timeout = 10
 
-    def set_timeout(self, timeout=1):
+    def set_timeout(self, timeout=10):
         self._client_defualt_timeout = timeout
 
     def remoteCall(self, addr, methodNane, args=(), kw=None):
@@ -377,7 +377,7 @@ class ZMQRPCCallable:
 
 
 class ZMQClient(RPCClientMixin):
-    def __init__(self, addr, timeout=1, loop=None):
+    def __init__(self, addr, timeout=10, loop=None):
         self._loop = loop or asyncio.get_event_loop()
         self.set_timeout(timeout)
         self.addr = addr
