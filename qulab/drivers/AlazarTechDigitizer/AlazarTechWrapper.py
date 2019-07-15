@@ -456,7 +456,7 @@ class AutoDMA:
         self.dig.setRecordSize(0, self.samplesPerRecord)
 
     def before(self):
-        flags = API.ADMA_NPT | API.ADMA_EXTERNAL_STARTCAPTURE
+        flags = API.ADMA_NPT | API.ADMA_EXTERNAL_STARTCAPTURE | API.ADMA_INTERLEAVE_SAMPLES
         if self.buffers is None:
             flags |= API.ADMA_ALLOC_BUFFERS
 
@@ -487,8 +487,8 @@ class AutoDMA:
 
         for data in _read():
             data = data - codeZero
-            chA = scaleA * data[:self.samplesPerRecord * self.recordsPerBuffer]
-            chB = scaleB * data[self.samplesPerRecord * self.recordsPerBuffer:]
+            chA = scaleA * data[0::2]
+            chB = scaleB * data[1::2]
             yield chA, chB
 
     def _read(self):

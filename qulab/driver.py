@@ -258,7 +258,7 @@ class BaseDriver:
     quants = []
     """"""
 
-    def __init__(self, *, ins=None, addr=None, model=None, timeout=3, **kw):
+    def __init__(self, *, ins=None, addr=None, model=None, timeout=10, **kw):
         self.addr = addr
         self.ins = ins
         self.timeout = timeout

@@ -20,6 +20,7 @@ requirements = [
     'ipython>=7.4.0',
     'ipywidgets>=7.4.2',
     'mongoengine>=0.17.0',
+    'nest-asyncio>=1.0.0',
     'numpy>=1.13.3',
     'scipy>=1.0.0',
     'portalocker>=1.4.0',
@@ -29,6 +30,7 @@ requirements = [
     'pyzmq>=18.0.1',
     'redis>=3.2.1',
     'contextvars;python_version<"3.7"',
+    'dataclasses;python_version<"3.7"',
 ]
 
 if platform.system() == 'Windows':

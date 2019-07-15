@@ -4,6 +4,7 @@ cryptography==2.7
 ipython==7.6.0
 ipywidgets==7.4.2
 mongoengine==0.18.2
+nest-asyncio==1.0.0
 numpy==1.16.4
 scipy==1.3.0
 portalocker==1.4.0
@@ -16,3 +17,4 @@ u-msgpack-python==2.5.1
 
 pywin32==224; platform_system=="Windows"
 contextvars==2.4; python_version<"3.7"
+dataclasses; python_version<"3.7"

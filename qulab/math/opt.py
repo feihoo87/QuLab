@@ -1,7 +1,11 @@
+import asyncio
 import functools
 
+import nest_asyncio
 import numpy as np
 from scipy.optimize import minimize
+
+nest_asyncio.apply()
 
 
 def get_initial_simplex(start, senstive=None):
@@ -44,9 +48,17 @@ def optimize(target,
 
     optimizedTargetValue = None
 
+    if asyncio.iscoroutinefunction(target):
+
+        def _target(*x):
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(target(*x))
+    else:
+        _target = target
+
     @functools.lru_cache()
     def cache_target(*x):
-        return target(*x)
+        return _target(*x)
 
     def f(x):
         nonlocal optimizedTargetValue
