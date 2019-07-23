@@ -299,19 +299,24 @@ class AlazarTechDigitizer():
                       BufferLength)
 
 
+def initialize(dig):
+    dig.setCaptureClock(API.EXTERNAL_CLOCK_10MHz_REF, API.SAMPLE_RATE_1GSPS)
+    dig.setBWLimit(API.CHANNEL_A, 0)
+    dig.setBWLimit(API.CHANNEL_B, 0)
+    dig.setExternalTrigger(API.DC_COUPLING)
+    dig.configureAuxIO(API.AUX_OUT_TRIGGER, 0)
+    dig.setParameter(0, API.SET_DATA_FORMAT, API.DATA_FORMAT_UNSIGNED)
+
+
 def configure(
     dig, ARange=1.0, BRange=1.0,
     trigLevel=0.3, triggerDelay=0, triggerTimeout=0,
     bufferCount=1024,
     **kw):
-
-    dig.setCaptureClock(API.EXTERNAL_CLOCK_10MHz_REF, API.SAMPLE_RATE_1GSPS)
     dig.inputControl(API.CHANNEL_A, API.DC_COUPLING, getInputRange(ARange, dig.kind),
                      API.IMPEDANCE_50_OHM)
-    dig.setBWLimit(API.CHANNEL_A, 0)
     dig.inputControl(API.CHANNEL_B, API.DC_COUPLING, getInputRange(BRange, dig.kind),
                      API.IMPEDANCE_50_OHM)
-    dig.setBWLimit(API.CHANNEL_B, 0)
 
     # convert relative level to U8
     maxLevel = 5.0
@@ -321,12 +326,10 @@ def configure(
     dig.setTriggerOperation(API.TRIG_ENGINE_OP_J, API.TRIG_ENGINE_J, API.TRIG_EXTERNAL,
                             API.TRIGGER_SLOPE_POSITIVE, JLevel, API.TRIG_ENGINE_K,
                             API.TRIG_DISABLE, API.TRIGGER_SLOPE_POSITIVE, KLevel)
-    dig.setExternalTrigger(API.DC_COUPLING)
+    
     dig.setTriggerDelay(triggerDelay)
     dig.setTriggerTimeOut(triggerTimeout)
-    dig.configureAuxIO(API.AUX_OUT_TRIGGER, 0)
 
-    dig.setParameter(0, API.SET_DATA_FORMAT, API.DATA_FORMAT_UNSIGNED)
     dig.setParameter(0, API.SETGET_ASYNC_BUFFCOUNT, bufferCount)
 
 

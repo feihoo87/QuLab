@@ -7,7 +7,7 @@ import numpy as np
 from qulab import BaseDriver
 
 from .AlazarTechWrapper import (AlazarTechDigitizer, AutoDMA, DMABufferArray,
-                                configure)
+                                configure, initialize)
 from .exception import AlazarTechError
 
 log = logging.getLogger(__name__)
@@ -52,6 +52,7 @@ class Driver(BaseDriver):
         self.config['samplesPerRecord'] = getSamplesPerRecode(self.config['n'])
         if config is not None:
             self.set(**config)
+        initialize(self.dig)
         configure(self.dig, **self.config)
 
     def set(self, **cmd):
