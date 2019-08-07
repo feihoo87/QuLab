@@ -162,7 +162,6 @@ class AlazarTechDigitizer():
                             Slope2=1,
                             Level2=128):
         """Configure the trigger system.
-
         In general, the trigger level code is given by:
             TriggerLevelCode = 128 + 127 * TriggerLevelVolts / InputRangeVolts.
         """
