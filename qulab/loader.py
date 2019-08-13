@@ -22,11 +22,11 @@ def loadDriver(name):
     location = find_location(name)
     if location is None:
         try:
-            mod = importlib.import_module(f'qulab.drivers.{name}')
+            mod = importlib.import_module(f'qulab.Driver.drivers.{name}')
         except:
             return None
     else:
-        spec = importlib.util.spec_from_file_location(f'qulab.drivers.{name}',
+        spec = importlib.util.spec_from_file_location(f'qulab.Driver.drivers.{name}',
                                                       location)
         mod = importlib.util.module_from_spec(spec)
     return getattr(mod, 'Driver')
