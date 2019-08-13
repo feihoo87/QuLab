@@ -99,17 +99,19 @@ class visaDriver(BaseDriver):
     error_command = 'SYST:ERR?'
     """The SCPI command to query errors."""
 
-    def __init__(self, addr=None, timeout=10, **kw):
+
+    def __init__(self, addr=None, timeout=10, visa_backend='@ni', **kw):
         super(visaDriver, self).__init__(addr, timeout, **kw)
+        self.visa_backend='@ni'
 
     def __repr__(self):
         return 'visaDriver(addr=%s,model=%s)' % (self.addr,self.model)
 
-    def performOpen(self, visa_backend='@ni', **kw):
+    def performOpen(self, **kw):
         try:
             self.handle.open()
         except:
-            rm = visa.ResourceManager(visa_backend)
+            rm = visa.ResourceManager(self.visa_backend)
             self.handle = rm.open_resource(self.addr)
         self.handle.timeout = self.timeout * 1000
         try:
