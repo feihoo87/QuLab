@@ -3,8 +3,9 @@ import time
 from collections import deque
 
 import numpy as np
+import re
 
-from ..base import BaseDriver
+from ...BaseDriver import BaseDriver
 
 from .AlazarTechWrapper import (AlazarTechDigitizer, AutoDMA, DMABufferArray,
                                 configure)
@@ -88,7 +89,7 @@ class Driver(BaseDriver):
 
         if any(key in [
                 'ARange', 'BRange', 'trigLevel', 'triggerDelay',
-                'triggerTimeout'
+                'triggerTimeout','bufferCount',
         ] for key in cmd):
             configure(self.handle, **self.config)
 

@@ -1,5 +1,5 @@
 import numpy as np
-from ..BaseDriver import visaDriver, QInteger, QOption, QReal
+from ..BaseDriver import visaDriver, QInteger, QOption, QReal, QVector
 
 
 class Driver(visaDriver):
@@ -12,12 +12,12 @@ class Driver(visaDriver):
               unit='dBm',
               set_cmd='SOUR:POW %(value)e%(unit)s',
               get_cmd='SOUR:POW?'),
-        QOption('PowerMode',
-                value='OFF',
-                ch=1,
-                set_cmd='SOUR%(ch)s:POW:MODE %(option)s',
-                get_cmd='SOUR%(ch)s:POW:MODE?',
-                options=[('OFF', 'OFF'), ('ON', 'ON')]),
+        # QOption('PowerMode',
+        #         value='OFF',
+        #         ch=1,
+        #         set_cmd='SOUR%(ch)s:POW:MODE %(option)s',
+        #         get_cmd='SOUR%(ch)s:POW:MODE?',
+        #         options=[('OFF', 'OFF'), ('ON', 'ON')]),
         QReal('Bandwidth',
               value=1000,
               unit='Hz',

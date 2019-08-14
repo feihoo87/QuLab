@@ -18,8 +18,8 @@ class BaseDriver(object):
 
     quants = []
 
-    CHs=[]
-    '''Channels list'''
+    CHs=[1,2,3,4]
+    '''Channels list, default is 4 channels'''
 
     def __init__(self, addr=None, timeout=3, **kw):
         self.addr = addr
@@ -38,13 +38,17 @@ class BaseDriver(object):
         self.config = newcfg(self.quants, self.CHs)
         log.info('new config!')
 
-    def set(self,**cfg):
+    def getConfig(self):
+        return self.config
+
+    def set(self, cfg={}, **kw):
+        assert isinstance(cfg,dict)
+        cfg.update(**kw)
         for key in cfg.keys():
             if isinstance(cfg[key],dict):
                 self.setValue(key, **cfg[key])
             else:
                 self.setValue(key, cfg[key])
-        return self
 
     def performOpen(self,**kw):
         pass
@@ -71,7 +75,6 @@ class BaseDriver(object):
             _kw.update(value=value,**kw)
             self.performSetValue(quant, **_kw)
             self.config[name][_kw.pop('ch')].update(_kw) # update config
-            return self
         else:
             raise Error('No such Quantity!')
 
@@ -100,7 +103,7 @@ class visaDriver(BaseDriver):
     """The SCPI command to query errors."""
 
 
-    def __init__(self, addr=None, timeout=10, visa_backend='@ni', **kw):
+    def __init__(self, addr=None, timeout=3, visa_backend='@ni', **kw):
         super(visaDriver, self).__init__(addr, timeout, **kw)
         self.visa_backend='@ni'
 

@@ -2,7 +2,7 @@ import asyncio
 import logging
 import pickle
 
-from qulab.loader import loadDriver
+from qulab.loader_newDriver import loadDriver
 from qulab.sugar import getDHT, mount
 from qulab.utils import ShutdownBlocker
 

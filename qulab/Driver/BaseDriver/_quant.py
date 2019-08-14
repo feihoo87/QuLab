@@ -149,7 +149,7 @@ class QString(Quantity):
 
     def _process_query(self, value):
         '''process the value query from Instrument before final return'''
-        return value.strip("\n\"' ")
+        return value.strip("\n\"' \r")
 
 
 class QOption(Quantity):
@@ -165,7 +165,7 @@ class QOption(Quantity):
 
     def _process_query(self, value):
         '''process the value query from Instrument before final return'''
-        _value = value.strip("\n\"' ")
+        _value = value.strip("\n\"' \r")
         value = self._opts[_value]
         return value
 

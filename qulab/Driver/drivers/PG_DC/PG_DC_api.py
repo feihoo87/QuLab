@@ -38,18 +38,18 @@ class UDPSocketClient:
            ctypes.windll.user32.MessageBoxA(0, ("Failed to Connect IP: " + self.mHost) .encode('gb2312'), 'Error'.encode('gb2312'),0)
        return self.mData
 
-      def setIP(self, IP):
-          self.mHost = str(IP)
-          self.mAddress = (self.mHost, self.mPort)
+    def setIP(self, IP):
+        self.mHost = str(IP)
+        self.mAddress = (self.mHost, self.mPort)
 
-      def setPort(self, port):
-          self.mPort =  int(port)
-          self.mAddress = (self.mHost, self.mPort)
+    def setPort(self, port):
+        self.mPort =  int(port)
+        self.mAddress = (self.mHost, self.mPort)
 
-      def setAddress(self, IP,  port):
-          self.mHost = str(IP)
-          self.mPort = int(port)
-          self.mAddress = (self.mHost, self.mPort)
+    def setAddress(self, IP,  port):
+        self.mHost = str(IP)
+        self.mPort = int(port)
+        self.mAddress = (self.mHost, self.mPort)
 
 
 # class Voltage():
@@ -126,7 +126,7 @@ class Voltage():
         # self.volValue = 1.0
         #
         # # Set channel 1 as default
-        self.SetChannelNum(0)
+        self.SetChannelNum(0,0)
 
     def SetPort(self, port):
         self.gUDPSocketClient.setPort(port)
@@ -165,7 +165,7 @@ class Voltage():
 
     def setVoltage(self,voltage=0,ch=0):
         self.SetChannelNum(ch,0)
-        self.SetDValue(self.CalculateDValue(volt))
+        self.SetDValue(self.CalculateDValue(voltage))
 
     def CalculateVoltage(self,dValue):
         if(dValue >= gDMax):
@@ -180,7 +180,7 @@ class Voltage():
         dValue = round((volValue-self.gVolMin)*(2**20-1)/(self.gVolMax-self.gVolMin))
         return dValue
 
-    def SetChannelNum(self,channelNum, initialized):
+    def SetChannelNum(self,channelNum, initialized=0):
         # set the data length to 4
         self.gUDPSocketClient.setBufSize(4 + 16);
         cmdData  =  struct.pack('2B', 0, 0)  + struct.pack('B', initialized)  + struct.pack('B', channelNum)
