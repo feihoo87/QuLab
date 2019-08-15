@@ -2,7 +2,7 @@
 import time
 import numpy as np
 
-from ..BaseDriver import visaDriver, QInteger, QOption, QReal, QString, QVector
+from qulab.Driver import visaDriver, QInteger, QOption, QReal, QString, QVector
 
 
 # yapf: disable

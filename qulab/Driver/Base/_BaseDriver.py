@@ -3,6 +3,7 @@ import copy
 import logging
 import numpy as np
 import visa
+import struct
 
 from ._quant import QReal, QInteger, QString, QOption, QBool, QVector, QList, newcfg
 
@@ -51,10 +52,10 @@ class BaseDriver(object):
                 self.setValue(key, cfg[key])
 
     def performOpen(self,**kw):
-        pass
+        log.info(f'Open Instrument {self.model}@{self.addr}')
 
     def performClose(self,**kw):
-        pass
+        log.info(f'Close Instrument {self.model}@{self.addr}')
 
     def open(self, **kw):
         self.performOpen(**kw)
@@ -123,11 +124,13 @@ class visaDriver(BaseDriver):
             model = IDN[1].strip()
             version = IDN[3].strip()
             self.model = model
+            log.info(f'Open Instrument {self.model}@{self.addr}')
         except:
             raise Error('query IDN error!')
 
     def performClose(self, **kw):
         self.handle.close()
+        log.info(f'Close Instrument {self.model}@{self.addr}')
 
     def performSetValue(self, quant, value, **kw):
         quant.set(self,value,**kw)

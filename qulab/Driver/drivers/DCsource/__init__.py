@@ -1,5 +1,5 @@
 import logging
-from ..BaseDriver import (BaseDriver, QInteger, QOption, QReal, QVector)
+from qulab.Driver import (BaseDriver, QInteger, QOption, QReal, QVector)
 
 from .VoltageSettingCore import (CalculateDValue, SetChannelNum, SetDefaultIP,
                                  SetDValue)
@@ -8,6 +8,8 @@ log = logging.getLogger('qulab.driver.DCSource')
 
 
 class Driver(BaseDriver):
+
+    CHs=[1,2,3,4]
 
     quants = [
         QReal('Offset', value=0, unit='V', ch=1),
@@ -21,6 +23,7 @@ class Driver(BaseDriver):
 
     def performOpen(self):
         SetDefaultIP(self.addr)
+        super().performOpen()
 
     def setVolt(self, volt, ch=1):
         log.info(f'Set volt of Channel {ch} to {volt}')

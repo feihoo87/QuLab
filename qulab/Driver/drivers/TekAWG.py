@@ -1,10 +1,11 @@
 import numpy as np
 
-from ..BaseDriver import visaDriver, QList, QOption, QReal
+from qulab.Driver import visaDriver, QList, QOption, QReal
 
 
 class Driver(visaDriver):
     support_models = ['AWG5014C', 'AWG5208']
+    CHs=[1,2,3,4]
 
     quants = [
         QReal('Sample Rate',

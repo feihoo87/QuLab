@@ -2,7 +2,7 @@
 import numpy as np
 import logging
 
-from ...BaseDriver import BaseDriver, QInteger, QOption, QReal, QString, QVector
+from qulab.Driver import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
 from .PG_DC_api import Voltage
 
@@ -10,11 +10,12 @@ log = logging.getLogger('qulab.driver.PG_DC')
 
 class Driver(BaseDriver):
     support_models = ['PG_DC']
+
+    CHs=[1,2,3,4]
+
     quants = [
         QReal('Offset', value=0, unit='V', ch=1),
             ]
-    
-    CHs=[1,2,3,4]
 
     def __init__(self, addr, **kw):
         '''
@@ -25,7 +26,7 @@ class Driver(BaseDriver):
 
     def performOpen(self):
         self.handle = Voltage(self.addr)
-        log.info(f'Open PG_DC source!')
+        super().performOpen()
 
     def performSetValue(self, quant, value, ch=1, **kw):
         if quant.name == 'Offset':

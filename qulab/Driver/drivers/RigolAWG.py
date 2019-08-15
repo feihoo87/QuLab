@@ -1,10 +1,11 @@
 import numpy as np
 
-from ..BaseDriver import visaDriver, QReal
+from qulab.Driver import visaDriver, QReal
 
 
 class Driver(visaDriver):
     support_models = ['DG1062Z']
+    cHs=[1,2]
 
     quants = [
         # Set the waveform offset voltage of the specified channel.

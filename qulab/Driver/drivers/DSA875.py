@@ -2,7 +2,7 @@ import re
 import time
 import numpy as np
 
-from ..BaseDriver import visaDriver, QInteger, QOption, QReal
+from qulab.Driver import visaDriver, QInteger, QOption, QReal
 
 
 class Driver(visaDriver):

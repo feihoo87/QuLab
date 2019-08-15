@@ -5,7 +5,7 @@ from collections import deque
 import numpy as np
 import re
 
-from ...BaseDriver import BaseDriver
+from qulab.Driver import BaseDriver
 
 from .AlazarTechWrapper import (AlazarTechDigitizer, AutoDMA, DMABufferArray,
                                 configure)

@@ -3,7 +3,7 @@ import struct
 import numpy as np
 from visa import VisaIOWarning
 
-from ..BaseDriver import visaDriver, QOption, QReal, QVector
+from qulab.Driver import visaDriver, QOption, QReal, QVector
 
 
 class Driver(visaDriver):

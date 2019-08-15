@@ -1,5 +1,5 @@
 import numpy as np
-from ..BaseDriver import visaDriver, QInteger, QOption, QReal, QVector
+from qulab.Driver import visaDriver, QInteger, QOption, QReal, QVector
 
 
 class Driver(visaDriver):
