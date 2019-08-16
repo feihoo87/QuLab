@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from qulab import BaseDriver, QOption, QReal, QList, QInteger
+from qulab.Driver import BaseDriver, QOption, QReal, QList, QInteger
 from . import LabBrick_LMS_Wrapper
 
 
@@ -18,23 +18,24 @@ class Driver(BaseDriver):
         QOption('Reference',options=[('Internal', True), ('External', False)])
         ]
 
-    def __init__(self, **kw):
-        BaseDriver.__init__(self, **kw)
-        self.Serial = kw['Serial']
+    def __init__(self, addr, **kw):
+        '''addr is Serial number!'''
+        super().__init__(self, addr, **kw)
+        self.model='LMS'
+        self.Serial=int(addr)
 
     def performOpen(self, options={}):
         """Perform the operation of opening the instrument connection"""
-        self.SG = None
         # open connection
-        self.SG = LabBrick_LMS_Wrapper.LabBrick_Synthesizer(bTestMode=False)
-        self.SG.initDevice(self.Serial)
+        self.handle = LabBrick_LMS_Wrapper.LabBrick_Synthesizer(bTestMode=False)
+        self.handle.initDevice(self.Serial)
 
 
     def performClose(self, bError=False, options={}):
         """Perform the close instrument connection operation"""
         # do not check for error if close was called with an error
         try:
-            self.SG.closeDevice()
+            self.handle.closeDevice()
         except:
             # never return error here
             pass
@@ -47,25 +48,25 @@ class Driver(BaseDriver):
         # proceed depending on command
         if quant.name == 'Frequency':
             # make sure value is in range
-            value = self.SG.setFrequency(value)
+            value = self.handle.setFrequency(value)
         elif quant.name == 'Power':
-            self.SG.setPowerLevel(value)
+            self.handle.setPowerLevel(value)
         elif quant.name == 'Output':
-            # self.SG.setRFOn(bool(value))
+            # self.handle.setRFOn(bool(value))
             options=dict(quant.options)
-            self.SG.setRFOn(bool(options[value]))
+            self.handle.setRFOn(bool(options[value]))
         elif quant.name == 'Reference':
-            # self.SG.setUseInternalRef(bool(value))
+            # self.handle.setUseInternalRef(bool(value))
             options=dict(quant.options)
-            self.SG.setUseInternalRef(bool(options[value]))
+            self.handle.setUseInternalRef(bool(options[value]))
         # elif quant.name == 'External pulse modulation':
-        #     self.SG.setExternalPulseMod(bool(value))
+        #     self.handle.setExternalPulseMod(bool(value))
         # elif quant.name in ('Internal pulse modulation', 'Pulse time', 'Pulse period'):
         #     # special case for internal pulse modulation, set all config at once
         #     bOn = self.getValue('Internal pulse modulation')
         #     pulseTime = self.getValue('Pulse time')
         #     pulsePeriod = self.getValue('Pulse period')
-        #     self.SG.setInternalPulseMod(pulseTime, pulsePeriod, bOn)
+        #     self.handle.setInternalPulseMod(pulseTime, pulsePeriod, bOn)
         # return value
 
 
@@ -73,21 +74,21 @@ class Driver(BaseDriver):
         """Perform the Get Value instrument operation"""
         # proceed depending on command
         if quant.name == 'Frequency':
-            value = self.SG.getFrequency()
+            value = self.handle.getFrequency()
         elif quant.name == 'Power':
-            value = self.SG.getPowerLevel()
+            value = self.handle.getPowerLevel()
         elif quant.name == 'Output':
-            value = self.SG.getRFOn()
+            value = self.handle.getRFOn()
         elif quant.name == 'Reference':
-            value = self.SG.getUseInternalRef()
+            value = self.handle.getUseInternalRef()
         # elif quant.name == 'Internal pulse modulation':
-        #     value = self.SG.getInternalPulseMod()
+        #     value = self.handle.getInternalPulseMod()
         # elif quant.name == 'Pulse time':
-        #     value = self.SG.getPulseOnTime()
+        #     value = self.handle.getPulseOnTime()
         # elif quant.name == 'Pulse period':
-        #     value = self.SG.getPulsePeriod()
+        #     value = self.handle.getPulsePeriod()
         # elif quant.name == 'External pulse modulation':
-        #     value = self.SG.getExternalPulseMod()
+        #     value = self.handle.getExternalPulseMod()
         # return value
         return value
 
