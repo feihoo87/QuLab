@@ -1,4 +1,4 @@
-from qulab.Driver import BaseDriver, QOption, QReal
+from qulab.Driver import BaseDriver, QOption, QReal, QInteger
 from . import AWGboard
 
 

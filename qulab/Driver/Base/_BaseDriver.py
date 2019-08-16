@@ -35,11 +35,14 @@ class BaseDriver(object):
     def __repr__(self):
         return 'Driver(addr=%s,model=%s)' % (self.addr,self.model)
 
+    def __del__(self):
+        self.close()
+
     def newcfg(self):
         self.config = newcfg(self.quants, self.CHs)
         log.info('new config!')
 
-    def getConfig(self):
+    def getcfg(self):
         return self.config
 
     def set(self, cfg={}, **kw):

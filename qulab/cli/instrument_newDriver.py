@@ -31,7 +31,7 @@ async def start(args):
         if buff is not None:
             info['config'] = pickle.loads(buff)
     dev = Driver(**info)
-    dev.performOpen()
+    dev.open()
     if args.store_config:
         asyncio.ensure_future(save_config(dht, dev, args.name + '_config'))
     await mount(dev, args.name)
