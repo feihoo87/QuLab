@@ -4,6 +4,7 @@ sys.path.append(r'C:\Program Files (x86)\Keysight\SD1\Libraries\Python')
 import keysightSD1
 
 import numpy as np
+import re
 import logging
 from qulab.Driver import BaseDriver, QOption, QReal, QList, QInteger
 

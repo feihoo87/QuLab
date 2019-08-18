@@ -11,7 +11,7 @@ from .AlazarTechWrapper import (AlazarTechDigitizer, AutoDMA, DMABufferArray,
                                 configure)
 from .exception import AlazarTechError
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('qulab.driver.ATS')
 
 
 def getSamplesPerRecode(numOfPoints):

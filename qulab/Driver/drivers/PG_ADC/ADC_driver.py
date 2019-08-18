@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-from qulab import BaseDriver, QInteger, QOption, QReal, QString, QVector
+from qulab.Driver import BaseDriver, QInteger, QOption, QReal, QString, QVector
 from . import TimeDomainPlotCore as ad_core
 
 
@@ -10,13 +10,13 @@ class Driver(BaseDriver):
     #     # QReal('Offset', value=0, ch=0),
     #         ]
 
-    def __init__(self, **kw):
-        BaseDriver.__init__(self, **kw)
-        self.ip=kw['IP']
+    def __init__(self, addr, **kw):
+        '''addr: IP'''
+        super().__init__(self, addr, **kw)
         self.model = 'PG_ADC'
 
     def performOpen(self):
-        ad_core._gUDPSocketClient = ad_core.UDPSocketClient(ip=self.ip)
+        ad_core._gUDPSocketClient = ad_core.UDPSocketClient(ip=self.addr)
         ad_core.Initialize()
         ad_core.setTriggerType(1) # 外部触发
         self.handle = ad_core

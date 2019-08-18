@@ -9,6 +9,7 @@ class Driver(visaDriver):
     support_models = ['DP832']
     '''Rigol DP800 series DC source'''
 
+    CHs=[1,2,3]
     quants = [
         QReal('Offset', value=0, unit='V', ch=1,
           set_cmd=':SOUR%(ch)d:VOLT %(value).2f',

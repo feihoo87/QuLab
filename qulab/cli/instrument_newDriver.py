@@ -24,7 +24,7 @@ async def save_config(dht, dev, key):
 async def start(args):
     dht = await getDHT()
     Driver = loadDriver(args.driver)
-    info = dict(addr=args.address)
+    info = dict(addr=args.address, model=args.model)
     
     if args.store_config:
         buff = await dht.get(args.name + '_config')
@@ -40,7 +40,7 @@ async def start(args):
 
 
 def main(args):
-    setLogger(logging.DEBUG)
+    setLogger(logging.INFO)
     loop = asyncio.get_event_loop()
     asyncio.ensure_future(start(args), loop=loop)
 

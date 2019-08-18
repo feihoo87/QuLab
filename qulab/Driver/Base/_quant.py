@@ -89,7 +89,7 @@ class Quantity(object):
 
 
 class QReal(Quantity):
-    def __init__(self,name,value=None,unit=None,ch=None,
+    def __init__(self,name,value=None,unit='',ch=None,
                     get_cmd='',set_cmd='',):
         super().__init__(name,value,unit,ch,
             get_cmd=get_cmd,set_cmd=set_cmd,type='Real',)
@@ -110,7 +110,7 @@ class QReal(Quantity):
 
 
 class QInteger(QReal):
-    def __init__(self,name,value=None,unit=None,ch=None,
+    def __init__(self,name,value=None,unit='',ch=None,
                     get_cmd='',set_cmd='',):
         super().__init__(name,value,unit,ch,
             get_cmd=get_cmd,set_cmd=set_cmd,)
@@ -126,7 +126,7 @@ class QInteger(QReal):
 
 
 class QBool(QReal):
-    def __init__(self,name,value=None,unit=None,ch=None,
+    def __init__(self,name,value=None,unit='',ch=None,
                     get_cmd='',set_cmd='',):
         super().__init__(name,value,unit,ch,
             get_cmd=get_cmd,set_cmd=set_cmd,)
@@ -142,7 +142,7 @@ class QBool(QReal):
 
 
 class QString(Quantity):
-    def __init__(self,name,value=None,unit=None,ch=None,
+    def __init__(self,name,value=None,unit='',ch=None,
                     get_cmd='',set_cmd='',):
         super().__init__(name,value,unit,ch,
             get_cmd=get_cmd,set_cmd=set_cmd,type='String',)
@@ -153,7 +153,7 @@ class QString(Quantity):
 
 
 class QOption(Quantity):
-    def __init__(self,name,value=None,unit=None,ch=None,options=[],
+    def __init__(self,name,value=None,unit='',ch=None,options=[],
                     get_cmd='',set_cmd='',):
         super().__init__(name,value,unit,ch,
             get_cmd=get_cmd,set_cmd=set_cmd,type='Option',)
@@ -176,7 +176,7 @@ class QOption(Quantity):
 
 
 class QVector(Quantity):
-    def __init__(self,name,value=None,unit=None,ch=None,
+    def __init__(self,name,value=None,unit='',ch=None,
                     get_cmd='',set_cmd='',):
         super().__init__(name,value,unit,ch,
             get_cmd=get_cmd,set_cmd=set_cmd,type='Vector',)
@@ -188,7 +188,7 @@ class QVector(Quantity):
 
 
 class QList(Quantity):
-    def __init__(self,name,value=None,unit=None,ch=None,
+    def __init__(self,name,value=None,unit='',ch=None,
                     get_cmd='',set_cmd='',):
         super().__init__(name,value,unit,ch,
             get_cmd=get_cmd,set_cmd=set_cmd,type='List',)

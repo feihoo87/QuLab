@@ -7,7 +7,7 @@ import struct
 
 from ._quant import QReal, QInteger, QString, QOption, QBool, QVector, QList, newcfg
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('qulab.driver')
 __all__ = [
     'BaseDriver', 'visaDriver'
 ]
@@ -24,9 +24,9 @@ class BaseDriver(object):
 
     def __init__(self, addr=None, timeout=3, **kw):
         self.addr = addr
-        self.handle = None
-        self.model = None
         self.timeout = timeout
+        self.handle = kw.get('handle',None)
+        self.model = kw.get('model',None)
         self.config = newcfg(self.quants, self.CHs)
         self.quantities={}
         for quant in self.quants:
@@ -55,16 +55,18 @@ class BaseDriver(object):
                 self.setValue(key, cfg[key])
 
     def performOpen(self,**kw):
-        log.info(f'Open Instrument {self.model}@{self.addr}')
+        pass
 
     def performClose(self,**kw):
-        log.info(f'Close Instrument {self.model}@{self.addr}')
+        pass
 
     def open(self, **kw):
         self.performOpen(**kw)
+        log.info(f'Open Instrument {self.model}@{self.addr}')
 
     def close(self, **kw):
         self.performClose(**kw)
+        log.info(f'Close Instrument {self.model}@{self.addr}')
 
     def performSetValue(self, quant, value, **kw):
         pass
@@ -78,6 +80,7 @@ class BaseDriver(object):
             _kw=copy.deepcopy(quant.default)
             _kw.update(value=value,**kw)
             self.performSetValue(quant, **_kw)
+            log.info('Set CH-%s Value: %s --> %s %s' % (_kw.get('ch'),name,value,_kw.get('unit')))
             self.config[name][_kw.pop('ch')].update(_kw) # update config
         else:
             raise Error('No such Quantity!')
@@ -89,6 +92,7 @@ class BaseDriver(object):
             _kw.update(**kw)
             value = self.performGetValue(quant, **_kw)
             _kw.update(value=value)
+            log.info('Get CH-%s Value: %s --> %s %s' % (_kw.get('ch'),name,value,_kw.get('unit')))
             self.config[name][_kw.pop('ch')].update(_kw) # update config
             return value
         else:
@@ -127,13 +131,11 @@ class visaDriver(BaseDriver):
             model = IDN[1].strip()
             version = IDN[3].strip()
             self.model = model
-            log.info(f'Open Instrument {self.model}@{self.addr}')
         except:
             raise Error('query IDN error!')
 
     def performClose(self, **kw):
         self.handle.close()
-        log.info(f'Close Instrument {self.model}@{self.addr}')
 
     def performSetValue(self, quant, value, **kw):
         quant.set(self,value,**kw)

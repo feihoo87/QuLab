@@ -7,6 +7,7 @@ class Driver(visaDriver):
     error_command = '*ESR?'
     support_models = ['AFG3102']
 
+    CHs=[1,2]
     quants = [
         QOption('Output',
                 ch=1,

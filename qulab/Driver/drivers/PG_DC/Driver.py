@@ -26,10 +26,8 @@ class Driver(BaseDriver):
 
     def performOpen(self):
         self.handle = Voltage(self.addr)
-        super().performOpen()
 
     def performSetValue(self, quant, value, ch=1, **kw):
         if quant.name == 'Offset':
             # ch: 1,2,3,4 -> 0,1,2,3
             self.handle.setVoltage(value,ch=ch-1)
-            log.info(f'Set volt of Channel {ch} to {value}')

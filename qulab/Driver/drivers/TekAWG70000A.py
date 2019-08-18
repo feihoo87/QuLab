@@ -7,6 +7,7 @@ from qulab.Driver import visaDriver, QList, QOption, QReal
 class Driver(visaDriver):
     support_models = ['AWG70001A', 'AWG70002A']
 
+    CHs=[1,2]
     quants = [
         # Sample Rate set_cmd is block cmd
         #
