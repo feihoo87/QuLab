@@ -93,8 +93,6 @@ class Driver(BaseDriver):
         moduleID = self.handle.openWithSlot(self.model, CHASSIS, SLOT)
         if moduleID < 0:
         	print("Module open error:", moduleID)
-        except Exception:
-            log.exception(Exception)
 
     def _parse_addr(self,addr):
         re_addr = re.compile(
