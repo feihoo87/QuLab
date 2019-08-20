@@ -8,10 +8,10 @@ import re
 from qulab.Driver import BaseDriver
 
 from .AlazarTechWrapper import (AlazarTechDigitizer, AutoDMA, DMABufferArray,
-                                configure)
+                                configure,initialize)
 from .exception import AlazarTechError
 
-log = logging.getLogger('qulab.driver.ATS')
+log = logging.getLogger('qulab.Driver')
 
 
 def getSamplesPerRecode(numOfPoints):
@@ -61,6 +61,7 @@ class Driver(BaseDriver):
         systemID=dict_parse.get('systemID',1) #default 1
         boardID=dict_parse.get('boardID',1) #default 1
         self.handle = AlazarTechDigitizer(systemID, boardID)
+        initialize(self.handle)
         configure(self.handle, **self.config)
 
     def _parse_addr(self,addr):

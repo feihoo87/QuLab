@@ -8,7 +8,7 @@ from qulab.utils import ShutdownBlocker
 
 
 def setLogger(level=logging.DEBUG):
-    log = logging.getLogger('qulab.driver')
+    log = logging.getLogger('qulab.Driver')
     log.setLevel(level)
     ch = logging.StreamHandler()
     ch.setLevel(level)
@@ -40,7 +40,7 @@ async def start(args):
 
 
 def main(args):
-    setLogger(logging.INFO)
+    setLogger(logging.DEBUG)
     loop = asyncio.get_event_loop()
     asyncio.ensure_future(start(args), loop=loop)
 

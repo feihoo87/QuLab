@@ -8,7 +8,7 @@ import numpy as np
 import zhinst.utils
 from qulab import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
-logger = logging.getLogger('qulab.drivers.ZI')
+logger = logging.getLogger('qulab.Driver.ZI')
 
 
 class Driver(BaseDriver):

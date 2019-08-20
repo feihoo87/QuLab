@@ -6,8 +6,8 @@ class Driver(BaseDriver):
 
     CHs=[1,2,3,4]
     quants = [
-        QReal('Offset',unit='V',ch=1,),
-        QReal('Amplitude',unit='VPP',ch=1,),
+        QReal('Offset',value=0,unit='V',ch=1,),
+        QReal('Amplitude',value=1,unit='V',ch=1,),
         QInteger('Output',value=0,ch=1,),
         ]
 
@@ -30,7 +30,7 @@ class Driver(BaseDriver):
 
     def performSetValue(self, quant, value, ch=1, **kw):
         if quant.name == 'Offset':
-            self.setOffset(offs, ch)
+            self.setOffset(value, ch)
         elif quant.name == 'Amplitude':
             self.setVpp(value,ch)
         elif quant.name == 'Output':
@@ -38,6 +38,8 @@ class Driver(BaseDriver):
                 self.on(ch)
             elif value==0:
                 self.off(ch)
+            else:
+                raise Error('Wrong Value!')
 
     def on(self, ch=1):
         self.handle.Start(ch)

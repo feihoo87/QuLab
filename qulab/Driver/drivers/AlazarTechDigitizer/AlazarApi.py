@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
-logger = logging.getLogger('qulab.drivers.ATS')
+logger = logging.getLogger('qulab.Driver')
 logger.addHandler(logging.NullHandler())
 
 logger.debug('ATS driver start loading APIs ...')
@@ -242,7 +242,7 @@ AlazarReadWriteTest = __get_Func("AlazarReadWriteTest", RETURN_CODE, [HANDLE, PU
 #RETURN_CODE AlazarMemoryTest( HANDLE h, U32 *errors );
 AlazarMemoryTest = __get_Func("AlazarMemoryTest", RETURN_CODE, [HANDLE, PU32])
 #RETURN_CODE AlazarBusyFlag( HANDLE h,int *BusyFlag);
-AlazarBusyFlag = __get_Func("AlazarBusyFlag", RETURN_CODE, [HANDLE, c_int_p])
+# AlazarBusyFlag = __get_Func("AlazarBusyFlag", RETURN_CODE, [HANDLE, c_int_p])
 #RETURN_CODE AlazarTriggeredFlag( HANDLE h,int *TriggeredFlag);
 AlazarTriggeredFlag = __get_Func("AlazarTriggeredFlag", RETURN_CODE, [HANDLE, c_int_p])
 #U32	      AlazarBoardsFound();
@@ -574,7 +574,7 @@ AlazarWriteRegister = __get_Func("AlazarWriteRegister", RETURN_CODE, [HANDLE, U3
 # DAC CONTROL API
 #RETURN_CODE AlazarDACSetting
 #(HANDLE h, U32 SetGet, U32 OriginalOrModified, U8 Channel, U32 DACNAME, U32 Coupling, U32 InputRange, U32 Impedance, U32 *getVal, U32 setVal, U32 *error);
-AlazarDACSetting = __get_Func("AlazarDACSetting", RETURN_CODE, [HANDLE, U32, U32, U8, U32, U32, U32, U32, PU32, U32, PU32])
+# AlazarDACSetting = __get_Func("AlazarDACSetting", RETURN_CODE, [HANDLE, U32, U32, U8, U32, U32, U32, U32, PU32, U32, PU32])
 
 #RETURN_CODE
 #AlazarConfigureAuxIO (
