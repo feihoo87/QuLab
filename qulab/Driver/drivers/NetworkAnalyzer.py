@@ -89,6 +89,7 @@ class Driver(visaDriver):
     '''
     def performOpen(self):
         super().performOpen()
+        self.set_timeout(15)
         self.pna_select(ch=1)
 
     def performGetValue(self, quant, **kw):

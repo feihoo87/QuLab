@@ -69,6 +69,9 @@ class BaseDriver(object):
         self.performClose(**kw)
         log.info(f'{datetime.now()}    Close Instrument {self.model}@{self.addr}')
 
+    def performOPC(self):
+        return 1
+
     def performSetValue(self, quant, value, **kw):
         pass
 
@@ -76,28 +79,26 @@ class BaseDriver(object):
         return self.config[quant.name][kw['ch']]['value']
 
     def setValue(self, name, value, **kw):
-        if name in self.quantities:
-            quant=self.quantities[name]
-            _kw=copy.deepcopy(quant.default)
-            _kw.update(value=value,**kw)
-            self.performSetValue(quant, **_kw)
-            log.info('%s    Set Value of CH-%s: %s --> %s %s' % (datetime.now(),_kw.get('ch'),name,value,_kw.get('unit')))
-            self.config[name][_kw.pop('ch')].update(_kw) # update config
-        else:
-            raise Error('No such Quantity!')
+        assert name in self.quantities
+        quant=self.quantities[name]
+        _kw=copy.deepcopy(quant.default)
+        _kw.update(value=value,**kw)
+        self.performSetValue(quant, **_kw)
+        log.info('%s    Set Value of CH-%s: %s --> %s %s' % (datetime.now(),_kw.get('ch'),name,value,_kw.get('unit')))
+        self.config[name][_kw.pop('ch')].update(_kw) # update config
+        opc=self.performOPC()
+        return opc
 
     def getValue(self, name, **kw):
-        if name in self.quantities:
-            quant=self.quantities[name]
-            _kw=copy.deepcopy(quant.default)
-            _kw.update(**kw)
-            value = self.performGetValue(quant, **_kw)
-            _kw.update(value=value)
-            log.info('%s    Get Value of CH-%s: %s <-- %s %s' % (datetime.now(),_kw.get('ch'),name,value,_kw.get('unit')))
-            self.config[name][_kw.pop('ch')].update(_kw) # update config
-            return value
-        else:
-            raise Error('No such Quantity!')
+        assert name in self.quantities
+        quant=self.quantities[name]
+        _kw=copy.deepcopy(quant.default)
+        _kw.update(**kw)
+        value = self.performGetValue(quant, **_kw)
+        _kw.update(value=value)
+        log.info('%s    Get Value of CH-%s: %s <-- %s %s' % (datetime.now(),_kw.get('ch'),name,value,_kw.get('unit')))
+        self.config[name][_kw.pop('ch')].update(_kw) # update config
+        return value
 
     def query(self,message,**kw):
         return
@@ -138,17 +139,26 @@ class visaDriver(BaseDriver):
     def performClose(self, **kw):
         self.handle.close()
 
+    def performOPC(self):
+        opc=int(self.handle.query("*OPC?"))
+        return opc
+
     def performSetValue(self, quant, value, **kw):
-        quant.set(self,value,**kw)
+        if quant.set_cmd is not '':
+            quant.set(self,value,**kw)         
+        else:
+            super().performSetValue(quant, value, **kw)
 
     def performGetValue(self, quant, **kw):
-        return quant.get(self,**kw)
+        if quant.get_cmd is not '':
+            return quant.get(self,**kw)
+        else:
+            return super().performGetValue(quant, **kw)
 
     def set_timeout(self, t):
         self.timeout = t
         if self.handle is not None:
             self.handle.timeout = t * 1000
-        return self
 
     def errors(self):
         """返回错误列表"""
@@ -233,7 +243,6 @@ class visaDriver(BaseDriver):
             raise
         if check_errors:
             self.check_errors_and_log(message)
-        return self
 
     def write_ascii_values(self, message, values, converter='f', separator=',',
                            termination=None, encoding=None, check_errors=False):
@@ -249,7 +258,6 @@ class visaDriver(BaseDriver):
             raise
         if check_errors:
             self.check_errors_and_log(log_msg)
-        return self
 
     def write_binary_values(self, message, values, datatype='f',
                                 is_big_endian=False, termination=None,
@@ -267,7 +275,6 @@ class visaDriver(BaseDriver):
             raise
         if check_errors:
             self.check_errors_and_log(log_msg)
-        return self
 
 
 def IEEE_488_2_BinBlock(datalist, dtype="int16", is_big_endian=True):
