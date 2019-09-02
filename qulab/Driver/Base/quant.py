@@ -96,45 +96,33 @@ class QReal(Quantity):
 
     def _process_query(self, value):
         '''process the value query from Instrument before final return'''
-        return value[0]
-
-    def get(self, driver, Driver=None, **kw):
-        '''refer '__get__' of the descriptor in python'''
-        if self.get_cmd is not '':
-            cmd = self._formatGetCmd(**kw)
-            value = driver.query(cmd,mode='ascii')
-            value = self._process_query(value)
-        else:
-            value=None
-        return value
+        return float(value)
 
 
-class QInteger(QReal):
+class QInteger(Quantity):
     def __init__(self,name,value=None,unit='',ch=None,
                     get_cmd='',set_cmd='',):
         super().__init__(name,value,unit,ch,
-            get_cmd=get_cmd,set_cmd=set_cmd,)
-        self.type='Integer'
+            get_cmd=get_cmd,set_cmd=set_cmd,type='Integer',)
 
     def _process_query(self, value):
         '''process the value query from Instrument before final return'''
-        return int(value[0])
+        return int(value)
 
     def _pre_formatSetCmd(self,**kw):
         kw['value']=int(kw['value'])
         return kw
 
 
-class QBool(QReal):
+class QBool(Quantity):
     def __init__(self,name,value=None,unit='',ch=None,
                     get_cmd='',set_cmd='',):
         super().__init__(name,value,unit,ch,
-            get_cmd=get_cmd,set_cmd=set_cmd,)
-        self.type='Bool'
+            get_cmd=get_cmd,set_cmd=set_cmd,type='Bool',)
 
     def _process_query(self, value):
         '''process the value query from Instrument before final return'''
-        return bool(value[0])
+        return bool(value)
 
     def _pre_formatSetCmd(self,**kw):
         kw['value']=Bool(kw['value'])

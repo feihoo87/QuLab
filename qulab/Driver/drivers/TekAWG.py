@@ -70,7 +70,7 @@ class Driver(visaDriver):
             self.sequence_list = None
 
     def performSetValue(self, quant, value, **kw):
-        super(Driver,self).performSetValue(self, quant, value, **kw)
+        super(Driver,self).performSetValue(quant, value, **kw)
 
     def performGetValue(self, quant, **kw):
         if quant.name == 'WList':
@@ -80,7 +80,7 @@ class Driver(visaDriver):
             quant.value = self.sequence_list
             return self.sequence_list
         else:
-            return super(Driver,self).performGetValue(self, quant, **kw)
+            return super(Driver,self).performGetValue(quant, **kw)
 
     def get_waveform_list(self):
         if self.model in ['AWG5208']:

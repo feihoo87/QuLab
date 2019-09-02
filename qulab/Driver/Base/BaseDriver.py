@@ -6,7 +6,7 @@ import visa
 import struct
 from datetime import datetime
 
-from ._quant import QReal, QInteger, QString, QOption, QBool, QVector, QList, newcfg
+from .quant import QReal, QInteger, QString, QOption, QBool, QVector, QList, newcfg
 
 log = logging.getLogger('qulab.Driver')
 __all__ = [
@@ -37,6 +37,13 @@ class BaseDriver(object):
         return 'Driver(addr=%s,model=%s)' % (self.addr,self.model)
 
     def __del__(self):
+        self.close()
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
         self.close()
 
     def newcfg(self):
@@ -73,10 +80,16 @@ class BaseDriver(object):
         return 1
 
     def performSetValue(self, quant, value, **kw):
-        pass
+        if quant.set_cmd is not '':
+            quant.set(self,value,**kw)
+        else:
+            pass
 
     def performGetValue(self, quant, **kw):
-        return self.config[quant.name][kw['ch']]['value']
+        if quant.get_cmd is not '':
+            return quant.get(self,**kw)
+        else:
+            return self.config[quant.name][kw['ch']]['value']
 
     def setValue(self, name, value, **kw):
         assert name in self.quantities
@@ -140,20 +153,8 @@ class visaDriver(BaseDriver):
         self.handle.close()
 
     def performOPC(self):
-        opc=int(self.handle.query("*OPC?"))
+        opc=int(self.query("*OPC?"))
         return opc
-
-    def performSetValue(self, quant, value, **kw):
-        if quant.set_cmd is not '':
-            quant.set(self,value,**kw)         
-        else:
-            super().performSetValue(quant, value, **kw)
-
-    def performGetValue(self, quant, **kw):
-        if quant.get_cmd is not '':
-            return quant.get(self,**kw)
-        else:
-            return super().performGetValue(quant, **kw)
 
     def set_timeout(self, t):
         self.timeout = t
