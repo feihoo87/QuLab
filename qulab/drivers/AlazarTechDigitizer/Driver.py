@@ -45,6 +45,7 @@ class Driver(BaseDriver):
                            trigLevel=0.0,
                            triggerDelay=0,
                            triggerTimeout=0,
+                           recordsPerBuffer=64,
                            bufferCount=512)
         self.config['e'] = getExpArray(self.config['f_list'], self.config['n'],
                                        self.config['weight'],
@@ -60,6 +61,11 @@ class Driver(BaseDriver):
             cmd['samplesPerRecord'] = getSamplesPerRecode(cmd['n'])
 
         self.config.update(cmd)
+
+        if self.config['repeats'] % self.config['recordsPerBuffer'] != 0:
+            self.config['repeats'] = (
+                self.config['repeats'] // self.config['recordsPerBuffer'] +
+                1) * self.config['recordsPerBuffer']
 
         if any(key in ['f_list', 'n', 'weight', 'sampleRate'] for key in cmd):
             self.config['e'] = getExpArray(self.config['f_list'],
@@ -91,32 +97,39 @@ class Driver(BaseDriver):
 
     def getData(self, fft=False, avg=False):
         samplesPerRecord = self.config['samplesPerRecord']
+        recordsPerBuffer = self.config['recordsPerBuffer']
         repeats = self.config['repeats']
         e = self.config['e']
-        maxlen = repeats if repeats > 0 else self.config['maxlen']
-        queue = deque(maxlen=maxlen)
         n = e.shape[0]
+        maxlen = self.config['maxlen']
+
+        A, B = None, None
 
         retry = 0
         while retry < 3:
             try:
-                for chA, chB in self._aquireData(samplesPerRecord,
-                                                 repeats=repeats,
-                                                 buffers=None,
-                                                 recordsPerBuffer=1,
-                                                 timeout=1):
+                for chA, chB in self._aquireData(
+                        samplesPerRecord,
+                        repeats=repeats,
+                        buffers=None,
+                        recordsPerBuffer=recordsPerBuffer,
+                        timeout=1):
+                    A_lst = chA.reshape((recordsPerBuffer, samplesPerRecord))
+                    B_lst = chB.reshape((recordsPerBuffer, samplesPerRecord))
                     if fft:
-                        queue.append(
-                            [chA[:n].dot(e).T / n, chB[:n].dot(e).T / n])
-                    else:
-                        queue.append([chA[:n], chB[:n]])
-                    if len(queue) >= queue.maxlen:
+                        A_lst = (A_lst[:, :n]).dot(e) / n
+                        B_lst = (B_lst[:, :n]).dot(e) / n
+                    try:
+                        A = np.r_[A, A_lst]
+                        B = np.r_[B, B_lst]
+                    except:
+                        A, B = A_lst, B_lst
+                    if repeats == 0 and A.shape[1] >= maxlen:
                         break
                 if avg:
-                    return np.mean(np.asanyarray(queue), axis=0)
+                    return A.mean(axis=0), B.mean(axis=0)
                 else:
-                    ret = np.asanyarray(queue)
-                    return np.asarray([ret[:, 0, :], ret[:, 1, :]])
+                    return A, B
             except AlazarTechError as err:
                 log.exception(err.msg)
                 if err.code == 518:
