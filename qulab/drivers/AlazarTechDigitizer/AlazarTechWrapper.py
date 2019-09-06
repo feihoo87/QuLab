@@ -519,7 +519,7 @@ class AutoDMA:
                                              int(1000 * self.timeout))
             self.dig.checkErrors()
             yield buff.buffer
-            count += 1
+            count += self.recordsPerBuffer
             if count>=self.repeats and self.repeats>0:
                 break
             self.dig.postAsyncBuffer(buff.addr, buff.bytes)
