@@ -488,13 +488,13 @@ class TEWXAwg(object):
         if pref is None:
             pref = ''
 
-        bin_dat_header = self._make_bin_dat_header(pref, bin_dat.nbytes)
-
         if paranoia_level is None:
             paranoia_level = self._paranoia_level
-
+        
         if paranoia_level >= 1:
-            bin_dat_header = '*OPC?; ' + bin_dat_header
+            pref = '*OPC?; ' + pref
+
+        bin_dat_header = self._make_bin_dat_header(pref, bin_dat.nbytes)
 
         if self._intf_type == CommIntfType.LAN:
             self._tcp_sock.sendall(bin_dat_header)
@@ -981,7 +981,7 @@ class TEWXAwg(object):
         if pref is None:
             pref = ''
         bin_dat_header = '{0}#{1:d}{2:s}'.format(pref, len(size_str), size_str)
-        return bin_dat_header
+        return bin_dat_header.encode()
 
     def _send_raw_bin_dat(self, bin_data):
         '''Send the given binary-data (`numpy.ndarray`) through the tcp socket (no binary-data-header is added) '''

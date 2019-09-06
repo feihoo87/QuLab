@@ -56,12 +56,12 @@ class Driver(wxDriver):
                 get_cmd=':INIT:CONT?',
                 options=[('OFF', 0), ('ON', 1)]),
 
-        QInteger('Current CH',value=1,
-                set_cmd=':INST:SEL %(value)d',
-                get_cmd=':INST:SEL?',),
-        QInteger('Current Trace',value=1,ch=1,
-                set_cmd=':INST:SEL %(ch)d;:TRAC:SEL %(value)d',
-                get_cmd=':INST:SEL %(ch)d;:TRAC:SEL?'),
+        # QInteger('Current CH',value=1,
+        #         set_cmd=':INST:SEL %(value)d',
+        #         get_cmd=':INST:SEL?',),
+        # QInteger('Current Trace',value=1,ch=1,
+        #         set_cmd=':INST:SEL %(ch)d;:TRAC:SEL %(value)d',
+        #         get_cmd=':INST:SEL %(ch)d;:TRAC:SEL?'),
 
         QOption('Output', value='OFF', ch=1,
                 set_cmd=':INST:SEL %(ch)d;:OUTP %(option)s',
@@ -98,7 +98,7 @@ class Driver(wxDriver):
             self.write(':TRAC:DEL %d' % segment)
 
     def upwave(self, points, ch=1, trace=1):
-        self.setValue('Current Trace',trace,ch=ch)
+        self.write(':INST:SEL %d;:TRAC:SEL %d' % (ch,trace))
         points = points.clip(-1, 1)
         wav = self.build_wave(points)
         self.handle.send_binary_data(':TRAC:DATA', wav)
@@ -115,7 +115,7 @@ class Driver(wxDriver):
     #                              encoding=None)
 
     def usewave(self,ch=1,trace=1):
-        self.setValue('Current Trace',trace,ch=ch)
+        self.write(':INST:SEL %d;:TRAC:SEL %d' % (ch,trace))
 
     # #在创建好的波形文件中，写入或者更新具体波形
     # def upwave_wx(self, points, ch=1, trac=1):
