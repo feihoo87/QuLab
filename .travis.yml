@@ -19,7 +19,7 @@ matrix:
       language: shell
       before_install:
         - brew install redis
-        - brew install mongodb
+        - brew cask install mongodb
         - brew services start redis
         - brew services start mongodb
         - pip3 install -U pip
