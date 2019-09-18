@@ -23,7 +23,7 @@ matrix:
         - brew services start redis
         - mongod --fork --logpath=mongod.log
         - pip3 install -U pip
-      env: PATH=/Applications/MongoDB.app/Contents/Resources/Vendor/mongodb:$PATH
+      env: PATH=/Applications/MongoDB.app/Contents/Resources/Vendor/mongodb/bin:$PATH
       after_script:
         - mongod --shutdown
     - name: "Python on Windows"
