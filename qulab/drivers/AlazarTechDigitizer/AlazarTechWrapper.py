@@ -508,7 +508,7 @@ class AutoDMA:
                                                  int(1000 * self.timeout))
             self.dig.checkErrors()
             yield np.asarray(buff)
-            count += 1
+            count += self.recordsPerBuffer
             if count>=self.repeats and self.repeats>0:
                 break
 
