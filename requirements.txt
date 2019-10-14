@@ -1,7 +1,7 @@
 aioredis==1.3.0
 blinker==1.4
 cryptography==2.7
-ipython==7.7.0
+ipython==7.8.0
 ipywidgets==7.5.1
 mongoengine==0.18.2
 nest-asyncio==1.0.0
