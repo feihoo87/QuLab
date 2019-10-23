@@ -29,7 +29,6 @@ class Record(Document):
             self.title, self.finished_time, self.tags)
 
     @property
-    @functools.lru_cache(maxsize=1)
     def data(self):
         return from_pickle(self.datafield)
 
