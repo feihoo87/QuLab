@@ -1,6 +1,7 @@
 import redis
 import pickle
 import time
+import datetime
 from pathlib import Path
 import numpy as np
 import functools
@@ -13,17 +14,17 @@ storage_cfg = config.get('storage', {})
 
 class dataCollector(object):
     
-    def __init__(self,name,dim=1,zshape=1,server=None,addr='redis://localhost:6379/0'):
+    def __init__(self,name,dim=1,zshape=1,server=None,addr='redis://localhost:6379/0',expire_time=604800):
         self.name=name
         axis=[]
         for i in range(dim):
             _name=f'{name}_ax{i}'
-            axis.append(redisZSet(_name,server,addr))
+            axis.append(redisZSet(_name,server,addr,expire_time))
         self.axis=axis
         self.dim=dim
         
         _name=f'{name}_zlist'
-        self.z=redisList(_name,server,addr)
+        self.z=redisList(_name,server,addr,expire_time)
         self.zshape=zshape if isinstance(zshape,tuple) else (zshape,)
     
     def delete(self):
@@ -38,7 +39,7 @@ class dataCollector(object):
         _z=functools.reduce(np.append,[np.asarray(_a).flatten() for _a in arg[i+1:]])
         self.z.add(*_z)
 
-    def _ztoarray(self):
+    def _ztoarray(self,moveaxis=False):
         data_raw=np.asarray(self.z.data).flatten()
         size_raw=data_raw.size
         if self.size>size_raw:          
@@ -47,11 +48,14 @@ class dataCollector(object):
         else:
             data=data_raw[:self.size]
         data_array=np.asarray(data).reshape(self.shape)
+        if moveaxis:
+            # 对 data array 进行移轴，使之更便于读取
+            data_array=np.moveaxis(data_array,self.dim,0) if self.zshape!=(1,) else data_array
         return data_array
     
-    def read(self):
+    def read(self,moveaxis=False):
         axis_data=(np.array(ax.data) for ax in self.axis)
-        z_array=self._ztoarray()
+        z_array=self._ztoarray(moveaxis)
         return (*axis_data,z_array)
             
     @property
@@ -69,27 +73,31 @@ class dataCollector(object):
     
     @property
     def data(self):
-        return self.read()    
+        return self.read(moveaxis=False)    
 
 class redisRecord(object):
     
     def __init__(self,name,dim=1,zshape=1,server=None,
-                addr='redis://localhost:6379/0',autosave=True,):
+                addr='redis://localhost:6379/0',save_backend='both',autosave=True,expire_time=604800):
         self.name=name
-        self.collector=dataCollector(name,dim,zshape,server,addr)
+        self.collector=dataCollector(name,dim,zshape,server,addr,expire_time)
         
         _name=f'{name}_config'
-        self.cfg=redisString(_name,server,addr)
+        self.cfg=redisString(_name,server,addr,expire_time)
         _name=f'{name}_setting'
-        self.st=redisString(_name,server,addr)
+        self.st=redisString(_name,server,addr,expire_time)
         _name=f'{name}_tags'
-        self.tg=redisSet(_name,server,addr)
+        self.tg=redisSet(_name,server,addr,expire_time)
 
         _name=f'{name}_isactive'
-        self.isactive=redisString(_name,server,addr)
+        self.isactive=redisString(_name,server,addr,expire_time)
         self.isactive.set(False)
 
+        self.save_backend=save_backend
         self.autosave=autosave
+
+        self.created_time=datetime.datetime.now()
+        self.finished_time=datetime.datetime.now()
     
     def delete(self):
         self.collector.delete()
@@ -128,20 +136,31 @@ class redisRecord(object):
     def setting(self):
         return self.st.get()
 
-    def save(self,base_path=None,mode='both'):
+    def save(self,base_path=None,backend=None):
         if base_path is None:
             # base_path = Path(str('D:'))   
             base_path = Path(storage_cfg.get('data_path', Path.cwd()))
         else:
             base_path = Path(base_path)
 
+        if backend is None:
+            backend = self.save_backend
+
+        record = dict(
+                config=self.config,
+                setting=self.setting,
+                tags=self.tags,
+                data=self.data
+            )
+
         path = base_path / time.strftime('%Y') / time.strftime('%m%d')
         path.mkdir(parents=True, exist_ok=True)
+        fname_raw=f"{self.name}_{time.strftime('%Y%m%d%H%M%S')}"
 
         res=[]
 
-        if mode in ['both','data']:
-            args=self.data
+        if backend in ['both','npz']:
+            args=record['data']
             if len(args)==3:
                 x,y,z=args
                 kw=dict(x=x,y=y,z=z)
@@ -150,25 +169,21 @@ class redisRecord(object):
                 kw=dict(x=x,z=z)
             else:
                 raise
-            fname = f"{self.name}_{time.strftime('%Y%m%d%H%M%S')}.npz"
+            fname = f"{fname_raw}.npz"
             np.savez_compressed(path / fname, **kw)
             print(path / fname)
             res.append(path / fname)
 
-        if mode in ['both','record']:
-            record = {}
-            record.update(
-                config=self.config,
-                setting=self.setting,
-                tags=self.tags,
-                data=self.data
-            )
+        if backend in ['both','dat']:   
             record_b=pickle.dumps(record)
-            fname = f"{self.name}_record{time.strftime('%Y%m%d%H%M%S')}.txt"
+            fname = f"{fname_raw}.dat"
             with open(path / fname,'wb') as f:
                 f.write(record_b)
             print(path / fname)
             res.append(path / fname)
+
+        if backend in ['mongo']:
+            pass
         return tuple(res)
 
     @staticmethod
@@ -179,10 +194,12 @@ class redisRecord(object):
         return record
     
     def __enter__(self):
+        self.created_time=datetime.datetime.now()     
         self.collector.delete()
         self.isactive.set(True)
         
     def __exit__(self,t,val,tb):
+        self.finished_time=datetime.datetime.now()
         if self.autosave and self.collector.z.size>0:
-            self.save(mode='both')
+            self.save()
         self.isactive.set(False)

@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 from . import AWGBoardDefines
-#import AWGBoardDefines
+# import AWGBoardDefines
 import struct
 from itertools import repeat
 
@@ -21,8 +21,11 @@ awg_para = {
 'C18EFFFE1':[[1.162,1.16,1.144,1.138], [193,259,411,279]],
 'C18EFFFE2':[[1.118,1.116,1.146,1.146], [46,106,14,-135]],
 'C18EFFFE3':[[1.162,1.166,1.13,1.138], [493,352,396,422]],
-'C18EFFFE4':[[1.316,1.252,1.264,1.25], [-337,376,-512,242]],
-'C18EFFFE5':[[1.152,1.152,1.155,1.146], [434, 200, 537, 302]],
+'C18EFFFE4':[[1.316,1.252,1.262,1.248], [-576,215,-612,146]],
+'C18EFFFCD':[[0.93,0.93,0.91,0.91], [226,315,260,123]],
+'C18EFFFDA':[[0.93,0.92,0.92,0.91], [330,220,191,213]],
+'C18EFFFDC':[[0.94,0.94,0.92,0.9], [160,312,162,116]],
+'C18EFFFDD':[[0.91,0.92,0.9,0.92], [186,164,78,134]],
 }
 
 
@@ -294,10 +297,13 @@ class AWGBoard(RAWBoard):
         self.offset_volt = [0] * self.channel_count
         # 默认0电平码值
         self.defaultcode = [32768] * self.channel_count
+        self.amp_gain = [32767]  * self.channel_count
         # 每个通道对应的指令集执行的次数
         self.loopcnt = [60000] * self.channel_count
         # 每个通道是否在上一条指令执行后保持输出，默认不保持
         self.holdoutput = [0] * self.channel_count
+        # wave length is the maximum data samples for each channel
+        self.max_sample_cnt = 200000
         # 电压范围是负载以50欧匹配时看到的最大电压值
         self.voltrange = [1.0] * self.channel_count
         # 命令集
@@ -345,7 +351,7 @@ class AWGBoard(RAWBoard):
         self._channel_check(channel)
         bank = self.bank_dic['awg'][channel - 1]
         sub_ch = (((channel - 1) & 0x01) << 3)
-        reg_low = self.holdoutput[channel - 1] | (self.defaultcode[channel - 1] << 16)
+        reg_low = self.holdoutput[channel - 1] | (self.amp_gain[channel - 1] << 16)
         reg_high = self.loopcnt[channel - 1]
         addr = self.board_def.REG_CNFG_REG0 + sub_ch
         self.Write_Reg(bank, addr, reg_low)
@@ -362,6 +368,20 @@ class AWGBoard(RAWBoard):
 
         self._channel_check(channel)
         self.loopcnt[channel - 1] = loopcnt
+        self._commit_para(channel)
+
+    def SetAmpGain(self, channel, amp_gain):
+        """
+        :param self: AWG对象
+        :param amp_gain: 通道ch波形输出增益系数，范围[-1,1]
+        :param channel: AWG 通道值（1，2，3，4）
+        :return: None，网络通信失败表示命令设置失败
+        """
+        assert -1 <= amp_gain <= 1
+        self._channel_check(channel)
+        _b = struct.pack('<h', int(amp_gain*32767))
+        _hex = struct.unpack('<H', _b)[0]
+        self.amp_gain[channel - 1] = _hex
         self._commit_para(channel)
 
     def Start(self, channel):
@@ -673,11 +693,11 @@ class AWGBoard(RAWBoard):
                 """
                 cmd_id = 0x4000
                 cur_sample_point = 0
-            elif wave_type in ['延时','delay'] :
-                cmd_id = 0x2000
-            elif wave_type in ['延时','cont']:
+            elif wave_type in ['跳转', 'jump']:
                 cmd_id = 0x0000
-                is_continue = True
+                pass
+            else:
+                cmd_id = 0x2000
 
             # 计算起始时间对应的采样点
             # print('波形长度',len(wave_list[idx]))
@@ -701,7 +721,7 @@ class AWGBoard(RAWBoard):
             length = (len(temp_wave) >> 3)
             # 生成对应的命令
             # print(start_addr, length)
-            assert start_addr + length <= (100000 >> 3), '波形范围越界'
+            assert start_addr + length <= (self.max_sample_cnt >> 3), '波形范围越界'
             assert delay_cnt <= 65535, '延时计数超过最大值'
             temp_cmd = [start_addr, length, delay_cnt, cmd_id]
 
@@ -745,8 +765,9 @@ class AWGBoard(RAWBoard):
         :param self:
         :return:
         """
-        self._calibrated_offset = awg_para[self.dev_id][1]
-        self.diffampgain = awg_para[self.dev_id][0]
+        if self.dev_id in awg_para.keys():
+            self._calibrated_offset = awg_para[self.dev_id][1]
+            self.diffampgain = awg_para[self.dev_id][0]
         # line = awg_para
         # line = line.strip('\n').split(':')
         # if line[0].strip() == self.dev_id or line[0].strip() == '000423':
@@ -790,6 +811,34 @@ class AWGBoard(RAWBoard):
         # self.Start(1 << (channel - 1))
         # 还是由用户显示的启动AWG
 
+    def dac_is_calibrated(self, chip):
+        '''
+        check if the dac is ready for output
+
+        :param chip: dac chip num
+        :return:
+        '''
+        _sta = self.Read_Reg(chip, 0x147)
+        if _sta & 0xFF == 0x00C0:
+            _473 = self.Read_Reg(chip, 0x473)
+            if not self.count_ones(_473):
+                return False
+        else:
+            return False
+
+        if self.Read_Reg(chip, 0x521) & 0x12 != 0x12:
+            return False
+        return True
+
+    
+    def count_ones(self, data):
+        cnt = 0
+        for i in range(8):
+            cnt += (data >> i) & 0x01
+        if cnt > 5:
+            return True
+        else:
+            return False
     def dac_init(self, chip):
         """
 
@@ -799,23 +848,35 @@ class AWGBoard(RAWBoard):
         :return:
 
         """
-        try_cnt = 5
+        try_cnt = 20
         while try_cnt > 0:
             try_cnt -= 1
-            if self.Read_Reg(chip, 0x147) & 0xFF == 0x00C0:
-                break
-            if try_cnt == 0:
-                print(f'dac chip {chip} 初始化失败')
-                break
-            self.Write_Reg(chip, 0x47d, 0xff)
-            self.Write_Reg(chip, 0x00a, 0xAD)
+            if self.dac_is_calibrated(chip):
+                return True
+            # if not force :
+            #     if self.Read_Reg(chip, 0x147) & 0xFF == 0x00C0:
+            #         if self.count_ones(self.Read_Reg(chip, 0x473)):
+            #             if self.Read_Reg(chip, 0x521) & 0x12 == 0x12:
+            #                 break
+            #             # else:
+            #             #     print(f'this is the first calibrate for chip {chip}')
+            #     if try_cnt == 0:
+            #         print(f'dac chip {chip} 初始化失败')
+            #         break
 
-            self.Write_Reg(chip, 0x000, 0x81)
-            self.Write_Reg(chip, 0x000, 0x18)
+            self.Write_Reg(chip, 0x000, 0xBD)
+            self.Write_Reg(chip, 0x000, 0x3C)
+            self.Write_Reg(chip, 0x011, 0x00)
+
+            # self.Write_Reg(chip, 0x47d, 0xff)
+            # self.Write_Reg(chip, 0x00a, 0xAD)
+
+            # self.Write_Reg(chip, 0x000, 0x81)
+            # self.Write_Reg(chip, 0x000, 0x18)
 
             self.Write_Reg(chip, 0x12F, 0x21)
-            self.Write_Reg(chip, 0x011, 0xFF)
-            self.Write_Reg(chip, 0x011, 0x00)
+            # self.Write_Reg(chip, 0x011, 0xFF)
+            # self.Write_Reg(chip, 0x011, 0x00)
 
             self.Write_Reg(chip, 0x080, 0x00)
             self.Write_Reg(chip, 0x081, 0x00)
@@ -832,7 +893,8 @@ class AWGBoard(RAWBoard):
             self.Write_Reg(chip, 0x088, 0xC9)
             self.Write_Reg(chip, 0x089, 0x0E)
             self.Write_Reg(chip, 0x08A, 0x12)
-            self.Write_Reg(chip, 0x08D, 0x01)
+
+            self.Write_Reg(chip, 0x08D, 0x7B)
 
             self.Write_Reg(chip, 0x1B0, 0x00)
             self.Write_Reg(chip, 0x1B9, 0x24)
@@ -844,8 +906,8 @@ class AWGBoard(RAWBoard):
             self.Write_Reg(chip, 0x1C4, 0x7E)
 
             self.Write_Reg(chip, 0x08B, 0x01)
-            self.Write_Reg(chip, 0x085, 0x10)
             self.Write_Reg(chip, 0x08C, 0x02)
+            self.Write_Reg(chip, 0x085, 0x10)
 
             self.Write_Reg(chip, 0x1B5, 0x09)
             self.Write_Reg(chip, 0x1BB, 0x13)
@@ -905,7 +967,7 @@ class AWGBoard(RAWBoard):
             self.Write_Reg(chip, 0x2A0, 0x06)
             self.Write_Reg(chip, 0x280, 0x01)
 
-            self.Write_Reg(chip, 0x268, 0x22)
+            self.Write_Reg(chip, 0x268, 0x62)
             self.Write_Reg(chip, 0x301, 0x01)
             if chip == 1:
                 self.Write_Reg(chip, 0x304, 0x10)
@@ -915,8 +977,8 @@ class AWGBoard(RAWBoard):
             if chip == 2:
                 self.Write_Reg(chip, 0x304, 0x10)
                 self.Write_Reg(chip, 0x305, 0x10)
-                self.Write_Reg(chip, 0x306, 0x04)
-                self.Write_Reg(chip, 0x307, 0x04)
+                self.Write_Reg(chip, 0x306, 0x05)
+                self.Write_Reg(chip, 0x307, 0x05)
             self.Write_Reg(chip, 0x03a, 0x82)
             self.Write_Reg(chip, 0x03a, 0x81)
             self.Write_Reg(chip, 0x03a, 0xc1)
@@ -933,11 +995,13 @@ class AWGBoard(RAWBoard):
             self.Write_Reg(chip, 0x0e9, 0x03)
 
             cnt = 0
-            while cnt < 100:
+            while cnt < 200:
                 cal_stat = self.Read_Reg(chip, 0x0E9)
                 if ((cal_stat & 0xF0) == 0x80):
+                    # print(f'chip {chip} dac channle 1 calibrate is done')
                     break
                 cnt += 1
+                time.sleep(0.01)
 
             self.Write_Reg(chip, 0x0e8, 0x04)
             self.Write_Reg(chip, 0x0eD, 0xA2)
@@ -945,11 +1009,13 @@ class AWGBoard(RAWBoard):
             self.Write_Reg(chip, 0x0e9, 0x03)
 
             cnt = 0
-            while cnt < 100:
+            while cnt < 200:
                 cal_stat = self.Read_Reg(chip, 0x0E9)
                 if ((cal_stat & 0xF0) == 0x80):
+                    # print(f'chip {chip} dac channle 2 calibrate is done')
                     break
                 cnt += 1
+                time.sleep(0.01)
 
             self.Write_Reg(chip, 0x0e7, 0x30)
 
@@ -963,4 +1029,10 @@ class AWGBoard(RAWBoard):
             self.Write_Reg(chip, 0x045, 0x00)
             self.Write_Reg(chip, 0x03a, 0x82)
             self.Write_Reg(chip, 0x2a5, 0x01)
-            # print('0x147', hex(self.Read_Reg(ch, 0x147)))
+
+            if self.Read_Reg(chip, 0x147) & 0xFF == 0x00C0:
+                if self.count_ones(self.Read_Reg(chip, 0x473)):
+                    self.Write_Reg(chip, 0x521, 0x12)
+            # time.sleep(1)
+        print(f'dac chip {chip} 初始化失败')
+        return False
