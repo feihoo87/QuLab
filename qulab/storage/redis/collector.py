@@ -160,17 +160,18 @@ class redisRecord(object):
         res=[]
 
         if backend in ['both','npz']:
+            fname = f"{fname_raw}.npz"
             args=record['data']
             if len(args)==3:
                 x,y,z=args
                 kw=dict(x=x,y=y,z=z)
+                np.savez_compressed(path / fname, **kw)
             elif len(args)==2:
                 x,z=args
                 kw=dict(x=x,z=z)
+                np.savez_compressed(path / fname, **kw)
             else:
-                raise
-            fname = f"{fname_raw}.npz"
-            np.savez_compressed(path / fname, **kw)
+                np.savez_compressed(path / fname, *args)
             print(path / fname)
             res.append(path / fname)
 
