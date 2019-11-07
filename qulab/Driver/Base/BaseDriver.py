@@ -147,7 +147,7 @@ class visaDriver(BaseDriver):
             version = IDN[3].strip()
             self.model = model
         except:
-            raise Error('query IDN error!')
+            raise IOError('query IDN error!')
 
     def performClose(self, **kw):
         self.handle.close()
@@ -176,7 +176,7 @@ class visaDriver(BaseDriver):
             e.append((code, msg))
         return e
 
-    def query(self, message, mode=None, check_errors=False):
+    def query(self, message, mode=None,):
         if self.handle is None:
             return None
         log.debug("%s << %s", str(self.handle), message)
@@ -194,13 +194,10 @@ class visaDriver(BaseDriver):
             log.exception("%s << %s", str(self.handle), message)
             raise
         log.debug("%s >> %s", str(self.handle), res)
-        if check_errors:
-            self.check_errors_and_log(message)
         return res
 
     def query_ascii_values(self, message, converter='f', separator=',',
-                           container=list, delay=None,
-                           check_errors=False):
+                           container=list, delay=None,):
         if self.handle is None:
             return None
         log.debug("%s << %s", str(self.handle), message)
@@ -211,13 +208,11 @@ class visaDriver(BaseDriver):
             log.exception("%s << %s", str(self.handle), message)
             raise
         log.debug("%s >> <%d results>", str(self.handle), len(res))
-        if check_errors:
-            self.check_errors_and_log(message)
         return res
 
     def query_binary_values(self, message, datatype='f', is_big_endian=False,
                             container=list, delay=None,
-                            header_fmt='ieee', check_errors=False):
+                            header_fmt='ieee',):
         if self.handle is None:
             return None
         log.debug("%s << %s", str(self.handle), message)
@@ -228,11 +223,9 @@ class visaDriver(BaseDriver):
             log.exception("%s << %s", str(self.handle), message)
             raise
         log.debug("%s >> <%d results>", str(self.handle), len(res))
-        if check_errors:
-            self.check_errors_and_log(message)
         return res
 
-    def write(self, message, check_errors=False):
+    def write(self, message):
         """Send message to the instrument."""
         if self.handle is None:
             return None
@@ -242,11 +235,9 @@ class visaDriver(BaseDriver):
         except:
             log.exception("%s << %s", str(self.handle), message)
             raise
-        if check_errors:
-            self.check_errors_and_log(message)
 
     def write_ascii_values(self, message, values, converter='f', separator=',',
-                           termination=None, encoding=None, check_errors=False):
+                           termination=None, encoding=None,):
         if self.handle is None:
             return None
         log_msg = message+('<%d values>' % len(values))
@@ -257,12 +248,10 @@ class visaDriver(BaseDriver):
         except:
             log.exception("%s << %s", str(self.handle), log_msg)
             raise
-        if check_errors:
-            self.check_errors_and_log(log_msg)
 
     def write_binary_values(self, message, values, datatype='f',
                                 is_big_endian=False, termination=None,
-                                encoding=None, check_errors=False):
+                                encoding=None,):
         if self.handle is None:
             return None
         block, header = IEEE_488_2_BinBlock(values, datatype, is_big_endian)
@@ -274,8 +263,6 @@ class visaDriver(BaseDriver):
         except:
             log.exception("%s << %s", str(self.handle), log_msg)
             raise
-        if check_errors:
-            self.check_errors_and_log(log_msg)
 
 
 def IEEE_488_2_BinBlock(datalist, dtype="int16", is_big_endian=True):
