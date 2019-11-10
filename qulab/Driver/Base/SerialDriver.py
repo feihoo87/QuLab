@@ -61,6 +61,11 @@ class SerialDriver(BaseDriver):
                 break
             e.append((code, msg))
         return e
+    
+    def resetquery(self):
+        '''在写入错误的情况下，读取所有的返回信息，即清空错误返回'''
+        res_byte_list = self.handle.readlines()
+        return res_byte_list
             
     def query(self, message):
         if self.handle is None:
