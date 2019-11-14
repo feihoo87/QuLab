@@ -28,9 +28,9 @@ class SerialDriver(BaseDriver):
             self.handle=serial.Serial(self.addr,baudrate=self._baudrate,timeout=self.timeout)
         try:
             IDN = self.query("*IDN?").split(',')
-            company = IDN[0].strip()
+            # company = IDN[0].strip()
             model = IDN[1].strip()
-            version = IDN[3].strip()
+            # version = IDN[3].strip()
             self.model = model
         except:
             raise IOError('query IDN error!')
@@ -90,7 +90,7 @@ class SerialDriver(BaseDriver):
         log.debug("%s << %s", str(self.handle), message)
         try:
             message_byte=(message+'\n').encode()  #格式化字符串
-            ret = self.handle.write(message_byte)
+            _ = self.handle.write(message_byte)
         except:
             log.exception("%s << %s", str(self.handle), message)
             raise

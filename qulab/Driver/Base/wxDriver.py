@@ -46,7 +46,7 @@ class wxDriver(BaseDriver):
         """Send message to the instrument."""
         log.debug("%s << %s", str(self.handle), message)
         try:
-            ret = self.handle.send_cmd(message)
+            _ = self.handle.send_cmd(message)
         except:
             log.exception("%s << %s", str(self.handle), message)
             raise
@@ -62,7 +62,7 @@ class wxDriver(BaseDriver):
         dac_min = self.handle.get_dev_property('min_dac_val', 0)
         dac_max = self.handle.get_dev_property('max_dac_val', 2**14-1)
 
-        wav_len = len(points)
+        # wav_len = len(points)
 
         zero_val = (dac_min + dac_max) / 2.0
         amplitude = (dac_max - dac_min) / 2.0

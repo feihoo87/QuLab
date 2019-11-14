@@ -233,7 +233,7 @@ class visaDriver(BaseDriver):
             return None
         log.debug("%s << %s", str(self.handle), message)
         try:
-            ret = self.handle.write(message)
+            _ = self.handle.write(message)
         except:
             log.exception("%s << %s", str(self.handle), message)
             raise
@@ -245,7 +245,7 @@ class visaDriver(BaseDriver):
         log_msg = message+('<%d values>' % len(values))
         log.debug("%s << %s", str(self.handle), log_msg)
         try:
-            ret = self.handle.write_ascii_values(message, values, converter,
+            _ = self.handle.write_ascii_values(message, values, converter,
                                               separator, termination, encoding)
         except:
             log.exception("%s << %s", str(self.handle), log_msg)
@@ -260,7 +260,7 @@ class visaDriver(BaseDriver):
         log_msg = message+header+'<DATABLOCK>'
         log.debug("%s << %s", str(self.handle), log_msg)
         try:
-            ret = self.handle.write_binary_values(message, values, datatype,
+            _ = self.handle.write_binary_values(message, values, datatype,
                                     is_big_endian, termination, encoding)
         except:
             log.exception("%s << %s", str(self.handle), log_msg)

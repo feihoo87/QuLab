@@ -1,4 +1,5 @@
 import copy
+import numpy as np
 
 class Variable(object):
     '''descriptor of variable, which is a tuple (value, unit).'''
@@ -125,7 +126,7 @@ class QBool(Quantity):
         return bool(value)
 
     def _pre_formatSetCmd(self,**kw):
-        kw['value']=Bool(kw['value'])
+        kw['value']=bool(kw['value'])
         return kw
 
 
