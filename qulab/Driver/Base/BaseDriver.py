@@ -129,6 +129,8 @@ class visaDriver(BaseDriver):
     def __init__(self, addr=None, timeout=3, visa_backend='@ni', **kw):
         super(visaDriver, self).__init__(addr, timeout, **kw)
         self.visa_backend='@ni'
+        if 'ins' in kw.keys():#兼容旧版本diver使用方法,ins即为仪器句柄
+            self.handle = kw.get('ins') 
 
     def __repr__(self):
         return 'visaDriver(addr=%s,model=%s)' % (self.addr,self.model)
@@ -142,9 +144,9 @@ class visaDriver(BaseDriver):
         self.handle.timeout = self.timeout * 1000
         try:
             IDN = self.handle.query("*IDN?").split(',')
-            company = IDN[0].strip()
+            # company = IDN[0].strip()
             model = IDN[1].strip()
-            version = IDN[3].strip()
+            # version = IDN[3].strip()
             self.model = model
         except:
             raise IOError('query IDN error!')

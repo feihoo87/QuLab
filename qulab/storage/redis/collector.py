@@ -9,7 +9,17 @@ from . import save_backends as backends
 
 class dataCollector(object):
     
-    def __init__(self,name,dim=1,zshape=1,server=None,addr='redis://localhost:6379/0',expire_time=604800):
+    def __init__(self,name,dim=1,zshape=1,server=None,addr='redis://localhost:6379/0',expire_time=172800):
+        '''数据收集器
+
+        Parameter:
+            name: 名字(字符串)，用来在Redis中创建一系列的键
+            dim: 维度(整数)，即扫描参数的个数
+            zshape: 一组参数对应的数据的形状(整数或者元素为整数的元组)
+            server: 已连接的Redis对象，优先于addr使用(如果为None，则根据addr产生一个)
+            addr: 一个Redis数据库的地址，在server参数为None时使用
+            expire_time: 数据的过期时间，单位秒，默认两天
+        '''
         self.name=name
         axis=[]
         for i in range(dim):
@@ -61,9 +71,11 @@ class dataCollector(object):
     
     @property
     def size(self):
-        s=1
-        for v in self.shape:
-            s=s*v
+        # s=1
+        # for v in self.shape:
+        #     s=s*v
+        ## 等价于
+        s=functools.reduce(lambda a,b:a*b, self.shape)
         return s
     
     @property
@@ -73,7 +85,7 @@ class dataCollector(object):
 class redisRecord(object):
     
     def __init__(self,name,dim=1,zshape=1,server=None,
-                addr='redis://localhost:6379/0',save_backend='dat',autosave=True,expire_time=604800):
+                addr='redis://localhost:6379/0',save_backend='dat',autosave=True,expire_time=172800):
         self.name=name
         self.collector=dataCollector(name,dim,zshape,server,addr,expire_time)
         
@@ -131,20 +143,25 @@ class redisRecord(object):
         '''将记录保存
 
         Parameter:
-            backend: 事先定义的后端名字的字符串，可以用.连接多个，比如 'dat.npz.mongo'
+            backend: 由事先定义的后端名字与模式组成的字符串，
+                使用用.连接多个bk，如果有mode参数则使用@分割，比如 'dat.fig@pdf'
         Return:
             ID列表
         '''
         if backend is None:
             backend = self.save_backend
         bk_list=backend.split('.')
-        # id_list=[]
-        # for bk in bk_list:
-        #     save_func=getattr(backends,bk)
-        #     _id = save_func(self)
-        #     id_list.append(_id)
-        ## 等价于
-        id_list=[getattr(backends,bk)(self) for bk in bk_list]
+        id_list=[]
+        for bkm in bk_list:
+            if bkm.count('@'):
+                bk,mode=bkm.split('@')
+                kw=dict(mode=mode)
+            else:
+                bk=bkm
+                kw=dict()
+            save_func=getattr(backends,bk)
+            _id = save_func(self,**kw)
+            id_list.append(_id)
         return id_list
 
     @staticmethod

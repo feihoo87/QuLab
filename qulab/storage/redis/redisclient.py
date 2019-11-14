@@ -7,10 +7,10 @@ import functools
 
 class redisClient(object):
     
-    def __init__(self,name,server=None,addr='redis://localhost:6379/0',expire_time=604800):
+    def __init__(self,name,server=None,addr='redis://localhost:6379/0',expire_time=172800):
         self._r=redis.Redis.from_url(addr) if server is None else server
         self.name=name
-        self.expire_time=expire_time # 默认一周时间过期，单位秒
+        self.expire_time=expire_time # 默认数据两天过期，单位秒
         
     def delete(self):
         self._r.delete(self.name)
@@ -75,7 +75,7 @@ class redisSet(redisClient):
 class redisZSet(redisClient):
     '''有序集合'''
     
-    def __init__(self,name,server=None,addr='redis://localhost:6379/0',expire_time=604800):
+    def __init__(self,name,server=None,addr='redis://localhost:6379/0',expire_time=172800):
         super().__init__(name,server,addr,expire_time)
         self.__score=0
         
