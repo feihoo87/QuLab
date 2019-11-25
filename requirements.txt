@@ -1,20 +1,20 @@
-aioredis==1.2.0
+aioredis==1.3.0
 blinker==1.4
-cryptography==2.7
-ipython==7.7.0
+cryptography==2.8
+ipython==7.8.0
 ipywidgets==7.5.1
 mongoengine==0.18.2
-nest-asyncio==1.0.0
-numpy==1.17.0
+nest-asyncio==1.2.0
+numpy==1.17.3
 scipy==1.3.1
 portalocker==1.5.1
-PyVISA==1.9.1
+PyVISA==1.10.1
 PyVISA-py==0.3.1
 PyYAML==5.1.2
 pyzmq==18.1.0
-redis==3.3.6
-u-msgpack-python==2.5.1
+redis==3.3.11
+u-msgpack-python==2.5.2
 
-pywin32==224; platform_system=="Windows"
+pywin32==225; platform_system=="Windows"
 contextvars==2.4; python_version<"3.7"
-dataclasses==0.6; python_version<"3.7"
+dataclasses==0.7; python_version<"3.7"
