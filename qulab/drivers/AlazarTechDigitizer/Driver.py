@@ -27,7 +27,7 @@ def getExpArray(f_list, numOfPoints, weight=None, sampleRate=1e9):
         weight = np.ones(numOfPoints)
     for f in f_list:
         e.append(weight * np.exp(-1j * 2 * np.pi * f * t))
-    return np.asarray(e).T
+    return np.asarray(e).T / numOfPoints
 
 
 class Driver(BaseDriver):
@@ -95,37 +95,43 @@ class Driver(BaseDriver):
                      timeout=timeout) as h:
             yield from h.read()
 
-    def getData(self, fft=False, avg=False):
+    def getData(self, fft=False, avg=False, timeout=None):
         samplesPerRecord = self.config['samplesPerRecord']
         recordsPerBuffer = self.config['recordsPerBuffer']
         repeats = self.config['repeats']
         e = self.config['e']
         n = e.shape[0]
         maxlen = self.config['maxlen']
+        if timeout is None:
+            timeout = self.timeout
 
-        A, B = None, None
+        A, B = [], []
 
         retry = 0
-        while retry < 3:
+        while retry < 2:
             try:
-                for chA, chB in self._aquireData(
+                for index , (chA, chB) in zip(count(), self._aquireData(
                         samplesPerRecord,
                         repeats=repeats,
                         buffers=None,
                         recordsPerBuffer=recordsPerBuffer,
-                        timeout=1):
+                        timeout=timeout)):
                     A_lst = chA.reshape((recordsPerBuffer, samplesPerRecord))
                     B_lst = chB.reshape((recordsPerBuffer, samplesPerRecord))
                     if fft:
-                        A_lst = (A_lst[:, :n]).dot(e) / n
-                        B_lst = (B_lst[:, :n]).dot(e) / n
-                    try:
-                        A = np.r_[A, A_lst]
-                        B = np.r_[B, B_lst]
-                    except:
-                        A, B = A_lst, B_lst
-                    if repeats == 0 and A.shape[1] >= maxlen:
+                        A_lst = (A_lst[:, :n]).dot(e)
+                        B_lst = (B_lst[:, :n]).dot(e)
+                    A.append(A_lst)
+                    B.append(B_lst)
+                    if repeats == 0 and index*recordsPerBuffer >= maxlen:
                         break
+                
+                A = np.asarray(A)
+                B = np.asarray(B)
+    
+                A = A.flatten().reshape(A.shape[0]*A.shape[1], A.shape[2])
+                B = B.flatten().reshape(B.shape[0]*B.shape[1], B.shape[2])
+
                 if avg:
                     return A.mean(axis=0), B.mean(axis=0)
                 else:
@@ -141,8 +147,8 @@ class Driver(BaseDriver):
         else:
             raise SystemExit(1)
 
-    def getIQ(self, avg=False):
-        return self.getData(True, avg)
+    def getIQ(self, avg=False, timeout=None):
+        return self.getData(True, avg, timeout=timeout)
 
-    def getTraces(self, avg=True):
-        return self.getData(False, avg)
+    def getTraces(self, avg=True, timeout=None):
+        return self.getData(False, avg, timeout=timeout)
