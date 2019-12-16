@@ -1,4 +1,4 @@
-import logging
+# import logging
 import numpy as np
 
 from .BaseDriver import BaseDriver
@@ -6,7 +6,7 @@ from .quant import QReal, QInteger, QString, QOption, QBool, QVector, QList, new
 
 from .wxAWG_API.tewx import TEWXAwg
 
-log = logging.getLogger('qulab.Driver')
+# log = logging.getLogger(__name__)
 
 
 class wxDriver(BaseDriver):
@@ -33,22 +33,22 @@ class wxDriver(BaseDriver):
         return opc
 
     def query(self, message):
-        log.debug("%s << %s", str(self.handle), message)
+        self.log.debug("%s << %s", str(self.handle), message)
         try:
             res = self.handle.send_query(message)
         except:
-            log.exception("%s << %s", str(self.handle), message)
+            self.log.exception("%s << %s", str(self.handle), message)
             raise
-        log.debug("%s >> %s", str(self.handle), res)
+        self.log.debug("%s >> %s", str(self.handle), res)
         return res
 
     def write(self, message):
         """Send message to the instrument."""
-        log.debug("%s << %s", str(self.handle), message)
+        self.log.debug("%s << %s", str(self.handle), message)
         try:
             _ = self.handle.send_cmd(message)
         except:
-            log.exception("%s << %s", str(self.handle), message)
+            self.log.exception("%s << %s", str(self.handle), message)
             raise
 
     

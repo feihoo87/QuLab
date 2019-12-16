@@ -8,12 +8,21 @@ from datetime import datetime
 
 from .quant import QReal, QInteger, QString, QOption, QBool, QVector, QList, newcfg
 
-log = logging.getLogger('qulab.Driver')
+log = logging.getLogger(__name__)
 __all__ = [
     'BaseDriver', 'visaDriver'
 ]
 
 class BaseDriver(object):
+
+    __log__=None
+
+    @property
+    def log(self):
+        if self.__log__ is None:
+            return log
+        else:
+            return self.__log__
 
     support_models = []
     """the confirmed models supported by this driver"""
@@ -48,7 +57,7 @@ class BaseDriver(object):
 
     def newcfg(self):
         self.config = newcfg(self.quants, self.CHs)
-        log.info('new config!')
+        self.log.info('new config!')
 
     def getcfg(self):
         return self.config
@@ -70,11 +79,11 @@ class BaseDriver(object):
 
     def open(self, **kw):
         self.performOpen(**kw)
-        log.info(f'{datetime.now()}    Open Instrument {self.model}@{self.addr}')
+        self.log.info(f'{datetime.now()}    Open Instrument {self.model}@{self.addr}')
 
     def close(self, **kw):
         self.performClose(**kw)
-        log.info(f'{datetime.now()}    Close Instrument {self.model}@{self.addr}')
+        self.log.info(f'{datetime.now()}    Close Instrument {self.model}@{self.addr}')
 
     def performOPC(self):
         return 1
@@ -97,7 +106,7 @@ class BaseDriver(object):
         _kw=copy.deepcopy(quant.default)
         _kw.update(value=value,**kw)
         self.performSetValue(quant, **_kw)
-        log.info('%s    Set Value of CH-%s: %s --> %s %s' % (datetime.now(),_kw.get('ch'),name,value,_kw.get('unit')))
+        self.log.info('%s    Set Value of CH-%s: %s --> %s %s' % (datetime.now(),_kw.get('ch'),name,value,_kw.get('unit')))
         self.config[name][_kw.pop('ch')].update(_kw) # update config
         opc=self.performOPC()
         return opc
@@ -109,7 +118,7 @@ class BaseDriver(object):
         _kw.update(**kw)
         value = self.performGetValue(quant, **_kw)
         _kw.update(value=value)
-        log.info('%s    Get Value of CH-%s: %s <-- %s %s' % (datetime.now(),_kw.get('ch'),name,value,_kw.get('unit')))
+        self.log.info('%s    Get Value of CH-%s: %s <-- %s %s' % (datetime.now(),_kw.get('ch'),name,value,_kw.get('unit')))
         self.config[name][_kw.pop('ch')].update(_kw) # update config
         return value
 
@@ -181,7 +190,7 @@ class visaDriver(BaseDriver):
     def query(self, message, mode=None,):
         if self.handle is None:
             return None
-        log.debug("%s << %s", str(self.handle), message)
+        self.log.debug("%s << %s", str(self.handle), message)
         try:
             if mode is None:
                 res = self.handle.query(message)
@@ -193,23 +202,23 @@ class visaDriver(BaseDriver):
                         is_big_endian=False, container=list, delay=None,
                         header_fmt='ieee')
         except:
-            log.exception("%s << %s", str(self.handle), message)
+            self.log.exception("%s << %s", str(self.handle), message)
             raise
-        log.debug("%s >> %s", str(self.handle), res)
+        self.log.debug("%s >> %s", str(self.handle), res)
         return res
 
     def query_ascii_values(self, message, converter='f', separator=',',
                            container=list, delay=None,):
         if self.handle is None:
             return None
-        log.debug("%s << %s", str(self.handle), message)
+        self.log.debug("%s << %s", str(self.handle), message)
         try:
             res = self.handle.query_ascii_values(
                 message, converter, separator, container, delay)
         except:
-            log.exception("%s << %s", str(self.handle), message)
+            self.log.exception("%s << %s", str(self.handle), message)
             raise
-        log.debug("%s >> <%d results>", str(self.handle), len(res))
+        self.log.debug("%s >> <%d results>", str(self.handle), len(res))
         return res
 
     def query_binary_values(self, message, datatype='f', is_big_endian=False,
@@ -217,25 +226,25 @@ class visaDriver(BaseDriver):
                             header_fmt='ieee',):
         if self.handle is None:
             return None
-        log.debug("%s << %s", str(self.handle), message)
+        self.log.debug("%s << %s", str(self.handle), message)
         try:
             res = self.handle.query_binary_values(message, datatype,
                             is_big_endian,container, delay, header_fmt)
         except:
-            log.exception("%s << %s", str(self.handle), message)
+            self.log.exception("%s << %s", str(self.handle), message)
             raise
-        log.debug("%s >> <%d results>", str(self.handle), len(res))
+        self.log.debug("%s >> <%d results>", str(self.handle), len(res))
         return res
 
     def write(self, message):
         """Send message to the instrument."""
         if self.handle is None:
             return None
-        log.debug("%s << %s", str(self.handle), message)
+        self.log.debug("%s << %s", str(self.handle), message)
         try:
             _ = self.handle.write(message)
         except:
-            log.exception("%s << %s", str(self.handle), message)
+            self.log.exception("%s << %s", str(self.handle), message)
             raise
 
     def write_ascii_values(self, message, values, converter='f', separator=',',
@@ -243,12 +252,12 @@ class visaDriver(BaseDriver):
         if self.handle is None:
             return None
         log_msg = message+('<%d values>' % len(values))
-        log.debug("%s << %s", str(self.handle), log_msg)
+        self.log.debug("%s << %s", str(self.handle), log_msg)
         try:
             _ = self.handle.write_ascii_values(message, values, converter,
                                               separator, termination, encoding)
         except:
-            log.exception("%s << %s", str(self.handle), log_msg)
+            self.log.exception("%s << %s", str(self.handle), log_msg)
             raise
 
     def write_binary_values(self, message, values, datatype='f',
@@ -258,12 +267,12 @@ class visaDriver(BaseDriver):
             return None
         block, header = IEEE_488_2_BinBlock(values, datatype, is_big_endian)
         log_msg = message+header+'<DATABLOCK>'
-        log.debug("%s << %s", str(self.handle), log_msg)
+        self.log.debug("%s << %s", str(self.handle), log_msg)
         try:
             _ = self.handle.write_binary_values(message, values, datatype,
                                     is_big_endian, termination, encoding)
         except:
-            log.exception("%s << %s", str(self.handle), log_msg)
+            self.log.exception("%s << %s", str(self.handle), log_msg)
             raise
 
 

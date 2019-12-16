@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import numpy as np
+import logging
+log = logging.getLogger(__name__)
 
 from qulab.Driver import visaDriver, QInteger, QOption, QReal, QString, QVector
 
 
 class Driver(visaDriver):
+    __log__=log
     support_models = ['DPO4104B']
 
     quants = [

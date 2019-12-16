@@ -1,10 +1,13 @@
 import numpy as np
+import logging
+log = logging.getLogger(__name__)
 
 from qulab.Driver import SerialDriver, QReal, QOption
 
 
 class Driver(SerialDriver):
     support_models = ['DAT64H']
+    __log__ = log
 
     quants = [
 

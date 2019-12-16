@@ -3,8 +3,13 @@ import numpy as np
 from qulab.Driver import BaseDriver, QInteger, QOption, QReal, QString, QVector
 from . import TimeDomainPlotCore as ad_core
 
+import logging
+log = logging.getLogger(__name__)
 
 class Driver(BaseDriver):
+
+    __log__=log
+    
     support_models = ['PG_ADC']
     # quants = [
     #     # QReal('Offset', value=0, ch=0),

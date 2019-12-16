@@ -10,8 +10,7 @@ from .AlazarTechWrapper import (AlazarTechDigitizer, AutoDMA, DMABufferArray,
                                 configure,initialize)
 from .exception import AlazarTechError
 
-log = logging.getLogger('qulab.Driver')
-
+log = logging.getLogger(__name__)
 
 def getSamplesPerRecode(numOfPoints):
     samplesPerRecord = (numOfPoints // 64) * 64
@@ -31,6 +30,9 @@ def getExpArray(f_list, numOfPoints, weight=None, sampleRate=1e9):
 
 
 class Driver(BaseDriver):
+
+    __log__=log
+    
     def __init__(self, addr=None, **kw):
         super().__init__(addr=addr,**kw)
 
@@ -151,7 +153,7 @@ class Driver(BaseDriver):
                 else:
                     return A, B
             except AlazarTechError as err:
-                log.exception(err.msg)
+                self.log.exception(err.msg)
                 if err.code == 518:
                     raise SystemExit(2)
                 else:

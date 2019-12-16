@@ -12,6 +12,9 @@ log = logging.getLogger(__name__)
 # log.addHandler(logging.NullHandler())
 
 class Driver(BaseDriver):
+
+    __log__=log
+    
     support_models = ['M3202A', ]
 
     quants = [

@@ -4,9 +4,12 @@ import numpy as np
 
 from qulab.Driver import visaDriver, QInteger, QOption, QReal, QString, QVector
 
+import logging
+log = logging.getLogger(__name__)
 
 # yapf: disable
 class Driver(visaDriver):
+    __log__=log
     error_command = ''
     support_models = ['33120A', '33220A']
     quants = [

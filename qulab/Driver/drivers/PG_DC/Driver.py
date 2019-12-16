@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-import logging
 
 from qulab.Driver import BaseDriver, QInteger, QOption, QReal, QString, QVector
-
 from .PG_DC_api import Voltage
 
-log = logging.getLogger('qulab.driver.PG_DC')
+import logging
+log = logging.getLogger(__name__)
 
 class Driver(BaseDriver):
+
+    __log__=log
+    
     support_models = ['PG_DC']
 
     CHs=[1,2,3,4]

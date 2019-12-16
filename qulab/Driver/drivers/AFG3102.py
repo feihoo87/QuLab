@@ -1,9 +1,12 @@
 import numpy as np
+import logging
+log = logging.getLogger(__name__)
 
 from qulab.Driver import visaDriver, QOption, QReal
 
 
 class Driver(visaDriver):
+    __log__=log
     error_command = '*ESR?'
     support_models = ['AFG3102']
 

@@ -1,17 +1,18 @@
-import logging
 import os
 import time
 
 import numpy as np
+import logging
+log = logging.getLogger(__name__)
 
 # need zhinst package
 import zhinst.utils
 from qulab import BaseDriver, QInteger, QOption, QReal, QString, QVector
 
-logger = logging.getLogger('qulab.Driver.ZI')
-
 
 class Driver(BaseDriver):
+
+    __log__=log
     support_models = [
         'UHFLI',
     ]

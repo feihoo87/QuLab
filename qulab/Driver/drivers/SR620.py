@@ -2,11 +2,14 @@
 import struct
 import numpy as np
 from visa import VisaIOWarning
+import logging
+log = logging.getLogger(__name__)
 
 from qulab.Driver import visaDriver, QOption, QReal, QVector
 
 
 class Driver(visaDriver):
+    __log__=log
     error_command = ''
     support_models = ['SR620']
     quants = [

@@ -4,11 +4,13 @@ from qulab.Driver import (BaseDriver, QInteger, QOption, QReal, QVector)
 from .VoltageSettingCore import (CalculateDValue, SetChannelNum, SetDefaultIP,
                                  SetDValue)
 
-log = logging.getLogger('qulab.driver.DCSource')
+log = logging.getLogger(__name__)
 
 
 class Driver(BaseDriver):
 
+    __log__=log
+    
     CHs=[1,2,3,4]
 
     quants = [

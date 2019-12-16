@@ -1,8 +1,11 @@
 import numpy as np
+import logging
+log = logging.getLogger(__name__)
 from qulab.Driver import visaDriver, QInteger, QOption, QReal, QVector
 
 
 class Driver(visaDriver):
+    __log__=log
     support_models = ['E8363B', 'E8363C', 'E5071C', 'E5080A',
                     'ZNB20-2Port', 'N5232A']
 

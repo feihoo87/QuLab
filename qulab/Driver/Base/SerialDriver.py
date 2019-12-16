@@ -1,12 +1,12 @@
 import serial # use the pyserial module (https://pypi.python.org/pypi/pyserial)
 
-import logging
+# import logging
 import numpy as np
 
 from .BaseDriver import BaseDriver
 from .quant import QReal, QInteger, QString, QOption, QBool, QVector, QList, newcfg
 
-log = logging.getLogger('qulab.Driver')
+# log = logging.getLogger(__name__)
 
 class SerialDriver(BaseDriver):
 
@@ -70,7 +70,7 @@ class SerialDriver(BaseDriver):
     def query(self, message):
         if self.handle is None:
             return None
-        log.debug("%s << %s", str(self.handle), message)
+        self.log.debug("%s << %s", str(self.handle), message)
         try:
             message_byte=(message+'\n').encode()   #格式化字符串 
             self.handle.write(message_byte)
@@ -78,19 +78,19 @@ class SerialDriver(BaseDriver):
             # 如果写入的命令失败返回的结果为badCommandResponse = b'[BADCOMMAND]\r\n'  (DAT64H)
             res = res_byte.decode()
         except:
-            log.exception("%s << %s", str(self.handle), message)
+            self.log.exception("%s << %s", str(self.handle), message)
             raise
-        log.debug("%s >> %s", str(self.handle), res)
+        self.log.debug("%s >> %s", str(self.handle), res)
         return res
 
     def write(self, message):
         """Send message to the instrument."""
         if self.handle is None:
             return None
-        log.debug("%s << %s", str(self.handle), message)
+        self.log.debug("%s << %s", str(self.handle), message)
         try:
             message_byte=(message+'\n').encode()  #格式化字符串
             _ = self.handle.write(message_byte)
         except:
-            log.exception("%s << %s", str(self.handle), message)
+            self.log.exception("%s << %s", str(self.handle), message)
             raise

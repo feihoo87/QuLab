@@ -1,10 +1,14 @@
 from qulab.Driver import BaseDriver, QOption, QReal, QInteger
 from . import AWGboard
-
+import logging
+log = logging.getLogger(__name__)
 
 class Driver(BaseDriver):
 
+    __log__=log
+    
     CHs=[1,2,3,4]
+
     quants = [
         QReal('Offset',value=0,unit='V',ch=1,),
         QReal('Amplitude',value=1,unit='V',ch=1,),

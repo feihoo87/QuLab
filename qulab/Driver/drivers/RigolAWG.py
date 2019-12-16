@@ -1,9 +1,11 @@
 import numpy as np
-
+import logging
+log = logging.getLogger(__name__)
 from qulab.Driver import visaDriver, QReal
 
 
 class Driver(visaDriver):
+    __log__=log
     support_models = ['DG1062Z']
     CHs=[1,2]
 
