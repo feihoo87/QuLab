@@ -23,12 +23,12 @@ class dataCollector(object):
         self.name=name
         axis=[]
         for i in range(dim):
-            _name=f'{name}_ax{i}'
+            _name=f'{name}.ax{i}'
             axis.append(redisZSet(_name,server,addr,expire_time))
         self.axis=axis
         self.dim=dim
         
-        _name=f'{name}_zlist'
+        _name=f'{name}.z'
         self.z=redisList(_name,server,addr,expire_time)
         self.zshape=zshape if isinstance(zshape,tuple) else (zshape,)
     
@@ -89,14 +89,14 @@ class redisRecord(object):
         self.name=name
         self.collector=dataCollector(name,dim,zshape,server,addr,expire_time)
         
-        _name=f'{name}_config'
+        _name=f'{name}.config'
         self.cfg=redisString(_name,server,addr,expire_time)
-        _name=f'{name}_setting'
+        _name=f'{name}.setting'
         self.st=redisString(_name,server,addr,expire_time)
-        _name=f'{name}_tags'
+        _name=f'{name}.tags'
         self.tg=redisSet(_name,server,addr,expire_time)
 
-        _name=f'{name}_isactive'
+        _name=f'{name}.isactive'
         self.isactive=redisString(_name,server,addr,expire_time)
 
         self.save_backend=save_backend
