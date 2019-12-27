@@ -182,7 +182,7 @@ async def connect(path, *, loop=None):
     if isinstance(path, Connection):
         path = path.path
     if __redis is not None:
-        addr = _getAddressOnRedis(self.path)
+        addr = _getAddressOnRedis(path)
     else:
         addr = await dht.get(path)
     if addr is None:
