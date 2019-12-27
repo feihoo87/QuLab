@@ -238,7 +238,6 @@ class Server:
         Set the given SHA1 digest key (bytes) to the given value in the
         network.
         """
-        self.storage[dkey] = value
         node = Node(dkey)
 
         nearest = self.protocol.router.find_neighbors(node)
@@ -253,9 +252,9 @@ class Server:
         log.info("setting '%s' on %s", dkey.hex(), list(map(str, nodes)))
 
         # if this node is close too, then store here as well
-        #biggest = max([n.distance_to(node) for n in nodes])
-        #if self.node.distance_to(node) < biggest:
-        #    self.storage[dkey] = value
+        biggest = max([n.distance_to(node) for n in nodes])
+        if self.node.distance_to(node) < biggest:
+            self.storage[dkey] = value
         results = [self.protocol.call_store(n, dkey, value) for n in nodes]
         # return true only if at least one store call succeeded
         return any(await asyncio.gather(*results))

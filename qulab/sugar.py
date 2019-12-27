@@ -1,6 +1,8 @@
 import asyncio
 from urllib.parse import urlparse
 
+import redis
+
 from qulab._config import config, config_dir
 from qulab.dht.network import Server as DHT
 from qulab.dht.network import cfg as DHT_config
@@ -28,6 +30,17 @@ class Node:
 root = Node('')
 
 __dht = None
+__redis = config['db'].get('redis', None)
+if __redis is not None:
+    __redis = redis.Redis(__redis)
+
+
+def _setAddressOnRedis(path, addr):
+    __redis.set(f'qulab_route_table_{path}', addr)
+
+
+def _getAddressOnRedis(path):
+    return __redis.get(f'qulab_route_table_{path}').decode()
 
 
 def getBootstrapNodes():
@@ -77,6 +90,8 @@ async def mount(module, path, *, loop=None):
     s = ZMQServer(loop=loop)
     s.set_module(module)
     s.start()
+    if __redis is not None:
+        _setAddressOnRedis(path, addr)
     dht = await getDHT()
     await asyncio.sleep(0.1)
     addr = 'tcp://%s:%d' % (getHostIP(), s.port)
@@ -122,8 +137,11 @@ class Connection:
             raise
 
     async def _connect(self):
-        dht = await getDHT()
-        addr = await dht.get(self.path)
+        if __redis is not None:
+            addr = _getAddressOnRedis(self.path)
+        else:
+            dht = await getDHT()
+            addr = await dht.get(self.path)
         if addr is None:
             raise QuLabRPCError(f"Unknow RPC path {self.path}.")
         return ZMQClient(addr, loop=self.loop)
