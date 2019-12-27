@@ -35,11 +35,19 @@ if __redis is not None:
     __redis = redis.Redis(**__redis)
 
 
+class RedisNotSetError(Exception):
+    pass
+
+
 def _setAddressOnRedis(path, addr):
+    if __redis is None:
+        raise RedisNotSetError('redis not in config')
     __redis.set(f'qulab_route_table_{path}', addr)
 
 
 def _getAddressOnRedis(path):
+    if __redis is None:
+        raise RedisNotSetError('redis not in config')
     return __redis.get(f'qulab_route_table_{path}').decode()
 
 
@@ -92,8 +100,10 @@ async def mount(module, path, *, loop=None):
     s.start()
     await asyncio.sleep(0.1, loop=loop)
     addr = 'tcp://%s:%d' % (getHostIP(), s.port)
-    if __redis is not None:
+    try:
         _setAddressOnRedis(path, addr)
+    except RedisNotSetError:
+        pass
     dht = await getDHT()
     await dht.set(path, addr)
     return s
@@ -137,9 +147,9 @@ class Connection:
             raise
 
     async def _connect(self):
-        if __redis is not None:
+        try:
             addr = _getAddressOnRedis(self.path)
-        else:
+        except RedisNotSetError:
             dht = await getDHT()
             addr = await dht.get(self.path)
         if addr is None:
@@ -181,9 +191,9 @@ async def connect(path, *, loop=None):
     dht = await getDHT()
     if isinstance(path, Connection):
         path = path.path
-    if __redis is not None:
+    try:
         addr = _getAddressOnRedis(path)
-    else:
+    except RedisNotSetError:
         addr = await dht.get(path)
     if addr is None:
         raise QuLabRPCError(f'Unknow RPC path {path}.')
