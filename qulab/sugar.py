@@ -32,7 +32,7 @@ root = Node('')
 __dht = None
 __redis = config['db'].get('redis', None)
 if __redis is not None:
-    __redis = redis.Redis(__redis)
+    __redis = redis.Redis(**__redis)
 
 
 def _setAddressOnRedis(path, addr):
@@ -90,11 +90,11 @@ async def mount(module, path, *, loop=None):
     s = ZMQServer(loop=loop)
     s.set_module(module)
     s.start()
+    await asyncio.sleep(0.1, loop=loop)
+    addr = 'tcp://%s:%d' % (getHostIP(), s.port)
     if __redis is not None:
         _setAddressOnRedis(path, addr)
     dht = await getDHT()
-    await asyncio.sleep(0.1)
-    addr = 'tcp://%s:%d' % (getHostIP(), s.port)
     await dht.set(path, addr)
     return s
 
