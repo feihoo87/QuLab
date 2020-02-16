@@ -2,7 +2,7 @@ import functools
 
 from mongoengine import (BooleanField, ComplexDateTimeField, Document,
                          FileField, IntField, ListField, ReferenceField,
-                         StringField)
+                         StringField, DictField, BinaryField)
 
 from .base import delete_children, from_pickle, now, to_pickle, update_modified
 
@@ -17,9 +17,12 @@ class Record(Document):
     modified_time = ComplexDateTimeField(default=now)
     hidden = BooleanField(default=False)
     children = ListField(ReferenceField('Record'))
+    config=DictField()
+    setting=DictField()
     tags = ListField(StringField(max_length=50))
     datafield = FileField(collection_name='data')
     imagefield = FileField(collection_name='images')
+    imagefields = ListField(BinaryField())
     work = ReferenceField('CodeSnippet')
     notebook = ReferenceField('Notebook')
     notebook_index = IntField(min_value=0)

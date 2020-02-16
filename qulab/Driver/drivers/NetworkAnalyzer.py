@@ -1,8 +1,11 @@
 import numpy as np
-from qulab import BaseDriver, QInteger, QOption, QReal, QVector
+import logging
+log = logging.getLogger(__name__)
+from qulab.Driver import visaDriver, QInteger, QOption, QReal, QVector
 
 
-class Driver(BaseDriver):
+class Driver(visaDriver):
+    __log__=log
     support_models = ['E8363B', 'E8363C', 'E5071C', 'E5080A',
                     'ZNB20-2Port', 'N5232A']
 
@@ -12,6 +15,12 @@ class Driver(BaseDriver):
               unit='dBm',
               set_cmd='SOUR:POW %(value)e%(unit)s',
               get_cmd='SOUR:POW?'),
+        # QOption('PowerMode',
+        #         value='OFF',
+        #         ch=1,
+        #         set_cmd='SOUR%(ch)s:POW:MODE %(option)s',
+        #         get_cmd='SOUR%(ch)s:POW:MODE?',
+        #         options=[('OFF', 'OFF'), ('ON', 'ON')]),
         QReal('Bandwidth',
               value=1000,
               unit='Hz',
@@ -81,6 +90,10 @@ class Driver(BaseDriver):
         else:
             super(Driver, self).performSetValue(quant, value, **kw)
     '''
+    def performOpen(self):
+        super().performOpen()
+        self.set_timeout(15)
+        self.pna_select(ch=1)
 
     def performGetValue(self, quant, **kw):
         get_vector_methods = {
