@@ -4,6 +4,7 @@ from functools import lru_cache, reduce
 from itertools import chain, combinations, count, product, repeat
 
 import numpy as np
+from scipy import linalg
 from scipy.optimize import leastsq
 from scipy.sparse import coo_matrix
 
@@ -122,17 +123,18 @@ def formUMatrix(n):
                     A_i.append(row)
                     A_j.append(col)
                     A_data.append(A)
-    return coo_matrix((A_data, (A_i, A_j))), np.asarray(C)
+    A, b = coo_matrix((A_data, (A_i, A_j))), np.asarray(C)
+    B = A.T @ A
+    C = linalg.inv(B.toarray())
+    return A, C, b
 
 
-def acquireVFromData(n, P):
+def acquireVFromData(n, P, mat=None):
     """从测量数据中还原相干矢
     """
-
-    def error(v, A, C, P):
-        return np.asarray((A @ v + C - P))
-
-    p0 = np.zeros(2**(2 * n) - 1)
-    A, C = formUMatrix(n)
-    v, _ = leastsq(error, p0, args=(A, C, P))
-    return v
+    if mat is None:
+        A, C, b = formUMatrix(n)
+    else:
+        A, C, b = mat
+    v = A.T @ (P - b)
+    return C @ v

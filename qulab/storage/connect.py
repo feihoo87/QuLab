@@ -13,7 +13,10 @@ def connect():
     if __connection is not None:
         return
     uri = config['db']['mongodb']
-    __connection = _connect(host=uri)
+    if isinstance(uri, str):
+        __connection = _connect(host=uri)
+    else:
+        __connection = _connect(**uri)
 
 
 def disconnect():

@@ -1,6 +1,8 @@
 import asyncio
 from urllib.parse import urlparse
 
+import redis
+
 from qulab._config import config, config_dir
 from qulab.dht.network import Server as DHT
 from qulab.dht.network import cfg as DHT_config
@@ -28,6 +30,25 @@ class Node:
 root = Node('')
 
 __dht = None
+__redis = config['db'].get('redis', None)
+if __redis is not None:
+    __redis = redis.Redis(**__redis)
+
+
+class RedisNotSetError(Exception):
+    pass
+
+
+def _setAddressOnRedis(path, addr):
+    if __redis is None:
+        raise RedisNotSetError('redis not in config')
+    __redis.set(f'qulab_route_table_{path}', addr)
+
+
+def _getAddressOnRedis(path):
+    if __redis is None:
+        raise RedisNotSetError('redis not in config')
+    return __redis.get(f'qulab_route_table_{path}').decode()
 
 
 def getBootstrapNodes():
@@ -77,9 +98,13 @@ async def mount(module, path, *, loop=None):
     s = ZMQServer(loop=loop)
     s.set_module(module)
     s.start()
-    dht = await getDHT()
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.1, loop=loop)
     addr = 'tcp://%s:%d' % (getHostIP(), s.port)
+    try:
+        _setAddressOnRedis(path, addr)
+    except RedisNotSetError:
+        pass
+    dht = await getDHT()
     await dht.set(path, addr)
     return s
 
@@ -122,8 +147,11 @@ class Connection:
             raise
 
     async def _connect(self):
-        dht = await getDHT()
-        addr = await dht.get(self.path)
+        try:
+            addr = _getAddressOnRedis(self.path)
+        except RedisNotSetError:
+            dht = await getDHT()
+            addr = await dht.get(self.path)
         if addr is None:
             raise QuLabRPCError(f"Unknow RPC path {self.path}.")
         return ZMQClient(addr, loop=self.loop)
@@ -163,7 +191,10 @@ async def connect(path, *, loop=None):
     dht = await getDHT()
     if isinstance(path, Connection):
         path = path.path
-    addr = await dht.get(path)
+    try:
+        addr = _getAddressOnRedis(path)
+    except RedisNotSetError:
+        addr = await dht.get(path)
     if addr is None:
         raise QuLabRPCError(f'Unknow RPC path {path}.')
     return Connection(path, loop=loop)
