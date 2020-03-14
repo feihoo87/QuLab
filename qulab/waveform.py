@@ -14,11 +14,11 @@ def _const(c):
 
 
 _one = _const(1)
-_half = _const(1/2)
+_half = _const(1 / 2)
 
 
 def _is_const(x):
-    return len(x[0]) == 1 and x[0][0][0] == ()
+    return x == _zero or len(x[0]) == 1 and x[0][0][0] == ()
 
 
 def _basic_wave(Type, *args, shift=0):
@@ -47,8 +47,8 @@ def _mul(x, y):
     xt_list, xv_list = x
     yt_list, yv_list = y
     lo, hi = 0, 0
-    for (t1, t2), (v1, v2) in zip(
-            product(xt_list, yt_list), product(xv_list, yv_list)):
+    for (t1, t2), (v1, v2) in zip(product(xt_list, yt_list),
+                                  product(xv_list, yv_list)):
         if v1 * v2 == 0:
             continue
         t = _add(t1, t2)
@@ -70,7 +70,7 @@ def _add(x, y):
 
 
 def _shift(x, time):
-    if x == _zero or _is_const(x):
+    if _is_const(x):
         return x
 
     t_list = []
@@ -224,9 +224,8 @@ class Waveform:
         return v + (-self)
 
     def __rshift__(self, time):
-        return Waveform(
-            tuple(bound + time for bound in self.bounds),
-            tuple(_shift(expr, time) for expr in self.seq))
+        return Waveform(tuple(bound + time for bound in self.bounds),
+                        tuple(_shift(expr, time) for expr in self.seq))
 
     def __lshift__(self, time):
         return self >> (-time)
@@ -248,11 +247,14 @@ class Waveform:
 _zero_waveform = Waveform()
 _one_waveform = Waveform(seq=(_one, ))
 
+
 def zero():
     return _zero_waveform
 
+
 def one():
     return _one_waveform
+
 
 def const(c):
     return Waveform(seq=(_const(c), ))
@@ -263,41 +265,51 @@ GAUSSIAN = 2
 ERF = 3
 COS = 4
 SIN = 5
+SINC = 6
 
 _baseFunc = {
     LINEAR: lambda t: t,
     GAUSSIAN: lambda t, std_sq2: np.exp(-(t / std_sq2)**2),
     ERF: lambda t, std_sq2: special.erf(t / std_sq2),
     COS: lambda t, w: np.cos(w * t),
-    SIN: lambda t, w: np.sin(w * t)
+    SIN: lambda t, w: np.sin(w * t),
+    SINC: lambda t, bw: np.sinc(bw * t)
 }
 
 
 def _D_base(m):
     Type, shift, *args = m
     return {
-        LINEAR: _one_waveform,
-        GAUSSIAN: (((((GAUSSIAN, shift, *args), (LINEAR, shift)), (1, 1)), ), (-2/args[0]**2, )),
-        ERF: (((((GAUSSIAN, shift, *args), ), (1, )), ), (2/args[0]/np.sqrt(np.pi), )),
+        LINEAR:
+        _one_waveform,
+        GAUSSIAN: (((((LINEAR, shift), (GAUSSIAN, shift, *args)), (1, 1)), ),
+                   (-2 / args[0]**2, )),
+        ERF: (((((GAUSSIAN, shift, *args), ), (1, )), ),
+              (2 / args[0] / np.sqrt(np.pi), )),
         COS: (((((SIN, shift, *args), ), (1, )), ), (-args[0], )),
         SIN: (((((COS, shift, *args), ), (1, )), ), (args[0], )),
+        SINC: (((((LINEAR, shift), (COS, shift, *args)), (-1, 1)),
+                (((LINEAR, shift), (SIN, shift, *args)), (-2, 1))),
+               (1, -1 / args[0]))
     }[Type]
 
 
 def _D(x):
-    if x == _zero or _is_const(x):
+    if _is_const(x):
         return _zero
     t_list, v_list = x
-    if len(t_list) == 1:
+    if len(v_list) == 1:
         (m_list, n_list), v = t_list[0], v_list[0]
         if len(m_list) == 1:
             m, n = m_list[0], n_list[0]
             if n == 1:
                 return _mul(_D_base(m), _const(v))
             else:
-                return _mul((((m, ), (n-1,)) , (n*v,)) , _D((((m, ), (1,)) , (1,))))
+                return _mul(((((m, ), (n - 1, )), ), (n * v, )),
+                            _D(((((m, ), (1, )), ), (1, ))))
         else:
-            a, b = ((m_list[:1],n_list[:1]), (v,)), ((m_list[1:],n_list[1:]), (1,)*(len(m_list)-1))
+            a = (((m_list[:1], n_list[:1]), ), (v, ))
+            b = (((m_list[1:], n_list[1:]), ), (1, ) * (len(m_list) - 1))
             return _add(_mul(a, _D(b)), _mul(_D(a), b))
     else:
         return _add(_D((t_list[:1], v_list[:1])), _D((t_list[1:], v_list[1:])))
@@ -306,33 +318,28 @@ def _D(x):
 def D(wav):
     """derivative
     """
-    return Waveform(
-        bounds = wav.bounds,
-        seq = tuple(_D(x) for x in wav.seq)
-    )
+    return Waveform(bounds=wav.bounds, seq=tuple(_D(x) for x in wav.seq))
 
 
 def step(edge):
     std_sq2 = edge / 5
-    return Waveform(
-        bounds=(-edge, edge, +np.inf),
-        seq=(_zero, _add(_half, _mul(_half, _basic_wave(ERF, std_sq2))), _one))
+    # rise = _add(_half, _mul(_half, _basic_wave(ERF, std_sq2)))
+    rise = ((((), ()), (((3, 0, std_sq2), ), (1, ))), (0.5, 0.5))
+    return Waveform(bounds=(-edge, edge, +np.inf), seq=(_zero, rise, _one))
 
 
 def square(width):
-    return Waveform(
-        bounds=(-0.5 * width, 0.5 * width, +np.inf),
-        seq=(_zero, _one, _zero))
+    return Waveform(bounds=(-0.5 * width, 0.5 * width, +np.inf),
+                    seq=(_zero, _one, _zero))
 
 
 def gaussian(width):
     # width is two times FWHM
-    std_sq2 = width / (4 * np.sqrt(np.log(2)))
+    std_sq2 = width / 3.3302184446307908  #std_sq2 = width / (4 * np.sqrt(np.log(2)))
     # std is set to give total pulse area same as a square
     #std_sq2 = width/np.sqrt(np.pi)
-    return Waveform(
-        bounds=(-0.5 * width, 0.5 * width, +np.inf),
-        seq=(_zero, _basic_wave(GAUSSIAN, std_sq2), _zero))
+    return Waveform(bounds=(-0.5 * width, 0.5 * width, +np.inf),
+                    seq=(_zero, _basic_wave(GAUSSIAN, std_sq2), _zero))
 
 
 def cos(w, phi=0):
@@ -343,19 +350,27 @@ def sin(w, phi=0):
     return Waveform(seq=(_basic_wave(SIN, w, shift=-phi / w), ))
 
 
+def sinc(bw):
+    width = 100 / bw
+    return Waveform(bounds=(-0.5 * width, 0.5 * width, +np.inf),
+                    seq=(_zero, _basic_wave(SINC, bw), _zero))
+
+
 def cosPulse(width):
-    cos = _basic_wave(COS, 2*np.pi/width)
-    pulse = _mul(_add(cos, _one), _half)
-    return Waveform(
-        bounds=(-0.5 * width, 0.5 * width, +np.inf),
-        seq=(_zero, pulse, _zero))
+    # cos = _basic_wave(COS, 2*np.pi/width)
+    # pulse = _mul(_add(cos, _one), _half)
+    pulse = ((((), ()), (((COS, 0, 6.283185307179586 / width), ), (1, ))),
+             (0.5, 0.5))
+    return Waveform(bounds=(-0.5 * width, 0.5 * width, +np.inf),
+                    seq=(_zero, pulse, _zero))
 
 
 def _poly(*a):
     """
     a[0] + a[1] * t + a[2] * t**2 + ...
     """
-    return (((), ()), ) + tuple([((LINEAR, 0), (n,)) for n, _ in enumerate(a[:1], start=1)]) , a
+    return (((), ()), ) + tuple([((LINEAR, 0), (n, ))
+                                 for n, _ in enumerate(a[:1], start=1)]), a
 
 
 def poly(a):
@@ -365,7 +380,12 @@ def poly(a):
     return Waveform(seq=(_poly(*a), ))
 
 
-def mixing(pulse, phase=0.0, freq=None, ratioIQ=1.0, phaseDiff=0.0, DRAGScaling=None):
+def mixing(pulse,
+           phase=0.0,
+           freq=None,
+           ratioIQ=1.0,
+           phaseDiff=0.0,
+           DRAGScaling=None):
     """SSB or envelope mixing
     """
     if DRAGScaling is not None:
@@ -378,14 +398,18 @@ def mixing(pulse, phase=0.0, freq=None, ratioIQ=1.0, phaseDiff=0.0, DRAGScaling=
 
     if freq is not None:
         # SSB mixing
-        Iout = I * cos(2*np.pi*freq, -phase) - Q * cos(2*np.pi*freq, -phase+np.pi/2)
-        Qout = -I * sin(2*np.pi*freq, -phase + phaseDiff) + Q * sin(2*np.pi*freq, -phase+np.pi/2 + phaseDiff)
+        w = 2 * np.pi * freq
+        Iout = I * cos(w, -phase) + Q * sin(w, -phase)
+        Qout = -I * sin(w, -phase + phaseDiff) + Q * cos(w, -phase + phaseDiff)
         Qout = ratioIQ * Qout
     else:
         # envelope mixing
-        Iout = I * np.cos(-phase) - Q * np.cos(-phase+np.pi/2)
-        Qout = -I * np.sin(-phase) + Q * np.sin(-phase+np.pi/2)
+        Iout = I * np.cos(-phase) + Q * np.sin(-phase)
+        Qout = -I * np.sin(-phase) + Q * np.cos(-phase)
     return Iout, Qout
 
 
-__all__ = ['Waveform', 'D', 'zero', 'const', 'step', 'square', 'gaussian', 'cos', 'sin', 'cosPulse', 'poly', 'mixing']
+__all__ = [
+    'Waveform', 'D', 'zero', 'one', 'const', 'step', 'square', 'gaussian',
+    'cos', 'sin', 'cosPulse', 'poly', 'mixing'
+]
