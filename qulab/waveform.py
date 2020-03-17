@@ -191,10 +191,14 @@ class Waveform:
             self.seq = self.seq[:-1] + other.seq[1:]
 
     def __ior__(self, other):
+        if self == _zero_waveform:
+            return other
         self.append(other)
         return self
 
     def __or__(self, other):
+        if self == _zero_waveform:
+            return other
         w = Waveform(self.bounds, self.seq)
         w.append(other)
         return w
@@ -260,38 +264,59 @@ def const(c):
     return Waveform(seq=(_const(c), ))
 
 
-LINEAR = 1
-GAUSSIAN = 2
-ERF = 3
-COS = 4
-SIN = 5
-SINC = 6
+__TypeIndex = 1
+_baseFunc = {}
+_derivativeBaseFunc = {}
 
-_baseFunc = {
-    LINEAR: lambda t: t,
-    GAUSSIAN: lambda t, std_sq2: np.exp(-(t / std_sq2)**2),
-    ERF: lambda t, std_sq2: special.erf(t / std_sq2),
-    COS: lambda t, w: np.cos(w * t),
-    SIN: lambda t, w: np.sin(w * t),
-    SINC: lambda t, bw: np.sinc(bw * t)
-}
+
+def registerBaseFunc(func):
+    global __TypeIndex
+    Type = __TypeIndex
+    __TypeIndex += 1
+
+    _baseFunc[Type] = func
+
+    return Type
+
+
+def registerDerivative(Type, dFunc):
+    _derivativeBaseFunc[Type] = dFunc
+
+
+# register base function
+LINEAR = registerBaseFunc(lambda t: t)
+GAUSSIAN = registerBaseFunc(lambda t, std_sq2: np.exp(-(t / std_sq2)**2))
+ERF = registerBaseFunc(lambda t, std_sq2: special.erf(t / std_sq2))
+COS = registerBaseFunc(lambda t, w: np.cos(w * t))
+SIN = registerBaseFunc(lambda t, w: np.sin(w * t))
+SINC = registerBaseFunc(lambda t, bw: np.sinc(bw * t))
+
+# register derivative
+registerDerivative(LINEAR, lambda shift, *args: _one_waveform)
+
+registerDerivative(
+    GAUSSIAN, lambda shift, *args: (((((LINEAR, shift), (
+        GAUSSIAN, shift, *args)), (1, 1)), ), (-2 / args[0]**2, )))
+
+registerDerivative(
+    ERF, lambda shift, *args: (((((GAUSSIAN, shift, *args), ), (1, )), ), (
+        2 / args[0] / np.sqrt(np.pi), )))
+
+registerDerivative(
+    COS, lambda shift, *args: (((((SIN, shift, *args), ), (1, )), ), (-args[0],
+                                                                      )))
+registerDerivative(
+    SIN, lambda shift, *args: (((((COS, shift, *args), ), (1, )), ), (args[0],
+                                                                      )))
+registerDerivative(
+    SINC, lambda shift, *args: (((((LINEAR, shift), (COS, shift, *args)), (
+        -1, 1)), (((LINEAR, shift), (SIN, shift, *args)), (-2, 1))), (
+            1, -1 / args[0])))
 
 
 def _D_base(m):
     Type, shift, *args = m
-    return {
-        LINEAR:
-        _one_waveform,
-        GAUSSIAN: (((((LINEAR, shift), (GAUSSIAN, shift, *args)), (1, 1)), ),
-                   (-2 / args[0]**2, )),
-        ERF: (((((GAUSSIAN, shift, *args), ), (1, )), ),
-              (2 / args[0] / np.sqrt(np.pi), )),
-        COS: (((((SIN, shift, *args), ), (1, )), ), (-args[0], )),
-        SIN: (((((COS, shift, *args), ), (1, )), ), (args[0], )),
-        SINC: (((((LINEAR, shift), (COS, shift, *args)), (-1, 1)),
-                (((LINEAR, shift), (SIN, shift, *args)), (-2, 1))),
-               (1, -1 / args[0]))
-    }[Type]
+    return _derivativeBaseFunc[Type](shift, *args)
 
 
 def _D(x):
@@ -338,7 +363,7 @@ def gaussian(width):
     std_sq2 = width / 3.3302184446307908  #std_sq2 = width / (4 * np.sqrt(np.log(2)))
     # std is set to give total pulse area same as a square
     #std_sq2 = width/np.sqrt(np.pi)
-    return Waveform(bounds=(-0.5 * width, 0.5 * width, +np.inf),
+    return Waveform(bounds=(-0.75 * width, 0.75 * width, +np.inf),
                     seq=(_zero, _basic_wave(GAUSSIAN, std_sq2), _zero))
 
 
@@ -411,5 +436,6 @@ def mixing(pulse,
 
 __all__ = [
     'Waveform', 'D', 'zero', 'one', 'const', 'step', 'square', 'gaussian',
-    'cos', 'sin', 'cosPulse', 'poly', 'mixing'
+    'cos', 'sin', 'cosPulse', 'poly', 'mixing', 'registerBaseFunc',
+    'registerDerivative'
 ]
