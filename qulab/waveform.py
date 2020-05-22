@@ -191,14 +191,10 @@ class Waveform:
             self.seq = self.seq[:-1] + other.seq[1:]
 
     def __ior__(self, other):
-        if self == _zero_waveform:
-            return other
         self.append(other)
         return self
 
     def __or__(self, other):
-        if self == _zero_waveform:
-            return other
         w = Waveform(self.bounds, self.seq)
         w.append(other)
         return w
@@ -236,7 +232,7 @@ class Waveform:
 
     def __call__(self, x):
         range_list = np.searchsorted(x, self.bounds)
-        ret = np.zeros(x.shape)
+        ret = np.zeros_like(x)
         start, stop = 0, 0
         for i, stop in enumerate(range_list):
             if start < stop and self.seq[i] != _zero:
@@ -421,7 +417,7 @@ def mixing(pulse,
         I = pulse
         Q = zero()
 
-    if freq is not None:
+    if freq is not None and freq != 0.0:
         # SSB mixing
         w = 2 * np.pi * freq
         Iout = I * cos(w, -phase) + Q * sin(w, -phase)
