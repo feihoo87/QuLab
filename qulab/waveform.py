@@ -291,23 +291,24 @@ SINC = registerBaseFunc(lambda t, bw: np.sinc(bw * t))
 registerDerivative(LINEAR, lambda shift, *args: _one_waveform)
 
 registerDerivative(
-    GAUSSIAN, lambda shift, *args: (((((LINEAR, shift), (
-        GAUSSIAN, shift, *args)), (1, 1)), ), (-2 / args[0]**2, )))
+    GAUSSIAN, lambda shift, *args: (((((LINEAR, shift),
+                                       (GAUSSIAN, shift, *args)), (1, 1)), ),
+                                    (-2 / args[0]**2, )))
 
 registerDerivative(
-    ERF, lambda shift, *args: (((((GAUSSIAN, shift, *args), ), (1, )), ), (
-        2 / args[0] / np.sqrt(np.pi), )))
+    ERF, lambda shift, *args: (((((GAUSSIAN, shift, *args), ), (1, )), ),
+                               (2 / args[0] / np.sqrt(np.pi), )))
 
 registerDerivative(
-    COS, lambda shift, *args: (((((SIN, shift, *args), ), (1, )), ), (-args[0],
-                                                                      )))
+    COS, lambda shift, *args: (((((SIN, shift, *args), ), (1, )), ),
+                               (-args[0], )))
 registerDerivative(
-    SIN, lambda shift, *args: (((((COS, shift, *args), ), (1, )), ), (args[0],
-                                                                      )))
+    SIN, lambda shift, *args: (((((COS, shift, *args), ), (1, )), ),
+                               (args[0], )))
 registerDerivative(
-    SINC, lambda shift, *args: (((((LINEAR, shift), (COS, shift, *args)), (
-        -1, 1)), (((LINEAR, shift), (SIN, shift, *args)), (-2, 1))), (
-            1, -1 / args[0])))
+    SINC, lambda shift, *args:
+    (((((LINEAR, shift), (COS, shift, *args)), (-1, 1)),
+      (((LINEAR, shift), (SIN, shift, *args)), (-2, 1))), (1, -1 / args[0])))
 
 
 def _D_base(m):
@@ -330,7 +331,7 @@ def _D(x):
                             _D(((((m, ), (1, )), ), (1, ))))
         else:
             a = (((m_list[:1], n_list[:1]), ), (v, ))
-            b = (((m_list[1:], n_list[1:]), ), (1, ) * (len(m_list) - 1))
+            b = (((m_list[1:], n_list[1:]), ), (1, ))
             return _add(_mul(a, _D(b)), _mul(_D(a), b))
     else:
         return _add(_D((t_list[:1], v_list[:1])), _D((t_list[1:], v_list[1:])))
@@ -401,7 +402,9 @@ def poly(a):
     return Waveform(seq=(_poly(*a), ))
 
 
-def mixing(pulse,
+def mixing(I,
+           Q=None,
+           *,
            phase=0.0,
            freq=None,
            ratioIQ=1.0,
@@ -409,12 +412,8 @@ def mixing(pulse,
            DRAGScaling=None):
     """SSB or envelope mixing
     """
-    if DRAGScaling is not None:
-        # apply DRAG
-        I = pulse
-        Q = DRAGScaling * D(pulse)
-    else:
-        I = pulse
+    if Q is None:
+        I = I
         Q = zero()
 
     if freq is not None and freq != 0.0:
@@ -422,11 +421,20 @@ def mixing(pulse,
         w = 2 * np.pi * freq
         Iout = I * cos(w, -phase) + Q * sin(w, -phase)
         Qout = -I * sin(w, -phase + phaseDiff) + Q * cos(w, -phase + phaseDiff)
-        Qout = ratioIQ * Qout
     else:
         # envelope mixing
+        w = 0
         Iout = I * np.cos(-phase) + Q * np.sin(-phase)
         Qout = -I * np.sin(-phase) + Q * np.cos(-phase)
+
+    if DRAGScaling is not None:
+        # apply DRAG
+        I = (1 - w * DRAGScaling) * Iout - DRAGScaling * D(Qout)
+        Q = (1 - w * DRAGScaling) * Qout + DRAGScaling * D(Iout)
+        Iout, Qout = I, Q
+
+    Qout = ratioIQ * Qout
+
     return Iout, Qout
 
 
