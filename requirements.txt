@@ -13,7 +13,7 @@ PyVISA-py==0.5.1
 PyYAML==5.3.1
 pyzmq==20.0.0
 redis==3.5.3
-u-msgpack-python==2.6.0
+u-msgpack-python==2.7.1
 
 pywin32==227; platform_system=="Windows"
 contextvars==2.4; python_version<"3.7"
