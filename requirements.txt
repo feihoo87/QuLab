@@ -8,7 +8,7 @@ nest-asyncio==1.5.1
 numpy==1.20.2
 scipy==1.6.2
 portalocker==2.3.0
-PyVISA==1.10.1
+PyVISA==1.11.3
 PyVISA-py==0.4.1
 PyYAML==5.3.1
 pyzmq==19.0.1
