@@ -17,4 +17,4 @@ u-msgpack-python==2.7.1
 
 pywin32==301; platform_system=="Windows"
 contextvars==2.4; python_version<"3.7"
-dataclasses==0.7; python_version<"3.7"
+dataclasses==0.8; python_version<"3.7"
