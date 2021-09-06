@@ -10,7 +10,7 @@ scipy==1.7.1
 portalocker==2.3.2
 PyVISA==1.11.3
 PyVISA-py==0.5.2
-PyYAML==5.3.1
+PyYAML==5.4.1
 pyzmq==19.0.1
 redis==3.5.3
 u-msgpack-python==2.6.0
