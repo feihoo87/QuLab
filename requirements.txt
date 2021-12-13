@@ -1,6 +1,6 @@
 aioredis==2.0.0
 blinker==1.4
-cryptography==2.9.2
+cryptography==36.0.0
 ipython==7.15.0
 ipywidgets==7.5.1
 mongoengine==0.20.0
