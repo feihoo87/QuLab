@@ -15,6 +15,6 @@ pyzmq==22.3.0
 redis==4.0.2
 u-msgpack-python==2.7.1
 
-pywin32==227; platform_system=="Windows"
+pywin32==303; platform_system=="Windows"
 contextvars==2.4; python_version<"3.7"
 dataclasses==0.7; python_version<"3.7"
