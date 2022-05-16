@@ -11,7 +11,7 @@ portalocker==2.4.0
 PyVISA==1.12.0
 PyVISA-py==0.5.3
 PyYAML==6.0
-pyzmq==19.0.1
+pyzmq==22.3.0
 redis==3.5.3
 u-msgpack-python==2.6.0
 
