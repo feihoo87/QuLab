@@ -9,7 +9,7 @@ numpy==1.25.0
 scipy==1.11.1
 portalocker==2.7.0
 PyVISA==1.13.0
-PyVISA-py==0.4.1
+PyVISA-py==0.7.0
 PyYAML==5.3.1
 pyzmq==19.0.1
 redis==3.5.3
