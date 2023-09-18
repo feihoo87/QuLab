@@ -5,7 +5,7 @@ ipython==8.15.0
 ipywidgets==8.1.1
 mongoengine==0.27.0
 nest-asyncio==1.5.8
-numpy==1.18.5
+numpy==1.26.0
 scipy==1.4.1
 portalocker==1.7.0
 PyVISA==1.10.1
