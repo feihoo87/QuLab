@@ -1,5 +1,5 @@
 aioredis==2.0.1
-blinker==1.4
+blinker==1.7.0
 cryptography==2.9.2
 ipython==7.15.0
 ipywidgets==7.5.1
