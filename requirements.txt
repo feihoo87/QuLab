@@ -7,7 +7,7 @@ mongoengine==0.27.0
 nest-asyncio==1.5.8
 numpy==1.26.2
 scipy==1.11.3
-portalocker==1.7.0
+portalocker==2.8.2
 PyVISA==1.10.1
 PyVISA-py==0.4.1
 PyYAML==5.3.1
