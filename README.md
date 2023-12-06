@@ -23,7 +23,6 @@ git clone https://github.com/feihoo87/QuLab.git
 Then dependencies and QuLab can be installed in this way:
 ```bash
 cd QuLab
-python -m pip install -r requirements.txt
 python -m pip install -e .
 ```
 
