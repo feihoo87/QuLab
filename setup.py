@@ -17,7 +17,7 @@ def module_name(dirpath, filename):
 
 def get_extensions():
     extensions = []
-    for dirpath, dirnames, filenames in os.walk('cycles'):
+    for dirpath, dirnames, filenames in os.walk('qulab'):
         for filename in filenames:
             if filename.endswith('.pyx'):
                 extensions.append(
