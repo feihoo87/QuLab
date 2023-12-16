@@ -1,0 +1,64 @@
+name: Test and publish
+
+on:
+  push:
+    branches: [ master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ master ]
+  release:
+    types: [ published ]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --upgrade setuptools
+        python -m pip install build pytest pytest-asyncio numpy coveralls cython
+        python setup.py build_ext --inplace
+        python -m pip install .
+    - name: Test with pytest
+      run: |
+        coverage run --source=qulab -m pytest --verbose tests/
+    - name: Coveralls
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        coveralls --service=github   
+    - name: Build package
+      run: |
+        pip install build setuptools wheel twine
+        python setup.py sdist bdist_wheel
+    - name: Repair package
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        pip install auditwheel
+        wheel_file=dist/*.whl
+        auditwheel show $wheel_file
+        auditwheel repair $wheel_file --plat manylinux_2_17_x86_64
+        rm $wheel_file
+        mv wheelhouse/*.whl dist/
+        ls -lh dist/
+    - name: Publish package
+      if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' }}
+      run: |
+        twine upload --verbose --skip-existing dist/*
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
