@@ -1,0 +1,58 @@
+[build-system]
+requires = [ "setuptools", "wheel", "Cython", "numpy>=1.13.3" ]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "QuLab"
+license = {text = "MIT"}
+authors = [{name = "feihoo87", email = "feihoo87@gmail.com"}]
+maintainers = [{name = "feihoo87", email = "feihoo87@gmail.com"}]
+description = "contral instruments and manage data"
+keywords = [
+   "experiment",
+   "laboratory",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">= 3.10"
+dependencies = [
+    "blinker>=1.4",
+    "click>=7.1.2",
+    "dill>=0.3.6",
+    "GitPython>=3.1.14",
+    "ipython>=7.4.0",
+    "ipywidgets>=7.4.2",
+    "matplotlib>=3.7.2",
+    "numpy>=1.13.3",
+    "ply>=3.11",
+    "scipy>=1.0.0"
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/feihoo87/QuLab"
+"Bug Reports" = "https://github.com/feihoo87/QuLab/issues"
+"Source" = "https://github.com/feihoo87/QuLab/"
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[tool.setuptools]
+license-files = ["LICENSE"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "qulab.version.__version__"}
