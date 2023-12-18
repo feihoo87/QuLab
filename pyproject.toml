@@ -41,6 +41,9 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.scripts]
+"qulab" = "qulab.__main__:main"
+
 [project.urls]
 Homepage = "https://github.com/feihoo87/QuLab"
 "Bug Reports" = "https://github.com/feihoo87/QuLab/issues"
