@@ -1,7 +1,7 @@
 import ast
 
 import numpy as np
-
+import itertools
 from .base import scan_iters
 from .expression import Env, Expression, Symbol, _empty
 
@@ -119,7 +119,7 @@ class Scan():
     def _mapping(self, key, value):
         tmpkey = f"__tmp_{self._mapping_i}__"
         self._mapping_i += 1
-        self[tmpkey] = value
+        self.__setitem(tmpkey, value)
         self.mapping[key] = tmpkey
 
     def __setitem__(self, key, value):
@@ -219,11 +219,16 @@ class Scan():
         self.assemble()
         for step in self.scan():
             for k, v in self.mapping.items():
-                self.set(k, step.kwds[v])
+                if v in set(
+                        itertools.chain.from_iterable(
+                            step.vars[step.unchanged:])
+                ) or step.iteration == 0:
+                    self.set(k, step.kwds[v])
             self.process(step)
 
     def process(self, step):
-        print(step.kwds)
+        #print(step.vars[step.unchanged:], step.kwds)
+        pass
 
     def scan(self):
         for step in scan_iters(**self.scan_info):

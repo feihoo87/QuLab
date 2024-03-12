@@ -1,4 +1,3 @@
-
 import inspect
 import logging
 import warnings
@@ -7,7 +6,6 @@ from concurrent.futures import Executor, Future
 from dataclasses import dataclass, field
 from graphlib import TopologicalSorter
 from itertools import chain, count
-
 from queue import Empty, Queue
 from typing import Any, Callable, Iterable, Sequence, Type
 
@@ -323,20 +321,27 @@ def _args_generator(loops: list,
             kw = _generate_kwds(keys, current_iters, kwds, i, limit)
         except StopIteration:
             break
+        if vars:
+            vars2 = [
+                *vars[:-1],
+                tuple([*vars[-1], *local_vars]),
+                tuple(kw.keys())
+            ]
+        else:
+            vars2 = [tuple([*local_vars, *kw.keys()])]
         yield Begin(level=level,
                     pos=pos + (i, ),
                     kwds=kwds | kw,
-                    vars=[*vars, tuple([*local_vars, *kw.keys()])],
+                    vars=vars2,
                     _pipes=pipes,
                     _trackers=trackers)
-        yield from _args_generator(
-            loops, kwds | kw, level + 1, pos + (i, ),
-            [*vars, tuple([*local_vars, *kw.keys()])], filter, functions,
-            trackers, pipes, order)
+        yield from _args_generator(loops, kwds | kw, level + 1, pos + (i, ),
+                                   vars2, filter, functions, trackers, pipes,
+                                   order)
         yield End(level=level,
                   pos=pos + (i, ),
                   kwds=kwds | kw,
-                  vars=[*vars, tuple([*local_vars, *kw.keys()])],
+                  vars=vars2,
                   _pipes=pipes,
                   _trackers=trackers)
         _feedback(current_iters)
@@ -541,4 +546,3 @@ def scan_iters(loops: dict[str | tuple[str, ...],
         step.unchanged = i
         yield step
         last_step = step
-

@@ -8,6 +8,7 @@ from pyparsing import (CaselessKeyword, Combine, Forward, Group, Keyword,
                        alphanums, alphas, delimitedList, nums, oneOf, opAssoc,
                        pyparsing_common, restOfLine, srange, stringEnd,
                        stringStart)
+from scipy import special
 
 LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE, DOT, TILDE, BANG, PLUS, MINUS = map(
     Suppress, "()[]{}.~!+-")
@@ -60,15 +61,45 @@ class Env():
         self.consts = {}
         self.variables = {}
         self.refs = {}
+        self.functions = {
+            'sin': np.sin,
+            'cos': np.cos,
+            'tan': np.tan,
+            'pi': np.pi,
+            'e': np.e,
+            'log': np.log,
+            'log2': np.log2,
+            'log10': np.log10,
+            'exp': np.exp,
+            'sqrt': np.sqrt,
+            'abs': np.abs,
+            'sinh': np.sinh,
+            'cosh': np.cosh,
+            'tanh': np.tanh,
+            'arcsin': np.arcsin,
+            'arccos': np.arccos,
+            'arctan': np.arctan,
+            'arctan2': np.arctan2,
+            'arcsinh': np.arcsinh,
+            'arccosh': np.arccosh,
+            'arctanh': np.arctanh,
+            'sinc': np.sinc,
+            'sign': np.sign,
+            'heaviside': np.heaviside,
+            'erf': special.erf,
+            'erfc': special.erfc,
+        }
 
     def __contains__(self, key):
-        return key in self.consts or key in self.variables or key in self.refs
+        return key in self.consts or key in self.variables or key in self.functions or key in self.refs
 
     def __getitem__(self, key):
         if key in self.consts:
             return self.consts[key]
         if key in self.variables:
             return self.variables[key]
+        if key in self.functions:
+            return self.functions[key]
         if key in self.refs:
             return self[self.refs[key]]
         raise KeyError(f"Key {key} not found")
@@ -110,6 +141,9 @@ class Env():
         return key in self.consts
 
 
+_default_env = Env()
+
+
 class Expression():
 
     def __init__(self):
@@ -127,33 +161,85 @@ class Expression():
         raise NotImplementedError
 
     def __add__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 0:
+            return self
         return BinaryExpression(self, other, operator.add)
 
     def __radd__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 0:
+            return self
         return BinaryExpression(other, self, operator.add)
 
     def __sub__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 0:
+            return self
         return BinaryExpression(self, other, operator.sub)
 
     def __rsub__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 0:
+            return -self
         return BinaryExpression(other, self, operator.sub)
 
     def __mul__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 0:
+            return 0
+        if isinstance(other, ConstType) and other == 1:
+            return self
+        if isinstance(other, ConstType) and other == -1:
+            return -self
         return BinaryExpression(self, other, operator.mul)
 
     def __rmul__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 0:
+            return 0
+        if isinstance(other, ConstType) and other == 1:
+            return self
+        if isinstance(other, ConstType) and other == -1:
+            return -self
         return BinaryExpression(other, self, operator.mul)
 
     def __truediv__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 1:
+            return self
+        if isinstance(other, ConstType) and other == -1:
+            return -self
         return BinaryExpression(self, other, operator.truediv)
 
     def __rtruediv__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 0:
+            return 0
         return BinaryExpression(other, self, operator.truediv)
 
     def __pow__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 0:
+            return 1
+        if isinstance(other, ConstType) and other == 1:
+            return self
         return BinaryExpression(self, other, operator.pow)
 
     def __rpow__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 0:
+            return 0
         return BinaryExpression(other, self, operator.pow)
 
     def __neg__(self):
@@ -163,32 +249,52 @@ class Expression():
         return UnaryExpression(self, operator.pos)
 
     def __eq__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
         return BinaryExpression(self, other, operator.eq)
 
     def __ne__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
         return BinaryExpression(self, other, operator.ne)
 
     def __lt__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
         return BinaryExpression(self, other, operator.lt)
 
     def __le__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
         return BinaryExpression(self, other, operator.le)
 
     def __gt__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
         return BinaryExpression(self, other, operator.gt)
 
     def __ge__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
         return BinaryExpression(self, other, operator.ge)
 
     def __getitem__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
         return ObjectMethod(self, '__getitem__', other)
 
     def __getattr__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
         return ObjectMethod(self, '__getattr__', other)
 
     def __call__(self, *args):
+        args = [
+            o.eval(_default_env) if isinstance(o, Expression) else o
+            for o in args
+        ]
         return ObjectMethod(self, '__call__', *args)
-    
+
     def __round__(self, n=None):
         return self
 
@@ -243,7 +349,7 @@ class UnaryExpression(Expression):
             return self.op(self.a.d(x))
         else:
             return 0
-        
+
     def __repr__(self) -> str:
         return f"{self.op.__name__}({self.a!r})"
 
@@ -300,7 +406,7 @@ class BinaryExpression(Expression):
                 return 0
         else:
             return 0
-        
+
     def __repr__(self) -> str:
         return f"({self.a!r} {self.op.__name__} {self.b!r})"
 
@@ -333,6 +439,12 @@ class ObjectMethod(Expression):
             return ObjectMethod(obj, self.method, *args)
         else:
             return getattr(obj, self.method)(*args)
+        
+    def __repr__(self):
+        if self.method == '__call__':
+            return f"{self.obj!r}({', '.join(map(repr, self.args))})"
+        else:
+            return f"{self.obj!r}.{self.method}({', '.join(map(repr, self.args))})"
 
 
 class Symbol(Expression):
@@ -355,6 +467,6 @@ class Symbol(Expression):
             return 1
         else:
             return 0
-    
+
     def __repr__(self) -> str:
         return self.name
