@@ -1,7 +1,8 @@
 import ast
+import itertools
 
 import numpy as np
-import itertools
+
 from .base import scan_iters
 from .expression import Env, Expression, Symbol, _empty
 
@@ -73,6 +74,19 @@ class Optimizer():
                                                        **self.kwds)
 
 
+class Action():
+
+    __slots__ = ('name', 'args', 'kwds')
+
+    def __init__(self, name, *args, **kwds):
+        self.name = name
+        self.args = args
+        self.kwds = kwds
+
+    def __repr__(self):
+        return f"Action({self.name!r}, {self.args}, {self.kwds})"
+
+
 class Scan():
 
     def __new__(cls, *args, mixin=None, **kwds):
@@ -99,6 +113,8 @@ class Scan():
         self.filter = None
         self.scan_info = {'loops': {}}
         self._tmp = {}
+        self.actions = {}
+        self.iteration = 0
 
     @property
     def name(self):
@@ -114,7 +130,7 @@ class Scan():
         return default
 
     def set(self, key, value):
-        print(f"Set {key} to {value}")
+        self.add_action(Action('set', key, value))
 
     def _mapping(self, key, value):
         tmpkey = f"__tmp_{self._mapping_i}__"
@@ -227,14 +243,19 @@ class Scan():
             self.process(step)
 
     def process(self, step):
-        #print(step.vars[step.unchanged:], step.kwds)
-        pass
+        for k, v in step.kwds.items():
+            if not k.startswith('__tmp_') and not k.startswith('__'):
+                self.add_action(Action('write', k, v))
 
     def scan(self):
         for step in scan_iters(**self.scan_info):
             for k, v in self.mapping.items():
                 step.kwds[k] = step.kwds[v]
             yield step
+            self.iteration += 1
+
+    def add_action(self, action: Action):
+        self.actions.setdefault(self.iteration, []).append(action)
 
     def run(self, dry_run=False):
         pass
