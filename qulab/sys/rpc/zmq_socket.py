@@ -102,6 +102,8 @@ class ZMQContextManager:
         self.socket_type = socket_type
         if bind is None and connect is None:
             raise ValueError("Either 'bind' or 'connect' must be specified.")
+        if bind is not None and connect is not None:
+            raise ValueError("Both 'bind' and 'connect' cannot be specified.")
         self.bind = bind
         self.connect = connect
         self.secret_key = secret_key
