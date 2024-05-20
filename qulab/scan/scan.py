@@ -5,6 +5,7 @@ import itertools
 import pickle
 import uuid
 from graphlib import TopologicalSorter
+from pathlib import Path
 from types import MethodType
 from typing import Any, Callable, Type
 
@@ -218,7 +219,7 @@ class Promise():
 
 class Scan():
 
-    def __init__(self, prefix: str = 'task', dataserver: str | None = None):
+    def __init__(self, prefix: str = 'task', database: str | None = None):
         self.id = f"{prefix}({str(uuid.uuid1())})"
         self.record = None
         self.namespace = {}
@@ -228,7 +229,6 @@ class Scan():
             'functions': {},
             'optimizers': {},
             'jobs': {},
-            'values': {},
             'dependents': {},
             'order': {},
             'filters': {},
@@ -238,7 +238,7 @@ class Scan():
         self.variables = {}
         self._task = None
         self.sock = None
-        self.dataserver = dataserver
+        self.database = database
         self._variables = {}
         self._sem = asyncio.Semaphore(100)
 
@@ -306,8 +306,8 @@ class Scan():
             })
 
             record_id = await self.sock.recv_pyobj()
-            return Record(record_id, self.dataserver, self.description)
-        return Record(None, None, self.description)
+            return Record(record_id, self.database, self.description)
+        return Record(None, self.database, self.description)
 
     def get(self, name: str):
         if name in self.description['consts']:
@@ -395,17 +395,16 @@ class Scan():
                 if name in self.description['functions']:
                     self.variables[name] = await call_function(
                         self.description['functions'][name], self.variables)
-                elif name in self.description['values']:
-                    self.variables[name] = self.description['values'][name]
-        if self.dataserver is None:
-            self.record = await self.create_record()
-            await self.work()
-        else:
+        if isinstance(self.database,
+                      str) and self.database.startswith("tcp://"):
             async with ZMQContextManager(zmq.DEALER,
-                                         connect=self.dataserver) as socket:
+                                         connect=self.database) as socket:
                 self.sock = socket
                 self.record = await self.create_record()
                 await self.work()
+        else:
+            self.record = await self.create_record()
+            await self.work()
         return self.variables
 
     async def done(self):
@@ -543,8 +542,6 @@ class Scan():
                     if name in self.description['functions']:
                         variables[name] = await call_function(
                             self.description['functions'][name], variables)
-                    elif name in self.description['values']:
-                        variables[name] = self.description['values'][name]
 
             yield variables
 
@@ -591,6 +588,8 @@ class Scan():
             self._current_level -= 1
         if task is not None:
             await task
+        if self.current_level == 0:
+            await self.emit(self.current_level - 1, 0, 0, {})
 
     async def work(self, **kwds):
         if self.current_level in self.description['jobs']:
@@ -619,9 +618,9 @@ class Scan():
 
 class Record():
 
-    def __init__(self, id, dataserver, description=None):
+    def __init__(self, id, database, description=None):
         self.id = id
-        self.dataserver = dataserver
+        self.database = database
         self.description = description
         self._keys = set()
         self._items = {}
@@ -629,14 +628,36 @@ class Record():
         self._pos = []
         self._last_vars = set()
         self._levels = {}
+        self.independent_variables = {}
+        self.constants = {}
 
         for level, group in self.description['order'].items():
             for names in group:
                 for name in names:
                     self._levels[name] = level
 
+        for name, value in self.description['consts'].items():
+            if name not in self._items:
+                self._items[name] = value
+            self.constants[name] = value
+        for level, range_list in self.description['loops'].items():
+            for name, iterable in range_list:
+                if isinstance(iterable, (np.ndarray, list, tuple, range)):
+                    self._items[name] = iterable
+                    self.independent_variables[name] = (level, iterable)
+
     def __getitem__(self, key):
-        if self.dataserver is None:
+        if isinstance(self.database,
+                      str) and self.database.startswith("tcp://"):
+            with ZMQContextManager(zmq.DEALER,
+                                   connect=self.database) as socket:
+                socket.send_pyobj({
+                    'method': 'record_getitem',
+                    'record_id': self.id,
+                    'key': key
+                })
+                return socket.recv_pyobj()
+        else:
             d = self._items.get(key, None)
             if d is None:
                 return None
@@ -649,29 +670,24 @@ class Record():
                 return x
             else:
                 return d
-        else:
-            with ZMQContextManager(zmq.DEALER,
-                                   connect=self.dataserver) as socket:
-                socket.send_pyobj({
-                    'method': 'record_getitem',
-                    'record_id': self.id,
-                    'key': key
-                })
-                return socket.recv_pyobj()
 
     def keys(self):
-        if self.dataserver is None:
-            return list(self._keys)
-        else:
+        if isinstance(self.database,
+                      str) and self.database.startswith("tcp://"):
             with ZMQContextManager(zmq.DEALER,
-                                   connect=self.dataserver) as socket:
+                                   connect=self.database) as socket:
                 socket.send_pyobj({
                     'method': 'record_keys',
                     'record_id': self.id
                 })
                 return socket.recv_pyobj()
+        else:
+            return list(self._keys)
 
     def append(self, level, step, position, variables):
+        if level < 0:
+            return
+
         for key in set(variables.keys()) - self._last_vars:
             if key not in self._levels:
                 self._levels[key] = level
@@ -700,14 +716,23 @@ class Record():
             if level == self._levels[key]:
                 if key not in self._items:
                     self._items[key] = {
-                        'shape': tuple([i + 1 for i in pos]),
+                        'lu': tuple([i for i in pos]),
+                        'rd': tuple([i + 1 for i in pos]),
+                        'shape': tuple([1 for _ in pos]),
                         'pos': [pos],
                         'value': [value]
                     }
-                else:
-                    self._items[key]['shape'] = tuple([
+                elif key not in self.independent_variables:
+                    self._items[key]['lu'] = tuple([
+                        min(i, j) for i, j in zip(pos, self._items[key]['lu'])
+                    ])
+                    self._items[key]['rd'] = tuple([
                         max(i + 1, j)
-                        for i, j in zip(pos, self._items[key]['shape'])
+                        for i, j in zip(pos, self._items[key]['rd'])
+                    ])
+                    self._items[key]['shape'] = tuple([
+                        i - j for i, j in zip(self._items[key]['rd'],
+                                              self._items[key]['lu'])
                     ])
                     self._items[key]['pos'].append(pos)
                     self._items[key]['value'].append(value)
