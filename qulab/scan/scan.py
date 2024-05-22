@@ -21,7 +21,6 @@ from .optimize import NgOptimizer
 
 # from tqdm.notebook import tqdm
 
-
 _notgiven = object()
 
 
@@ -227,7 +226,9 @@ class Promise():
 
 class Scan():
 
-    def __init__(self, prefix: str = 'task', database: str | None = None):
+    def __init__(self,
+                 prefix: str = 'task',
+                 database: str | Path | None = Path.home() / 'data'):
         self.id = f"{prefix}({str(uuid.uuid1())})"
         self.record = None
         self.namespace = {}
@@ -700,6 +701,72 @@ def random_path(base):
             return path
 
 
+class BufferList():
+
+    def __init__(self, pos_file=None, value_file=None):
+        self._pos = []
+        self._value = []
+        self.lu = ()
+        self.rd = ()
+        self.pos_file = pos_file
+        self.value_file = value_file
+
+    @property
+    def shape(self):
+        return tuple([i - j for i, j in zip(self.rd, self.lu)])
+
+    def flush(self):
+        if self.pos_file is not None:
+            with open(self.pos_file, 'ab') as f:
+                for pos in self._pos:
+                    dill.dump(pos, f)
+            self._pos.clear()
+        if self.value_file is not None:
+            with open(self.value_file, 'ab') as f:
+                for value in self._value:
+                    dill.dump(value, f)
+            self._value.clear()
+
+    def append(self, pos, value):
+        self.lu = tuple([min(i, j) for i, j in zip(pos, self.lu)])
+        self.rd = tuple([max(i + 1, j) for i, j in zip(pos, self.rd)])
+        self._pos.append(pos)
+        self._value.append(value)
+        if len(self._value) > 1000:
+            self.flush()
+
+    def value(self):
+        v = []
+        if self.value_file is not None:
+            with open(self.value_file, 'rb') as f:
+                while True:
+                    try:
+                        v.append(dill.load(f))
+                    except EOFError:
+                        break
+        v.extend(self._value)
+        return v
+
+    def pos(self):
+        p = []
+        if self.pos_file is not None:
+            with open(self.pos_file, 'rb') as f:
+                while True:
+                    try:
+                        p.append(dill.load(f))
+                    except EOFError:
+                        break
+        p.extend(self._pos)
+        return p
+
+    def array(self):
+        pos = np.asarray(self.pos()) - np.asarray(self.lu)
+        data = np.asarray(self.value())
+        x = np.full(self.shape, np.nan, dtype=data[0].dtype)
+        x.__setitem__(tuple(pos.T), data)
+        return x
+
+
 class Record():
 
     def __init__(self, id, database, description=None):
@@ -712,6 +779,7 @@ class Record():
         self._pos = []
         self._last_vars = set()
         self._levels = {}
+        self._file = None
         self.independent_variables = {}
         self.constants = {}
 
@@ -729,6 +797,17 @@ class Record():
                 if isinstance(iterable, (np.ndarray, list, tuple, range)):
                     self._items[name] = iterable
                     self.independent_variables[name] = (level, iterable)
+
+        if self.is_local_record():
+            self.database = Path(self.database)
+            self._file = random_path(self.database / 'objects')
+            self._file.parent.mkdir(parents=True, exist_ok=True)
+
+    def is_local_record(self):
+        return not self.is_cache_record() and not self.is_remote_record()
+
+    def is_cache_record(self):
+        return self.database is None
 
     def is_remote_record(self):
         return isinstance(self.database,
@@ -755,13 +834,8 @@ class Record():
                 d = self._items.get(key)
             else:
                 d = self._items.get(key, default)
-            if isinstance(
-                    d, dict) and 'shape' in d and 'pos' in d and 'value' in d:
-                pos = tuple(np.asarray(d['pos']).T)
-                data = np.asarray(d['value'])
-                x = np.full(d['shape'], np.nan, dtype=data.dtype)
-                x.__setitem__(pos, data)
-                return x
+            if isinstance(d, BufferList):
+                return d.array()
             else:
                 return d
 
@@ -809,30 +883,28 @@ class Record():
         for key, value in variables.items():
             if level == self._levels[key]:
                 if key not in self._items:
-                    self._items[key] = {
-                        'lu': tuple([i for i in pos]),
-                        'rd': tuple([i + 1 for i in pos]),
-                        'shape': tuple([1 for _ in pos]),
-                        'pos': [pos],
-                        'value': [value]
-                    }
-                elif key not in self.independent_variables and key not in self.constants:
-                    self._items[key]['lu'] = tuple([
-                        min(i, j) for i, j in zip(pos, self._items[key]['lu'])
-                    ])
-                    self._items[key]['rd'] = tuple([
-                        max(i + 1, j)
-                        for i, j in zip(pos, self._items[key]['rd'])
-                    ])
-                    self._items[key]['shape'] = tuple([
-                        i - j for i, j in zip(self._items[key]['rd'],
-                                              self._items[key]['lu'])
-                    ])
-                    self._items[key]['pos'].append(pos)
-                    self._items[key]['value'].append(value)
+                    if self.is_local_record():
+                        f1 = random_path(self.database / 'objects')
+                        f1.parent.mkdir(parents=True, exist_ok=True)
+                        f2 = random_path(self.database / 'objects')
+                        f2.parent.mkdir(parents=True, exist_ok=True)
+                        self._items[key] = BufferList(f1, f2)
+                    else:
+                        self._items[key] = BufferList()
+                    self._items[key].lu = pos
+                    self._items[key].rd = tuple([i + 1 for i in pos])
+                elif isinstance(self._items[key], BufferList):
+                    self._items[key].append(pos, value)
             elif self._levels[key] == -1 and key not in self._items:
                 self._items[key] = value
 
     def flush(self):
-        if self.is_remote_record():
+        if self.is_remote_record() or self.is_cache_record():
             return
+
+        for key, value in self._items.items():
+            if isinstance(value, BufferList):
+                value.flush()
+
+        with open(self._file, 'wb') as f:
+            dill.dump(self, f)
