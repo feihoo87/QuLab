@@ -2,7 +2,7 @@ import ast
 import asyncio
 import inspect
 import itertools
-import pickle
+import sys
 import uuid
 from graphlib import TopologicalSorter
 from pathlib import Path
@@ -18,6 +18,11 @@ from skopt.space import Categorical, Integer, Real
 from ..sys.rpc.zmq_socket import ZMQContextManager
 from .expression import Env, Expression, Symbol, _empty
 from .optimize import NgOptimizer
+
+# from tqdm.notebook import tqdm
+
+
+_notgiven = object()
 
 
 async def call_function(func: Callable | Expression, variables: dict[str,
@@ -123,6 +128,9 @@ class OptimizeSpace():
         self.optimizer = optimizer
         self.space = space
         self.name = None
+
+    def __len__(self):
+        return self.optimizer.maxiter
 
 
 class Optimizer():
@@ -232,6 +240,7 @@ class Scan():
             'dependents': {},
             'order': {},
             'filters': {},
+            'total': {},
             'compiled': False,
         }
         self._current_level = 0
@@ -241,6 +250,7 @@ class Scan():
         self.database = database
         self._variables = {}
         self._sem = asyncio.Semaphore(100)
+        self._bar = {}
 
     def __getstate__(self) -> dict:
         state = self.__dict__.copy()
@@ -284,14 +294,26 @@ class Scan():
     async def _filter(self, variables: dict[str, Any], level: int = 0):
         try:
             return all([
-                await call_function(fun, variables)
-                for fun in self.description['filters'].get(level, [])
+                await call_function(fun, variables) for fun in itertools.chain(
+                    self.description['filters'].get(level, []),
+                    self.description['filters'].get(-1, []))
             ])
         except:
             return True
 
     async def create_record(self):
         import __main__
+        from IPython import get_ipython
+
+        ipy = get_ipython()
+        if ipy is not None:
+            scripts = ('ipython', ipy.user_ns['In'])
+        else:
+            try:
+                scripts = ('shell',
+                           [sys.executable, __main__.__file__, *sys.argv[1:]])
+            except:
+                scripts = ('', [])
 
         if self.sock is not None:
             await self.sock.send_pyobj({
@@ -302,7 +324,10 @@ class Scan():
                 'description':
                 dill.dumps(self.description),
                 # 'env':
-                # dill.dumps(__main__.__dict__)
+                # dill.dumps(__main__.__dict__),
+                'scripts':
+                scripts,
+                'tags': []
             })
 
             record_id = await self.sock.recv_pyobj()
@@ -330,6 +355,13 @@ class Scan():
         self.description['dependents'][name].update(depends)
 
     def add_filter(self, func, level):
+        """
+        Add a filter function to the scan.
+
+        Args:
+            func: A callable object or an instance of Expression.
+            level: The level of the scan to add the filter. -1 means any level.
+        """
         if level not in self.description['filters']:
             self.description['filters'][level] = []
         self.description['filters'][level].append(func)
@@ -345,12 +377,16 @@ class Scan():
             self.description['consts'][name] = value
 
     def search(self, name: str, range, level: int | None = None):
+        if level is not None:
+            assert level >= 0, 'level must be greater than or equal to 0.'
         if isinstance(range, OptimizeSpace):
             range.name = name
             range.optimizer.dimensions[name] = range.space
             self._add_loop_var(name, range.optimizer.level, range)
             self.add_depends(range.optimizer.name, [name])
         else:
+            if level is None:
+                raise ValueError('level must be provided.')
             self._add_loop_var(name, level, range)
             if isinstance(range, Expression) or callable(range):
                 self.add_depends(name, range.symbols())
@@ -361,6 +397,7 @@ class Scan():
                  method=NgOptimizer,
                  maxiter=100,
                  **kwds) -> Optimizer:
+        assert level >= 0, 'level must be greater than or equal to 0.'
         opt = Optimizer(self,
                         name,
                         level,
@@ -377,6 +414,7 @@ class Scan():
                  method=NgOptimizer,
                  maxiter=100,
                  **kwds) -> Optimizer:
+        assert level >= 0, 'level must be greater than or equal to 0.'
         opt = Optimizer(self,
                         name,
                         level,
@@ -390,6 +428,10 @@ class Scan():
     async def _run(self):
         self.assymbly()
         self.variables = self.description['consts'].copy()
+        # for level, total in self.description['total'].items():
+        #     if total == np.inf:
+        #         total = None
+        #     self._bar[level] = tqdm(total=total)
         for group in self.description['order'].get(-1, []):
             for name in group:
                 if name in self.description['functions']:
@@ -405,6 +447,8 @@ class Scan():
         else:
             self.record = await self.create_record()
             await self.work()
+        # for level, bar in self._bar.items():
+        #     bar.close()
         return self.variables
 
     async def done(self):
@@ -424,8 +468,11 @@ class Scan():
             for level, label in enumerate(
                 sorted(
                     set(self.description['loops'].keys())
-                    | set(self.description['jobs'].keys())))
+                    | set(self.description['jobs'].keys()) - {-1}))
         }
+
+        if -1 in self.description['jobs']:
+            mapping[-1] = max(mapping.values()) + 1
 
         self.description['loops'] = dict(
             sorted([(mapping[k], v)
@@ -434,6 +481,15 @@ class Scan():
             mapping[k]: v
             for k, v in self.description['jobs'].items()
         }
+
+        for level, loops in self.description['loops'].items():
+            self.description['total'][level] = np.inf
+            for name, space in loops:
+                try:
+                    self.description['total'][level] = min(
+                        self.description['total'][level], len(space))
+                except:
+                    pass
 
         dependents = self.description['dependents'].copy()
 
@@ -575,6 +631,8 @@ class Scan():
         step = 0
         position = 0
         task = None
+        # if self.current_level in self._bar:
+        #     self._bar[self.current_level].reset()
         async for variables in self._iter_level(self.current_level,
                                                 self.variables):
             self._current_level += 1
@@ -584,6 +642,8 @@ class Scan():
                     self.emit(self.current_level - 1, step, position,
                               variables.copy()))
                 step += 1
+            # if self.current_level in self._bar:
+            #     self._bar[self.current_level].update(1)
             position += 1
             self._current_level -= 1
         if task is not None:
@@ -605,15 +665,39 @@ class Scan():
         await self.work(**kwds)
 
     def set_job(self, job, level):
+        """
+        Set a job to the scan.
+
+        Args:
+            job: A callable object.
+            level: The level of the scan to add the job. -1 means innermost level.
+        """
         self.description['jobs'][level] = job
 
     async def promise(self, awaitable):
+        """
+        Promise to calculate asynchronous function and return the result in future.
+
+        Args:
+            awaitable: An awaitable object.
+
+        Returns:
+            Promise: A promise object.
+        """
         async with self._sem:
             return Promise(asyncio.create_task(self._await(awaitable)))
 
     async def _await(self, awaitable):
         async with self._sem:
             return await awaitable
+
+
+def random_path(base):
+    while True:
+        s = uuid.uuid4().hex
+        path = base / s[:2] / s[2:4] / s[4:6] / s[6:]
+        if not path.exists():
+            return path
 
 
 class Record():
@@ -646,9 +730,18 @@ class Record():
                     self._items[name] = iterable
                     self.independent_variables[name] = (level, iterable)
 
+    def is_remote_record(self):
+        return isinstance(self.database,
+                          str) and self.database.startswith("tcp://")
+
+    def __del__(self):
+        self.flush()
+
     def __getitem__(self, key):
-        if isinstance(self.database,
-                      str) and self.database.startswith("tcp://"):
+        return self.get(key)
+
+    def get(self, key, default=_notgiven):
+        if self.is_remote_record():
             with ZMQContextManager(zmq.DEALER,
                                    connect=self.database) as socket:
                 socket.send_pyobj({
@@ -658,10 +751,11 @@ class Record():
                 })
                 return socket.recv_pyobj()
         else:
-            d = self._items.get(key, None)
-            if d is None:
-                return None
-            elif isinstance(
+            if default is _notgiven:
+                d = self._items.get(key)
+            else:
+                d = self._items.get(key, default)
+            if isinstance(
                     d, dict) and 'shape' in d and 'pos' in d and 'value' in d:
                 pos = tuple(np.asarray(d['pos']).T)
                 data = np.asarray(d['value'])
@@ -672,8 +766,7 @@ class Record():
                 return d
 
     def keys(self):
-        if isinstance(self.database,
-                      str) and self.database.startswith("tcp://"):
+        if self.is_remote_record():
             with ZMQContextManager(zmq.DEALER,
                                    connect=self.database) as socket:
                 socket.send_pyobj({
@@ -686,6 +779,7 @@ class Record():
 
     def append(self, level, step, position, variables):
         if level < 0:
+            self.flush()
             return
 
         for key in set(variables.keys()) - self._last_vars:
@@ -722,7 +816,7 @@ class Record():
                         'pos': [pos],
                         'value': [value]
                     }
-                elif key not in self.independent_variables:
+                elif key not in self.independent_variables and key not in self.constants:
                     self._items[key]['lu'] = tuple([
                         min(i, j) for i, j in zip(pos, self._items[key]['lu'])
                     ])
@@ -738,3 +832,7 @@ class Record():
                     self._items[key]['value'].append(value)
             elif self._levels[key] == -1 and key not in self._items:
                 self._items[key] = value
+
+    def flush(self):
+        if self.is_remote_record():
+            return
