@@ -14,12 +14,11 @@ import numpy as np
 import skopt
 import zmq
 from skopt.space import Categorical, Integer, Real
+from tqdm.notebook import tqdm
 
 from ..sys.rpc.zmq_socket import ZMQContextManager
 from .expression import Env, Expression, Symbol, _empty
 from .optimize import NgOptimizer
-
-# from tqdm.notebook import tqdm
 
 _notgiven = object()
 
@@ -237,7 +236,7 @@ class Scan():
             'consts': {},
             'functions': {},
             'optimizers': {},
-            'jobs': {},
+            'actions': {},
             'dependents': {},
             'order': {},
             'filters': {},
@@ -429,10 +428,10 @@ class Scan():
     async def _run(self):
         self.assymbly()
         self.variables = self.description['consts'].copy()
-        # for level, total in self.description['total'].items():
-        #     if total == np.inf:
-        #         total = None
-        #     self._bar[level] = tqdm(total=total)
+        for level, total in self.description['total'].items():
+            if total == np.inf:
+                total = None
+            self._bar[level] = tqdm(total=total)
         for group in self.description['order'].get(-1, []):
             for name in group:
                 if name in self.description['functions']:
@@ -448,8 +447,8 @@ class Scan():
         else:
             self.record = await self.create_record()
             await self.work()
-        # for level, bar in self._bar.items():
-        #     bar.close()
+        for level, bar in self._bar.items():
+            bar.close()
         return self.variables
 
     async def done(self):
@@ -469,18 +468,18 @@ class Scan():
             for level, label in enumerate(
                 sorted(
                     set(self.description['loops'].keys())
-                    | set(self.description['jobs'].keys()) - {-1}))
+                    | set(self.description['actions'].keys()) - {-1}))
         }
 
-        if -1 in self.description['jobs']:
+        if -1 in self.description['actions']:
             mapping[-1] = max(mapping.values()) + 1
 
         self.description['loops'] = dict(
             sorted([(mapping[k], v)
                     for k, v in self.description['loops'].items()]))
-        self.description['jobs'] = {
+        self.description['actions'] = {
             mapping[k]: v
-            for k, v in self.description['jobs'].items()
+            for k, v in self.description['actions'].items()
         }
 
         for level, loops in self.description['loops'].items():
@@ -632,8 +631,8 @@ class Scan():
         step = 0
         position = 0
         task = None
-        # if self.current_level in self._bar:
-        #     self._bar[self.current_level].reset()
+        if self.current_level in self._bar:
+            self._bar[self.current_level].reset()
         async for variables in self._iter_level(self.current_level,
                                                 self.variables):
             self._current_level += 1
@@ -643,19 +642,19 @@ class Scan():
                     self.emit(self.current_level - 1, step, position,
                               variables.copy()))
                 step += 1
-            # if self.current_level in self._bar:
-            #     self._bar[self.current_level].update(1)
             position += 1
             self._current_level -= 1
+            if self.current_level in self._bar:
+                self._bar[self.current_level].update(1)
         if task is not None:
             await task
         if self.current_level == 0:
             await self.emit(self.current_level - 1, 0, 0, {})
 
     async def work(self, **kwds):
-        if self.current_level in self.description['jobs']:
-            fun = self.description['jobs'][self.current_level]
-            coro = fun(self, **kwds)
+        if self.current_level in self.description['actions']:
+            action = self.description['actions'][self.current_level]
+            coro = action(self, **kwds)
             if inspect.isawaitable(coro):
                 await coro
         else:
@@ -665,15 +664,15 @@ class Scan():
     async def do_something(self, **kwds):
         await self.work(**kwds)
 
-    def set_job(self, job, level):
+    def mount(self, action: Callable, level: int):
         """
-        Set a job to the scan.
+        Mount a action to the scan.
 
         Args:
-            job: A callable object.
-            level: The level of the scan to add the job. -1 means innermost level.
+            action: A callable object.
+            level: The level of the scan to mount the action.
         """
-        self.description['jobs'][level] = job
+        self.description['actions'][level] = action
 
     async def promise(self, awaitable):
         """
@@ -762,7 +761,8 @@ class BufferList():
     def array(self):
         pos = np.asarray(self.pos()) - np.asarray(self.lu)
         data = np.asarray(self.value())
-        x = np.full(self.shape, np.nan, dtype=data[0].dtype)
+        inner_shape = data.shape[1:]
+        x = np.full(self.shape + inner_shape, np.nan, dtype=data[0].dtype)
         x.__setitem__(tuple(pos.T), data)
         return x
 
