@@ -893,6 +893,7 @@ class Record():
                         self._items[key] = BufferList()
                     self._items[key].lu = pos
                     self._items[key].rd = tuple([i + 1 for i in pos])
+                    self._items[key].append(pos, value)
                 elif isinstance(self._items[key], BufferList):
                     self._items[key].append(pos, value)
             elif self._levels[key] == -1 and key not in self._items:
