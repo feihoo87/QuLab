@@ -2,7 +2,7 @@ import math
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm, Normalize, SymLogNorm
 from matplotlib.ticker import EngFormatter, LogFormatterSciNotation
 from scipy.interpolate import griddata
 
@@ -239,10 +239,16 @@ def plot_img(x,
     kwds.setdefault('aspect', 'auto')
     kwds.setdefault('interpolation', 'nearest')
 
+    vmin = kwds.get('vmin', np.nanmin(z))
+    vmax = kwds.get('vmax', np.nanmax(z))
     if zscale == 'log':
-        vmim = kwds.get('vmin', np.min(z))
-        vmax = kwds.get('vmax', np.max(z))
-        kwds.setdefault('norm', LogNorm(vmax=vmax, vmin=vmim))
+        kwds.setdefault('norm', LogNorm(vmax=vmax, vmin=vmin))
+    elif zscale == 'symlog':
+        kwds.setdefault('norm', SymLogNorm(vmax=vmax,
+                                           vmin=vmin,
+                                           linthresh=1e-5))
+    else:
+        kwds.setdefault('norm', Normalize(vmin=vmin, vmax=vmax))
     zlabel = f"{zlabel} [{z_unit}]" if z_unit else zlabel
 
     band_area = False
@@ -303,7 +309,7 @@ def plot_img(x,
         pass
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    cb = fig.colorbar(img, ax=ax)
+    cb = fig.colorbar(img, ax=ax, norm=kwds.get('norm', None))
     cb.set_label(zlabel)
 
 
