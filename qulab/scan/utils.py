@@ -1,5 +1,13 @@
 import inspect
 from concurrent.futures import Future
+from pathlib import Path
+
+import dill
+import zmq
+
+from qulab.sys.rpc.zmq_socket import ZMQContextManager
+
+from .recorder import Record
 
 
 def call_func_with_kwds(func, args, kwds, log=None):
@@ -35,3 +43,28 @@ def try_to_call(x, args, kwds, log=None):
     if callable(x):
         return call_func_with_kwds(x, args, kwds, log)
     return x
+
+
+def get_record(id, database='tcp://127.0.0.1:6789'):
+    if isinstance(database, str) and database.startswith('tcp://'):
+        with ZMQContextManager(zmq.DEALER, connect=database) as socket:
+            socket.send_pyobj({
+                'method': 'record_description',
+                'record_id': id
+            })
+            d = dill.loads(socket.recv_pyobj())
+            print(d.keys())
+            return Record(id, database, d)
+    else:
+        from .models import Record as RecordInDB
+        from .models import create_engine, sessionmaker
+
+        db_file = Path(database) / 'data.db'
+        engine = create_engine(f'sqlite:///{db_file}')
+        Session = sessionmaker(bind=engine)
+        with Session() as session:
+            path = Path(database) / 'objects' / session.get(RecordInDB,
+                                                            id).file
+            with open(path, 'rb') as f:
+                record = dill.load(f)
+            return record
