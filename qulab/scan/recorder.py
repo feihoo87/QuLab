@@ -5,6 +5,7 @@ import time
 import uuid
 from pathlib import Path
 
+import click
 import dill
 import numpy as np
 import zmq
@@ -264,7 +265,7 @@ def clear_cache():
         del record_cache[k]
 
 
-def get_record(session, id):
+def get_record(session, id, datapath):
     if id not in record_cache:
         path = datapath / 'objects' / session.get(RecordInDB, id).file
         with open(path, 'rb') as f:
@@ -276,7 +277,7 @@ def get_record(session, id):
     return record
 
 
-def create_record(session, description):
+def create_record(session, description, datapath):
     record = Record(None, datapath, description)
     record_in_db = RecordInDB()
     record_in_db.file = '/'.join(record._file.parts[-4:])
@@ -293,7 +294,7 @@ def create_record(session, description):
 
 
 @logger.catch
-async def handle(session: Session, request: Request):
+async def handle(session: Session, request: Request, datapath: Path):
 
     msg = request.msg
 
@@ -302,35 +303,37 @@ async def handle(session: Session, request: Request):
             await reply(request, 'pong')
         case 'record_create':
             description = dill.loads(msg['description'])
-            await reply(request, create_record(session, description))
+            await reply(request, create_record(session, description, datapath))
         case 'record_append':
-            record = get_record(session, msg['record_id'])
+            record = get_record(session, msg['record_id'], datapath)
             record.append(msg['level'], msg['step'], msg['position'],
                           msg['variables'])
         case 'record_description':
-            record = get_record(session, msg['record_id'])
+            record = get_record(session, msg['record_id'], datapath)
             await reply(request, dill.dumps(record.description))
         case 'record_getitem':
-            record = get_record(session, msg['record_id'])
+            record = get_record(session, msg['record_id'], datapath)
             await reply(request, record.get(msg['key']))
         case 'record_keys':
-            record = get_record(session, msg['record_id'])
+            record = get_record(session, msg['record_id'], datapath)
             await reply(request, record.keys())
         case _:
             logger.error(f'Unknown method: {msg["method"]}')
 
 
-async def _handle(session: Session, request: Request):
+async def _handle(session: Session, request: Request, datapath: Path):
     try:
-        await handle(session, request)
+        await handle(session, request, datapath)
     except:
         await reply(request, 'error')
 
 
-async def server():
+async def serve(port, datapath, url=None):
     logger.info('Server starting.')
-    async with ZMQContextManager(zmq.ROUTER, bind="tcp://*:6789") as sock:
-        engine = create_engine('sqlite:///' + str(datapath / 'data.db'))
+    async with ZMQContextManager(zmq.ROUTER, bind=f"tcp://*:{port}") as sock:
+        if url is None:
+            url = 'sqlite:///' + str(datapath / 'data.db')
+        engine = create_engine(url)
         create_tables(engine)
         Session = sessionmaker(engine)
         with Session() as session:
@@ -338,28 +341,38 @@ async def server():
             while True:
                 identity, msg = await sock.recv_multipart()
                 req = Request(sock, identity, msg)
-                asyncio.create_task(_handle(session, req))
+                asyncio.create_task(_handle(session, req, datapath))
 
 
-async def watch():
-    with ZMQContextManager(zmq.DEALER, connect="tcp://127.0.0.1:6789") as sock:
+async def watch(port, datapath, url=None, timeout=1):
+    with ZMQContextManager(zmq.DEALER,
+                           connect=f"tcp://127.0.0.1:{port}") as sock:
         sock.setsockopt(zmq.LINGER, 0)
         while True:
             try:
                 sock.send_pyobj({"method": "ping"})
-                if sock.poll(1000):
+                if sock.poll(int(1000 * timeout)):
                     sock.recv()
                 else:
                     raise asyncio.TimeoutError()
             except (zmq.error.ZMQError, asyncio.TimeoutError):
-                return asyncio.create_task(server())
-            await asyncio.sleep(1)
+                return asyncio.create_task(serve(port, datapath, url))
+            await asyncio.sleep(timeout)
 
 
-async def main():
-    task = await watch()
+async def main(port, datapath, url, timeout=1):
+    task = await watch(port=6789, datapath=datapath, url=None, timeout=1)
     await task
 
 
+@click.command()
+@click.option('--port', default=6789, help='Port of the server.')
+@click.option('--datapath', default=datapath, help='Path of the data.')
+@click.option('--url', default=None, help='URL of the database.')
+@click.option('--timeout', default=1, help='Timeout of ping.')
+def record(port, datapath, url, timeout):
+    asyncio.run(main(port, Path(datapath), url, timeout))
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    record()
