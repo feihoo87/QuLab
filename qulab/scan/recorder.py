@@ -13,8 +13,9 @@ from loguru import logger
 
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
+from .curd import query_record, remove_tags, tag, update_tags
 from .models import Record as RecordInDB
-from .models import Session, create_engine, create_tables, sessionmaker
+from .models import Session, create_engine, create_tables, sessionmaker, utcnow
 
 _notgiven = object()
 datapath = Path.home() / 'qulab' / 'data'
@@ -267,7 +268,9 @@ def clear_cache():
 
 def get_record(session, id, datapath):
     if id not in record_cache:
-        path = datapath / 'objects' / session.get(RecordInDB, id).file
+        record_in_db = session.get(RecordInDB, id)
+        record_in_db.atime = utcnow()
+        path = datapath / 'objects' / record_in_db.file
         with open(path, 'rb') as f:
             record = dill.load(f)
     else:
@@ -280,6 +283,10 @@ def get_record(session, id, datapath):
 def create_record(session, description, datapath):
     record = Record(None, datapath, description)
     record_in_db = RecordInDB()
+    if 'app' in description:
+        record_in_db.app = description['app']
+    if 'tags' in description:
+        record_in_db.tags = [tag(session, t) for t in description['tags']]
     record_in_db.file = '/'.join(record._file.parts[-4:])
     session.add(record_in_db)
     try:
@@ -308,6 +315,11 @@ async def handle(session: Session, request: Request, datapath: Path):
             record = get_record(session, msg['record_id'], datapath)
             record.append(msg['level'], msg['step'], msg['position'],
                           msg['variables'])
+            if msg['level'] < 0:
+                record_in_db = session.get(RecordInDB, msg['record_id'])
+                record_in_db.mtime = utcnow()
+                record_in_db.atime = utcnow()
+                session.commit()
         case 'record_description':
             record = get_record(session, msg['record_id'], datapath)
             await reply(request, dill.dumps(record.description))
@@ -317,6 +329,24 @@ async def handle(session: Session, request: Request, datapath: Path):
         case 'record_keys':
             record = get_record(session, msg['record_id'], datapath)
             await reply(request, record.keys())
+        case 'record_query':
+            total, apps, table = query_record(session,
+                                              offset=msg.get('offset', 0),
+                                              limit=msg.get('limit', 10),
+                                              app=msg.get('app', None),
+                                              tags=msg.get('tags', ()),
+                                              before=msg.get('before', None),
+                                              after=msg.get('after', None))
+            await reply(request, (total, apps, table))
+        case 'record_get_tags':
+            record_in_db = session.get(RecordInDB, msg['record_id'])
+            await reply(request, [t.name for t in record_in_db.tags])
+        case 'record_remove_tags':
+            remove_tags(session, msg['record_id'], msg['tags'])
+        case 'record_add_tags':
+            update_tags(session, msg['record_id'], msg['tags'], True)
+        case 'record_replace_tags':
+            update_tags(session, msg['record_id'], msg['tags'], False)
         case _:
             logger.error(f'Unknown method: {msg["method"]}')
 
@@ -328,7 +358,7 @@ async def _handle(session: Session, request: Request, datapath: Path):
         await reply(request, 'error')
 
 
-async def serve(port, datapath, url=None):
+async def serv(port, datapath, url=None):
     logger.info('Server starting.')
     async with ZMQContextManager(zmq.ROUTER, bind=f"tcp://*:{port}") as sock:
         if url is None:
@@ -356,7 +386,7 @@ async def watch(port, datapath, url=None, timeout=1):
                 else:
                     raise asyncio.TimeoutError()
             except (zmq.error.ZMQError, asyncio.TimeoutError):
-                return asyncio.create_task(serve(port, datapath, url))
+                return asyncio.create_task(serv(port, datapath, url))
             await asyncio.sleep(timeout)
 
 

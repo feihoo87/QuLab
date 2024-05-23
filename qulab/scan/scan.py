@@ -225,12 +225,15 @@ class Promise():
 class Scan():
 
     def __init__(self,
-                 prefix: str = 'task',
+                 app: str = 'task',
+                 tags: tuple[str] = (),
                  database: str | Path | None = Path.home() / 'data'):
-        self.id = f"{prefix}({str(uuid.uuid1())})"
+        self.id = f"{app}({str(uuid.uuid1())})"
         self.record = None
         self.namespace = {}
         self.description = {
+            'app': app,
+            'tags': tags,
             'loops': {},
             'consts': {},
             'functions': {},
