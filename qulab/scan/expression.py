@@ -323,6 +323,14 @@ class UnaryExpression(Expression):
         self.a = a
         self.op = op
 
+    def __getstate__(self) -> dict:
+        return {'a': self.a, 'op': self.op}
+
+    def __setstate__(self, state: dict):
+        self.a = state['a']
+        self.op = state['op']
+        self.cache = _empty
+
     def symbols(self) -> list[str]:
         if isinstance(self.a, Expression):
             return self.a.symbols()
@@ -361,6 +369,15 @@ class BinaryExpression(Expression):
         self.a = a
         self.b = b
         self.op = op
+
+    def __getstate__(self) -> dict:
+        return {'a': self.a, 'b': self.b, 'op': self.op}
+
+    def __setstate__(self, state: dict):
+        self.a = state['a']
+        self.b = state['b']
+        self.op = state['op']
+        self.cache = _empty
 
     def symbols(self) -> list[str]:
         symbs = set()
@@ -419,6 +436,15 @@ class ObjectMethod(Expression):
         self.method = method
         self.args = args
 
+    def __getstate__(self) -> dict:
+        return {'obj': self.obj, 'method': self.method, 'args': self.args}
+
+    def __setstate__(self, state: dict):
+        self.obj = state['obj']
+        self.method = state['method']
+        self.args = state['args']
+        self.cache = _empty
+
     def symbols(self) -> list[str]:
         symbs = set()
         if isinstance(self.obj, Expression):
@@ -439,7 +465,7 @@ class ObjectMethod(Expression):
             return ObjectMethod(obj, self.method, *args)
         else:
             return getattr(obj, self.method)(*args)
-        
+
     def __repr__(self):
         if self.method == '__call__':
             return f"{self.obj!r}({', '.join(map(repr, self.args))})"
@@ -452,6 +478,13 @@ class Symbol(Expression):
     def __init__(self, name):
         super().__init__()
         self.name = name
+
+    def __getstate__(self) -> dict:
+        return {'name': self.name}
+
+    def __setstate__(self, state: dict):
+        self.name = state['name']
+        self.cache = _empty
 
     def symbols(self) -> list[str]:
         return [self.name]
