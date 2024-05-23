@@ -227,7 +227,7 @@ class Scan():
     def __init__(self,
                  app: str = 'task',
                  tags: tuple[str] = (),
-                 database: str | Path | None = Path.home() / 'data'):
+                 database: str | Path | None = 'tcp://127.0.0.1:6789'):
         self.id = f"{app}({str(uuid.uuid1())})"
         self.record = None
         self.namespace = {}
