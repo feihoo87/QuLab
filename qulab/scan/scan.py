@@ -455,11 +455,18 @@ class Scan():
 
     async def done(self):
         if self._task is not None:
-            await self._task
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
 
     def start(self):
         import asyncio
         self._task = asyncio.create_task(self._run())
+
+    def cancel(self):
+        if self._task is not None:
+            self._task.cancel()
 
     def assymbly(self):
         if self.description['compiled']:

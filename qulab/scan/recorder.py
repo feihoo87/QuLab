@@ -266,6 +266,11 @@ def clear_cache():
         del record_cache[k]
 
 
+def flush_cache():
+    for k, (t, r) in record_cache.items():
+        r.flush()
+
+
 def get_record(session, id, datapath):
     if id not in record_cache:
         record_in_db = session.get(RecordInDB, id)
@@ -368,10 +373,15 @@ async def serv(port, datapath, url=None):
         Session = sessionmaker(engine)
         with Session() as session:
             logger.info('Server started.')
+            received = 0
             while True:
                 identity, msg = await sock.recv_multipart()
+                received += len(msg)
                 req = Request(sock, identity, msg)
                 asyncio.create_task(_handle(session, req, datapath))
+                if received > 1024 * 1024 * 1024:
+                    flush_cache()
+                    received = 0
 
 
 async def watch(port, datapath, url=None, timeout=1):
