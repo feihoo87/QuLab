@@ -375,7 +375,11 @@ async def _handle(session: Session, request: Request, datapath: Path):
         await reply(request, 'error')
 
 
-async def serv(port, datapath, url=None):
+async def serv(port,
+               datapath,
+               url=None,
+               buffer_size=1024 * 1024 * 1024,
+               interval=60):
     logger.info('Server starting.')
     async with ZMQContextManager(zmq.ROUTER, bind=f"tcp://*:{port}") as sock:
         if url is None:
@@ -392,14 +396,14 @@ async def serv(port, datapath, url=None):
                 received += len(msg)
                 req = Request(sock, identity, msg)
                 asyncio.create_task(_handle(session, req, datapath))
-                if received > 1024 * 1024 * 1024 or time.time(
-                ) - last_flush_time > 60:
+                if received > buffer_size or time.time(
+                ) - last_flush_time > interval:
                     flush_cache()
                     received = 0
                     last_flush_time = time.time()
 
 
-async def watch(port, datapath, url=None, timeout=1):
+async def watch(port, datapath, url=None, timeout=1, buffer=1024, interval=60):
     with ZMQContextManager(zmq.DEALER,
                            connect=f"tcp://127.0.0.1:{port}") as sock:
         sock.setsockopt(zmq.LINGER, 0)
@@ -411,12 +415,18 @@ async def watch(port, datapath, url=None, timeout=1):
                 else:
                     raise asyncio.TimeoutError()
             except (zmq.error.ZMQError, asyncio.TimeoutError):
-                return asyncio.create_task(serv(port, datapath, url))
+                return asyncio.create_task(
+                    serv(port, datapath, url, buffer * 1024 * 1024, interval))
             await asyncio.sleep(timeout)
 
 
-async def main(port, datapath, url, timeout=1):
-    task = await watch(port=6789, datapath=datapath, url=None, timeout=1)
+async def main(port, datapath, url, timeout=1, buffer=1024, interval=60):
+    task = await watch(port=port,
+                       datapath=datapath,
+                       url=url,
+                       timeout=timeout,
+                       buffer=buffer,
+                       interval=interval)
     await task
 
 
@@ -425,8 +435,12 @@ async def main(port, datapath, url, timeout=1):
 @click.option('--datapath', default=datapath, help='Path of the data.')
 @click.option('--url', default=None, help='URL of the database.')
 @click.option('--timeout', default=1, help='Timeout of ping.')
-def record(port, datapath, url, timeout):
-    asyncio.run(main(port, Path(datapath), url, timeout))
+@click.option('--buffer', default=1024, help='Buffer size (MB).')
+@click.option('--interval',
+              default=60,
+              help='Interval of flush cache, in unit of second.')
+def record(port, datapath, url, timeout, buffer, interval):
+    asyncio.run(main(port, Path(datapath), url, timeout, buffer, interval))
 
 
 if __name__ == "__main__":
