@@ -151,7 +151,7 @@ class Record():
     def __getitem__(self, key):
         return self.get(key)
 
-    def get(self, key, default=_notgiven):
+    def get(self, key, default=_notgiven, buffer_to_array=True):
         if self.is_remote_record():
             with ZMQContextManager(zmq.DEALER,
                                    connect=self.database) as socket:
@@ -160,14 +160,26 @@ class Record():
                     'record_id': self.id,
                     'key': key
                 })
-                return socket.recv_pyobj()
+                ret = socket.recv_pyobj()
+                if isinstance(ret, BufferList) and buffer_to_array:
+                    return ret.array()
+                else:
+                    return ret
         else:
             if default is _notgiven:
                 d = self._items.get(key)
             else:
                 d = self._items.get(key, default)
             if isinstance(d, BufferList):
-                return d.array()
+                if buffer_to_array:
+                    return d.array()
+                else:
+                    ret = BufferList()
+                    ret._pos = d.pos()
+                    ret._value = d.value()
+                    ret.lu = d.lu
+                    ret.rd = d.rd
+                    return ret
             else:
                 return d
 
@@ -330,7 +342,7 @@ async def handle(session: Session, request: Request, datapath: Path):
             await reply(request, dill.dumps(record.description))
         case 'record_getitem':
             record = get_record(session, msg['record_id'], datapath)
-            await reply(request, record.get(msg['key']))
+            await reply(request, record.get(msg['key'], buffer_to_array=False))
         case 'record_keys':
             record = get_record(session, msg['record_id'], datapath)
             await reply(request, record.keys())
@@ -374,14 +386,17 @@ async def serv(port, datapath, url=None):
         with Session() as session:
             logger.info('Server started.')
             received = 0
+            last_flush_time = time.time()
             while True:
                 identity, msg = await sock.recv_multipart()
                 received += len(msg)
                 req = Request(sock, identity, msg)
                 asyncio.create_task(_handle(session, req, datapath))
-                if received > 1024 * 1024 * 1024:
+                if received > 1024 * 1024 * 1024 or time.time(
+                ) - last_flush_time > 60:
                     flush_cache()
                     received = 0
+                    last_flush_time = time.time()
 
 
 async def watch(port, datapath, url=None, timeout=1):
