@@ -10,7 +10,7 @@ import uuid
 from graphlib import TopologicalSorter
 from pathlib import Path
 from types import MethodType
-from typing import Any, Callable, Type
+from typing import Any, Callable, Iterable, Type
 
 import dill
 import numpy as np
@@ -23,6 +23,7 @@ from ..sys.rpc.zmq_socket import ZMQContextManager
 from .expression import Env, Expression, Symbol
 from .optimize import NgOptimizer
 from .recorder import Record
+from .utils import async_zip, call_function
 
 __process_uuid = uuid.uuid1()
 __task_counter = itertools.count()
@@ -30,72 +31,6 @@ __task_counter = itertools.count()
 
 def task_uuid():
     return uuid.uuid3(__process_uuid, str(next(__task_counter)))
-
-
-async def call_function(func: Callable | Expression, variables: dict[str,
-                                                                     Any]):
-    if isinstance(func, Expression):
-        env = Env()
-        for name in func.symbols():
-            if name in variables:
-                if inspect.isawaitable(variables[name]):
-                    variables[name] = await variables[name]
-                env.variables[name] = variables[name]
-            else:
-                raise ValueError(f'{name} is not provided.')
-        return func.eval(env)
-
-    try:
-        sig = inspect.signature(func)
-    except:
-        return func()
-    args = []
-    for name, param in sig.parameters.items():
-        if param.kind == param.POSITIONAL_OR_KEYWORD:
-            if name in variables:
-                if inspect.isawaitable(variables[name]):
-                    variables[name] = await variables[name]
-                args.append(variables[name])
-            elif param.default is not param.empty:
-                args.append(param.default)
-            else:
-                raise ValueError(f'parameter {name} is not provided.')
-        elif param.kind == param.VAR_POSITIONAL:
-            raise ValueError('not support VAR_POSITIONAL')
-        elif param.kind == param.VAR_KEYWORD:
-            ret = func(**variables)
-            if inspect.isawaitable(ret):
-                ret = await ret
-            return ret
-    ret = func(*args)
-    if inspect.isawaitable(ret):
-        ret = await ret
-    return ret
-
-
-async def async_next(aiter):
-    try:
-        if hasattr(aiter, '__anext__'):
-            return await aiter.__anext__()
-        else:
-            return next(aiter)
-    except StopIteration:
-        raise StopAsyncIteration from None
-
-
-async def async_zip(*aiters):
-    aiters = [
-        ait.__aiter__() if hasattr(ait, '__aiter__') else iter(ait)
-        for ait in aiters
-    ]
-    try:
-        while True:
-            # 使用 asyncio.gather 等待所有异步生成器返回下一个元素
-            result = await asyncio.gather(*(async_next(ait) for ait in aiters))
-            yield tuple(result)
-    except StopAsyncIteration:
-        # 当任一异步生成器耗尽时停止迭代
-        return
 
 
 def _get_depends(func: Callable):
@@ -287,7 +222,7 @@ class Scan():
     async def emit(self, current_level, step, position, variables: dict[str,
                                                                         Any]):
         for key, value in list(variables.items()):
-            if inspect.isawaitable(value):
+            if inspect.isawaitable(value) and not self.hiden(key):
                 variables[key] = await value
         if self.sock is not None:
             await self.sock.send_pyobj({
@@ -444,7 +379,7 @@ class Scan():
         return opt
 
     async def _run(self):
-        self.assymbly()
+        assymbly(self.description)
         self.variables = self.description['consts'].copy()
         for level, total in self.description['total'].items():
             if total == np.inf:
@@ -484,167 +419,6 @@ class Scan():
         if self._task is not None:
             self._task.cancel()
 
-    def assymbly(self):
-        mapping = {
-            label: level
-            for level, label in enumerate(
-                sorted(
-                    set(self.description['loops'].keys())
-                    | set(self.description['actions'].keys()) - {-1}))
-        }
-
-        if -1 in self.description['actions']:
-            mapping[-1] = max(mapping.values()) + 1
-
-        self.description['loops'] = dict(
-            sorted([(mapping[k], v)
-                    for k, v in self.description['loops'].items()]))
-        self.description['actions'] = {
-            mapping[k]: v
-            for k, v in self.description['actions'].items()
-        }
-
-        for level, loops in self.description['loops'].items():
-            self.description['total'][level] = np.inf
-            for name, space in loops:
-                try:
-                    self.description['total'][level] = min(
-                        self.description['total'][level], len(space))
-                except:
-                    pass
-
-        dependents = self.description['dependents'].copy()
-
-        for level in range(len(mapping)):
-            range_list = self.description['loops'].get(level, [])
-            if level > 0:
-                if f'#__loop_{level}' not in self.description['dependents']:
-                    dependents[f'#__loop_{level}'] = []
-                dependents[f'#__loop_{level}'].append(f'#__loop_{level-1}')
-            for name, _ in range_list:
-                if name not in self.description['dependents']:
-                    dependents[name] = []
-                dependents[name].append(f'#__loop_{level}')
-
-        def _get_all_depends(key, graph):
-            ret = set()
-            if key not in graph:
-                return ret
-
-            for e in graph[key]:
-                ret.update(_get_all_depends(e, graph))
-            ret.update(graph[key])
-            return ret
-
-        full_depends = {}
-        for key in dependents:
-            full_depends[key] = _get_all_depends(key, dependents)
-
-        levels = {}
-        passed = set()
-        all_keys = set()
-        for level in reversed(self.description['loops'].keys()):
-            tag = f'#__loop_{level}'
-            for key, deps in full_depends.items():
-                all_keys.update(deps)
-                all_keys.add(key)
-                if key.startswith('#__loop_'):
-                    continue
-                if tag in deps:
-                    if level not in levels:
-                        levels[level] = set()
-                    if key not in passed:
-                        passed.add(key)
-                        levels[level].add(key)
-        levels[-1] = {
-            key
-            for key in all_keys - passed if not key.startswith('#__loop_')
-        }
-
-        order = []
-        ts = TopologicalSorter(dependents)
-        ts.prepare()
-        while ts.is_active():
-            ready = ts.get_ready()
-            order.append(ready)
-            for k in ready:
-                ts.done(k)
-
-        self.description['order'] = {}
-
-        for level in sorted(levels):
-            keys = set(levels[level])
-            self.description['order'][level] = []
-            for ready in order:
-                ready = list(keys & set(ready))
-                if ready:
-                    self.description['order'][level].append(ready)
-                    keys -= set(ready)
-
-    async def _iter_level(self, level, variables):
-        iters = {}
-        env = Env()
-        env.variables = variables
-        opts = {}
-
-        for name, iter in self.description['loops'][level]:
-            if isinstance(iter, OptimizeSpace):
-                if iter.optimizer.name not in opts:
-                    opts[iter.optimizer.name] = iter.optimizer.create()
-            elif isinstance(iter, Expression):
-                iters[name] = iter.eval(env)
-            elif callable(iter):
-                iters[name] = await call_function(iter, variables)
-            else:
-                iters[name] = iter
-
-        maxiter = 0xffffffff
-        for name, opt in opts.items():
-            opt_cfg = self.description['optimizers'][name]
-            maxiter = min(maxiter, opt_cfg.maxiter)
-
-        async for args in async_zip(*iters.values(), range(maxiter)):
-            variables.update(dict(zip(iters.keys(), args[:-1])))
-            for name, opt in opts.items():
-                args = opt.ask()
-                opt_cfg = self.description['optimizers'][name]
-                variables.update({
-                    n: v
-                    for n, v in zip(opt_cfg.dimensions.keys(), args)
-                })
-
-            for group in self.description['order'].get(level, []):
-                for name in group:
-                    if name in self.description['functions']:
-                        variables[name] = await call_function(
-                            self.description['functions'][name], variables)
-
-            yield variables
-
-            for name, opt in opts.items():
-                opt_cfg = self.description['optimizers'][name]
-                args = [variables[n] for n in opt_cfg.dimensions.keys()]
-                if name not in variables:
-                    raise ValueError(f'{name} not in variables.')
-                fun = variables[name]
-                if inspect.isawaitable(fun):
-                    fun = await fun
-                if opt_cfg.minimize:
-                    opt.tell(args, fun)
-                else:
-                    opt.tell(args, -fun)
-
-        for name, opt in opts.items():
-            opt_cfg = self.description['optimizers'][name]
-            result = opt.get_result()
-            variables.update({
-                n: v
-                for n, v in zip(opt_cfg.dimensions.keys(), result.x)
-            })
-            variables[name] = result.fun
-        if opts:
-            yield variables
-
     async def iter(self, **kwds):
         if self.current_level >= len(self.description['loops']):
             return
@@ -653,8 +427,11 @@ class Scan():
         task = None
         if self.current_level in self._bar:
             self._bar[self.current_level].reset()
-        async for variables in self._iter_level(self.current_level,
-                                                self.variables):
+        async for variables in _iter_level(
+                self.variables,
+                self.description['loops'].get(self.current_level, []),
+                self.description['order'].get(self.current_level, []),
+                self.description['functions'], self.description['optimizers']):
             self._current_level += 1
             if await self._filter(variables, self.current_level - 1):
                 yield variables
@@ -710,3 +487,176 @@ class Scan():
     async def _await(self, awaitable):
         async with self._sem:
             return await awaitable
+
+
+def assymbly(description):
+    mapping = {
+        label: level
+        for level, label in enumerate(
+            sorted(
+                set(description['loops'].keys())
+                | {k
+                   for k in description['actions'].keys() if k >= 0}))
+    }
+
+    if -1 in description['actions']:
+        mapping[-1] = max(mapping.values()) + 1
+
+    levels = sorted(mapping.values())
+    for k in description['actions'].keys():
+        if k < -1:
+            mapping[k] = levels[k]
+
+    description['loops'] = dict(
+        sorted([(mapping[k], v) for k, v in description['loops'].items()]))
+    description['actions'] = {
+        mapping[k]: v
+        for k, v in description['actions'].items()
+    }
+
+    for level, loops in description['loops'].items():
+        description['total'][level] = np.inf
+        for name, space in loops:
+            try:
+                description['total'][level] = min(description['total'][level],
+                                                  len(space))
+            except:
+                pass
+
+    dependents = description['dependents'].copy()
+
+    for level in levels:
+        range_list = description['loops'].get(level, [])
+        if level > 0:
+            if f'#__loop_{level}' not in description['dependents']:
+                dependents[f'#__loop_{level}'] = []
+            dependents[f'#__loop_{level}'].append(f'#__loop_{level-1}')
+        for name, _ in range_list:
+            if name not in description['dependents']:
+                dependents[name] = []
+            dependents[name].append(f'#__loop_{level}')
+
+    def _get_all_depends(key, graph):
+        ret = set()
+        if key not in graph:
+            return ret
+
+        for e in graph[key]:
+            ret.update(_get_all_depends(e, graph))
+        ret.update(graph[key])
+        return ret
+
+    full_depends = {}
+    for key in dependents:
+        full_depends[key] = _get_all_depends(key, dependents)
+
+    levels = {}
+    passed = set()
+    all_keys = set()
+    for level in reversed(description['loops'].keys()):
+        tag = f'#__loop_{level}'
+        for key, deps in full_depends.items():
+            all_keys.update(deps)
+            all_keys.add(key)
+            if key.startswith('#__loop_'):
+                continue
+            if tag in deps:
+                if level not in levels:
+                    levels[level] = set()
+                if key not in passed:
+                    passed.add(key)
+                    levels[level].add(key)
+    levels[-1] = {
+        key
+        for key in all_keys - passed if not key.startswith('#__loop_')
+    }
+
+    order = []
+    ts = TopologicalSorter(dependents)
+    ts.prepare()
+    while ts.is_active():
+        ready = ts.get_ready()
+        order.append(ready)
+        for k in ready:
+            ts.done(k)
+
+    description['order'] = {}
+
+    for level in sorted(levels):
+        keys = set(levels[level])
+        description['order'][level] = []
+        for ready in order:
+            ready = list(keys & set(ready))
+            if ready:
+                description['order'][level].append(ready)
+                keys -= set(ready)
+
+
+async def _iter_level(variables,
+                      iters: list[tuple[str, Iterable | Expression | Callable
+                                        | OptimizeSpace]],
+                      order: list[list[str]],
+                      functions: dict[str, Callable | Expression],
+                      optimizers: dict[str, Optimizer]):
+    iters_d = {}
+    env = Env()
+    env.variables = variables
+    opts = {}
+
+    for name, iter in iters:
+        if isinstance(iter, OptimizeSpace):
+            if iter.optimizer.name not in opts:
+                opts[iter.optimizer.name] = iter.optimizer.create()
+        elif isinstance(iter, Expression):
+            iters_d[name] = iter.eval(env)
+        elif callable(iter):
+            iters_d[name] = await call_function(iter, variables)
+        else:
+            iters_d[name] = iter
+
+    maxiter = 0xffffffff
+    for name, opt in opts.items():
+        opt_cfg = optimizers[name]
+        maxiter = min(maxiter, opt_cfg.maxiter)
+
+    async for args in async_zip(*iters_d.values(), range(maxiter)):
+        variables.update(dict(zip(iters_d.keys(), args[:-1])))
+        for name, opt in opts.items():
+            args = opt.ask()
+            opt_cfg = optimizers[name]
+            variables.update({
+                n: v
+                for n, v in zip(opt_cfg.dimensions.keys(), args)
+            })
+
+        for group in order:
+            for name in group:
+                if name in functions:
+                    variables[name] = await call_function(
+                        functions[name], variables)
+
+        yield variables
+
+        for name, opt in opts.items():
+            opt_cfg = optimizers[name]
+            args = [variables[n] for n in opt_cfg.dimensions.keys()]
+            if name not in variables:
+                raise ValueError(f'{name} not in variables.')
+            fun = variables[name]
+            if inspect.isawaitable(fun):
+                fun = await fun
+            if opt_cfg.minimize:
+                opt.tell(args, fun)
+            else:
+                opt.tell(args, -fun)
+
+    for name, opt in opts.items():
+        opt_cfg = optimizers[name]
+        result = opt.get_result()
+        variables.update({
+            n: v
+            for n, v in zip(opt_cfg.dimensions.keys(), result.x)
+        })
+        variables[name] = result.fun
+    if opts:
+        yield variables
