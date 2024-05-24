@@ -1,7 +1,10 @@
 import ast
 import asyncio
+import datetime
 import inspect
 import itertools
+import os
+import re
 import sys
 import uuid
 from graphlib import TopologicalSorter
@@ -20,6 +23,13 @@ from ..sys.rpc.zmq_socket import ZMQContextManager
 from .expression import Env, Expression, Symbol
 from .optimize import NgOptimizer
 from .recorder import Record
+
+__process_uuid = uuid.uuid1()
+__task_counter = itertools.count()
+
+
+def task_uuid():
+    return uuid.uuid3(__process_uuid, str(next(__task_counter)))
 
 
 async def call_function(func: Callable | Expression, variables: dict[str,
@@ -228,7 +238,7 @@ class Scan():
                  app: str = 'task',
                  tags: tuple[str] = (),
                  database: str | Path | None = 'tcp://127.0.0.1:6789'):
-        self.id = f"{app}({str(uuid.uuid1())})"
+        self.id = task_uuid()
         self.record = None
         self.namespace = {}
         self.description = {
@@ -242,17 +252,16 @@ class Scan():
             'dependents': {},
             'order': {},
             'filters': {},
-            'total': {},
-            'compiled': False,
+            'total': {}
         }
         self._current_level = 0
         self.variables = {}
         self._task = None
         self.sock = None
         self.database = database
-        self._variables = {}
         self._sem = asyncio.Semaphore(100)
         self._bar = {}
+        self._hide_patterns = [re.compile(r'^_.*'), re.compile(r'.*_$')]
 
     def __getstate__(self) -> dict:
         state = self.__dict__.copy()
@@ -288,10 +297,19 @@ class Scan():
                 'level': current_level,
                 'step': step,
                 'position': position,
-                'variables': variables
+                'variables': {
+                    k: v
+                    for k, v in variables.items() if not self.hiden(k)
+                }
             })
         else:
             self.record.append(current_level, step, position, variables)
+
+    def hide(self, name: str):
+        self._hide_patterns.append(re.compile(name))
+
+    def hiden(self, name: str) -> bool:
+        return any(p.match(name) for p in self._hide_patterns)
 
     async def _filter(self, variables: dict[str, Any], level: int = 0):
         try:
@@ -317,6 +335,9 @@ class Scan():
             except:
                 scripts = ('', [])
 
+        self.description['ctime'] = datetime.datetime.now()
+        self.description['scripts'] = scripts
+        self.description['env'] = {k: v for k, v in os.environ.items()}
         if self.sock is not None:
             await self.sock.send_pyobj({
                 'task':
@@ -324,12 +345,7 @@ class Scan():
                 'method':
                 'record_create',
                 'description':
-                dill.dumps(self.description),
-                # 'env':
-                # dill.dumps(__main__.__dict__),
-                'scripts':
-                scripts,
-                'tags': []
+                dill.dumps(self.description)
             })
 
             record_id = await self.sock.recv_pyobj()
@@ -469,9 +485,6 @@ class Scan():
             self._task.cancel()
 
     def assymbly(self):
-        if self.description['compiled']:
-            return
-
         mapping = {
             label: level
             for level, label in enumerate(
@@ -567,8 +580,6 @@ class Scan():
                 if ready:
                     self.description['order'][level].append(ready)
                     keys -= set(ready)
-
-        self.description['compiled'] = True
 
     async def _iter_level(self, level, variables):
         iters = {}
