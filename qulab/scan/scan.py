@@ -199,6 +199,18 @@ class Scan():
         self._hide_patterns = [r'^__.*', r'.*__$']
         self._hide_pattern_re = re.compile('|'.join(self._hide_patterns))
         self._task_queue = asyncio.Queue()
+        self._task_pool = []
+
+    def __del__(self):
+        try:
+            self._task.cancel()
+        except:
+            pass
+        for task in self._task_pool:
+            try:
+                task.cancel()
+            except:
+                pass
 
     def __getstate__(self) -> dict:
         state = self.__dict__.copy()
@@ -392,6 +404,7 @@ class Scan():
     async def _run(self):
         assymbly(self.description)
         task = asyncio.create_task(self._update_progress())
+        self._task_pool.append(task)
         self.variables = self.description['consts'].copy()
         for level, total in self.description['total'].items():
             if total == np.inf:
@@ -445,7 +458,6 @@ class Scan():
             return
         step = 0
         position = 0
-        task = None
         self._task_queue.put_nowait(
             self._reset_progress_bar(self.current_level))
         async for variables in _iter_level(
@@ -456,7 +468,7 @@ class Scan():
             self._current_level += 1
             if await self._filter(variables, self.current_level - 1):
                 yield variables
-                task = asyncio.create_task(
+                asyncio.create_task(
                     self.emit(self.current_level - 1, step, position,
                               variables.copy()))
                 step += 1
@@ -464,8 +476,6 @@ class Scan():
             self._current_level -= 1
             self._task_queue.put_nowait(
                 self._update_progress_bar(self.current_level, 1))
-        if task is not None:
-            await task
         if self.current_level == 0:
             await self.emit(self.current_level - 1, 0, 0, {})
             for name, value in self.variables.items():
