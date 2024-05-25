@@ -187,23 +187,23 @@ class Scan():
             'dependents': {},
             'order': {},
             'filters': {},
-            'total': {}
+            'total': {},
+            'database': database,
+            'hiden': [r'^__.*', r'.*__$']
         }
         self._current_level = 0
-        self.variables = {}
-        self._task = None
-        self.sock = None
-        self.database = database
+        self._variables = {}
+        self._main_task = None
+        self._sock = None
         self._sem = asyncio.Semaphore(100)
         self._bar: dict[int, tqdm] = {}
-        self._hide_patterns = [r'^__.*', r'.*__$']
-        self._hide_pattern_re = re.compile('|'.join(self._hide_patterns))
+        self._hide_pattern_re = re.compile('|'.join(self.description['hiden']))
         self._task_queue = asyncio.Queue()
         self._task_pool = []
 
     def __del__(self):
         try:
-            self._task.cancel()
+            self._main_task.cancel()
         except:
             pass
         for task in self._task_pool:
@@ -216,15 +216,21 @@ class Scan():
         state = self.__dict__.copy()
         del state['record']
         del state['sock']
-        del state['_task']
+        del state['_main_task']
+        del state['_bar']
+        del state['_task_queue']
+        del state['_task_pool']
         del state['_sem']
         return state
 
     def __setstate__(self, state: dict) -> None:
         self.__dict__.update(state)
         self.record = None
-        self.sock = None
-        self._task = None
+        self._sock = None
+        self._main_task = None
+        self._bar = {}
+        self._task_queue = asyncio.Queue()
+        self._task_pool = []
         self._sem = asyncio.Semaphore(100)
         for opt in self.description['optimizers'].values():
             opt.scanner = self
@@ -233,13 +239,17 @@ class Scan():
     def current_level(self):
         return self._current_level
 
+    @property
+    def variables(self) -> dict[str, Any]:
+        return self._variables
+
     async def emit(self, current_level, step, position, variables: dict[str,
                                                                         Any]):
         for key, value in list(variables.items()):
             if inspect.isawaitable(value) and not self.hiden(key):
                 variables[key] = await value
-        if self.sock is not None:
-            await self.sock.send_pyobj({
+        if self._sock is not None:
+            await self._sock.send_pyobj({
                 'task': self.id,
                 'method': 'record_append',
                 'record_id': self.record.id,
@@ -255,8 +265,8 @@ class Scan():
             self.record.append(current_level, step, position, variables)
 
     def hide(self, name: str):
-        self._hide_patterns.append(name)
-        self._hide_pattern_re = re.compile('|'.join(self._hide_patterns))
+        self.description['hiden'].append(name)
+        self._hide_pattern_re = re.compile('|'.join(self.description['hiden']))
 
     def hiden(self, name: str) -> bool:
         return bool(self._hide_pattern_re.match(name))
@@ -288,8 +298,8 @@ class Scan():
         self.description['ctime'] = datetime.datetime.now()
         self.description['scripts'] = scripts
         self.description['env'] = {k: v for k, v in os.environ.items()}
-        if self.sock is not None:
-            await self.sock.send_pyobj({
+        if self._sock is not None:
+            await self._sock.send_pyobj({
                 'task':
                 self.id,
                 'method':
@@ -298,9 +308,10 @@ class Scan():
                 dill.dumps(self.description)
             })
 
-            record_id = await self.sock.recv_pyobj()
-            return Record(record_id, self.database, self.description)
-        return Record(None, self.database, self.description)
+            record_id = await self._sock.recv_pyobj()
+            return Record(record_id, self.description['database'],
+                          self.description)
+        return Record(None, self.description['database'], self.description)
 
     def get(self, name: str):
         if name in self.description['consts']:
@@ -405,7 +416,7 @@ class Scan():
         assymbly(self.description)
         task = asyncio.create_task(self._update_progress())
         self._task_pool.append(task)
-        self.variables = self.description['consts'].copy()
+        self._variables = self.description['consts'].copy()
         for level, total in self.description['total'].items():
             if total == np.inf:
                 total = None
@@ -415,11 +426,13 @@ class Scan():
                 if name in self.description['functions']:
                     self.variables[name] = await call_function(
                         self.description['functions'][name], self.variables)
-        if isinstance(self.database,
-                      str) and self.database.startswith("tcp://"):
-            async with ZMQContextManager(zmq.DEALER,
-                                         connect=self.database) as socket:
-                self.sock = socket
+        if isinstance(
+                self.description['database'],
+                str) and self.description['database'].startswith("tcp://"):
+            async with ZMQContextManager(
+                    zmq.DEALER,
+                    connect=self.description['database']) as socket:
+                self._sock = socket
                 self.record = await self.create_record()
                 await self.work()
         else:
@@ -431,19 +444,38 @@ class Scan():
         return self.variables
 
     async def done(self):
-        if self._task is not None:
+        if self._main_task is not None:
             try:
-                await self._task
+                await self._main_task
             except asyncio.CancelledError:
                 pass
 
+    def finished(self):
+        return self._main_task.done()
+
     def start(self):
         import asyncio
-        self._task = asyncio.create_task(self._run())
+        self._main_task = asyncio.create_task(self._run())
+
+    async def submit(self, server='tcp://127.0.0.1:6788'):
+        assymbly(self.description)
+        async with ZMQContextManager(zmq.DEALER, connect=server) as socket:
+            await socket.send_pyobj({
+                'method': 'create',
+                'description': dill.dumps(self.description)
+            })
+            self.id = await socket.recv_pyobj()
+
+    async def get_record(self, server='tcp://127.0.0.1:6788'):
+        async with ZMQContextManager(zmq.DEALER, connect=server) as socket:
+            await socket.send_pyobj({'method': 'get_record_id', 'id': self.id})
+            record_id = await socket.recv_pyobj()
+            return Record(record_id, self.description['database'],
+                          self.description)
 
     def cancel(self):
-        if self._task is not None:
-            self._task.cancel()
+        if self._main_task is not None:
+            self._main_task.cancel()
 
     async def _reset_progress_bar(self, level):
         if level in self._bar:

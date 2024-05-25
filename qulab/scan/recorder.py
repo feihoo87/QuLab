@@ -283,7 +283,7 @@ def flush_cache():
         r.flush()
 
 
-def get_record(session, id, datapath):
+def get_record(session: Session, id: int, datapath: Path) -> Record:
     if id not in record_cache:
         record_in_db = session.get(RecordInDB, id)
         record_in_db.atime = utcnow()
@@ -297,7 +297,7 @@ def get_record(session, id, datapath):
     return record
 
 
-def create_record(session, description, datapath):
+def record_create(session: Session, description: dict, datapath: Path) -> int:
     record = Record(None, datapath, description)
     record_in_db = RecordInDB()
     if 'app' in description:
@@ -317,6 +317,20 @@ def create_record(session, description, datapath):
         raise
 
 
+def record_append(session: Session, record_id: int, level: int, step: int,
+                  position: int, variables: dict, datapath: Path):
+    record = get_record(session, record_id, datapath)
+    record.append(level, step, position, variables)
+    try:
+        record_in_db = session.get(RecordInDB, record_id)
+        record_in_db.mtime = utcnow()
+        record_in_db.atime = utcnow()
+        session.commit()
+    except:
+        session.rollback()
+        raise
+
+
 @logger.catch
 async def handle(session: Session, request: Request, datapath: Path):
 
@@ -327,16 +341,10 @@ async def handle(session: Session, request: Request, datapath: Path):
             await reply(request, 'pong')
         case 'record_create':
             description = dill.loads(msg['description'])
-            await reply(request, create_record(session, description, datapath))
+            await reply(request, record_create(session, description, datapath))
         case 'record_append':
-            record = get_record(session, msg['record_id'], datapath)
-            record.append(msg['level'], msg['step'], msg['position'],
-                          msg['variables'])
-            if msg['level'] < 0:
-                record_in_db = session.get(RecordInDB, msg['record_id'])
-                record_in_db.mtime = utcnow()
-                record_in_db.atime = utcnow()
-                session.commit()
+            record_append(session, msg['record_id'], msg['level'], msg['step'],
+                          msg['position'], msg['variables'], datapath)
         case 'record_description':
             record = get_record(session, msg['record_id'], datapath)
             await reply(request, dill.dumps(record.description))
@@ -365,7 +373,7 @@ async def handle(session: Session, request: Request, datapath: Path):
         case 'record_replace_tags':
             update_tags(session, msg['record_id'], msg['tags'], False)
         case _:
-            logger.error(f'Unknown method: {msg["method"]}')
+            logger.error(f"Unknown method: {msg['method']}")
 
 
 async def _handle(session: Session, request: Request, datapath: Path):
