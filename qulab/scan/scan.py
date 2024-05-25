@@ -1,4 +1,3 @@
-import ast
 import asyncio
 import datetime
 import inspect
@@ -10,7 +9,7 @@ import uuid
 from graphlib import TopologicalSorter
 from pathlib import Path
 from types import MethodType
-from typing import Any, Callable, Iterable, Type
+from typing import Any, Awaitable, Callable, Iterable, Type
 
 import dill
 import numpy as np
@@ -51,17 +50,6 @@ def _get_depends(func: Callable):
         elif param.kind == param.VAR_POSITIONAL:
             raise ValueError('not support VAR_POSITIONAL')
     return args
-
-
-def is_valid_identifier(s: str) -> bool:
-    """
-    Check if a string is a valid identifier.
-    """
-    try:
-        ast.parse(f"f({s}=0)")
-        return True
-    except SyntaxError:
-        return False
 
 
 class OptimizeSpace():
@@ -169,10 +157,22 @@ class Promise():
 
 class Scan():
 
+    def __new__(cls, *args, mixin=None, **kwds):
+        if mixin is None:
+            return super().__new__(cls)
+        for k in dir(mixin):
+            if not hasattr(cls, k):
+                try:
+                    setattr(cls, k, getattr(mixin, k))
+                except:
+                    pass
+        return super().__new__(cls)
+
     def __init__(self,
                  app: str = 'task',
                  tags: tuple[str] = (),
-                 database: str | Path | None = 'tcp://127.0.0.1:6789'):
+                 database: str | Path | None = 'tcp://127.0.0.1:6789',
+                 mixin=None):
         self.id = task_uuid()
         self.record = None
         self.namespace = {}
@@ -195,8 +195,10 @@ class Scan():
         self.sock = None
         self.database = database
         self._sem = asyncio.Semaphore(100)
-        self._bar = {}
-        self._hide_patterns = [re.compile(r'^_.*'), re.compile(r'.*_$')]
+        self._bar: dict[int, tqdm] = {}
+        self._hide_patterns = [r'^__.*', r'.*__$']
+        self._hide_pattern_re = re.compile('|'.join(self._hide_patterns))
+        self._task_queue = asyncio.Queue()
 
     def __getstate__(self) -> dict:
         state = self.__dict__.copy()
@@ -242,9 +244,10 @@ class Scan():
 
     def hide(self, name: str):
         self._hide_patterns.append(re.compile(name))
+        self._hide_pattern_re = re.compile('|'.join(self._hide_patterns))
 
     def hiden(self, name: str) -> bool:
-        return any(p.match(name) for p in self._hide_patterns)
+        return bool(self._hide_pattern_re.match(name))
 
     async def _filter(self, variables: dict[str, Any], level: int = 0):
         try:
@@ -307,7 +310,7 @@ class Scan():
             self.description['dependents'][name] = set()
         self.description['dependents'][name].update(depends)
 
-    def add_filter(self, func, level):
+    def add_filter(self, func: Callable, level: int):
         """
         Add a filter function to the scan.
 
@@ -378,8 +381,17 @@ class Scan():
         self.description['optimizers'][name] = opt
         return opt
 
+    async def _update_progress(self):
+        while True:
+            task = await self._task_queue.get()
+            if isinstance(task, asyncio.Event):
+                task.set()
+            elif inspect.isawaitable(task):
+                await task
+
     async def _run(self):
         assymbly(self.description)
+        task = asyncio.create_task(self._update_progress())
         self.variables = self.description['consts'].copy()
         for level, total in self.description['total'].items():
             if total == np.inf:
@@ -402,6 +414,7 @@ class Scan():
             await self.work()
         for level, bar in self._bar.items():
             bar.close()
+        task.cancel()
         return self.variables
 
     async def done(self):
@@ -419,14 +432,22 @@ class Scan():
         if self._task is not None:
             self._task.cancel()
 
+    async def _reset_progress_bar(self, level):
+        if level in self._bar:
+            self._bar[level].reset()
+
+    async def _update_progress_bar(self, level, n: int):
+        if level in self._bar:
+            self._bar[level].update(n)
+
     async def iter(self, **kwds):
         if self.current_level >= len(self.description['loops']):
             return
         step = 0
         position = 0
         task = None
-        if self.current_level in self._bar:
-            self._bar[self.current_level].reset()
+        self._task_queue.put_nowait(
+            self._reset_progress_bar(self.current_level))
         async for variables in _iter_level(
                 self.variables,
                 self.description['loops'].get(self.current_level, []),
@@ -441,12 +462,19 @@ class Scan():
                 step += 1
             position += 1
             self._current_level -= 1
-            if self.current_level in self._bar:
-                self._bar[self.current_level].update(1)
+            self._task_queue.put_nowait(
+                self._update_progress_bar(self.current_level, 1))
         if task is not None:
             await task
         if self.current_level == 0:
             await self.emit(self.current_level - 1, 0, 0, {})
+            for name, value in self.variables.items():
+                if inspect.isawaitable(value):
+                    self.variables[name] = await value
+            while not self._task_queue.empty():
+                task = self._task_queue.get_nowait()
+                if inspect.isawaitable(task):
+                    await task
 
     async def work(self, **kwds):
         if self.current_level in self.description['actions']:
@@ -471,7 +499,7 @@ class Scan():
         """
         self.description['actions'][level] = action
 
-    async def promise(self, awaitable):
+    async def promise(self, awaitable: Awaitable) -> Promise:
         """
         Promise to calculate asynchronous function and return the result in future.
 
@@ -482,9 +510,11 @@ class Scan():
             Promise: A promise object.
         """
         async with self._sem:
-            return Promise(asyncio.create_task(self._await(awaitable)))
+            task = asyncio.create_task(self._await(awaitable))
+            self._task_queue.put_nowait(task)
+            return Promise(task)
 
-    async def _await(self, awaitable):
+    async def _await(self, awaitable: Awaitable):
         async with self._sem:
             return await awaitable
 
@@ -590,6 +620,7 @@ def assymbly(description):
             if ready:
                 description['order'][level].append(ready)
                 keys -= set(ready)
+    return description
 
 
 async def _iter_level(variables,
