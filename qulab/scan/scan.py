@@ -243,7 +243,7 @@ class Scan():
             self.record.append(current_level, step, position, variables)
 
     def hide(self, name: str):
-        self._hide_patterns.append(re.compile(name))
+        self._hide_patterns.append(name)
         self._hide_pattern_re = re.compile('|'.join(self._hide_patterns))
 
     def hiden(self, name: str) -> bool:
