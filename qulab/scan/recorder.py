@@ -4,6 +4,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
+from threading import Lock
 
 import click
 import dill
@@ -41,22 +42,43 @@ class BufferList():
         self.rd = ()
         self.pos_file = pos_file
         self.value_file = value_file
+        self._lock = Lock()
+
+    def __getstate__(self):
+        return {
+            'pos_file': self.pos_file,
+            'value_file': self.value_file,
+            '_pos': self._pos,
+            '_value': self._value,
+            'lu': self.lu,
+            'rd': self.rd
+        }
+
+    def __setstate__(self, state):
+        self.pos_file = state['pos_file']
+        self.value_file = state['value_file']
+        self._pos = state['_pos']
+        self._value = state['_value']
+        self.lu = state['lu']
+        self.rd = state['rd']
+        self._lock = Lock()
 
     @property
     def shape(self):
         return tuple([i - j for i, j in zip(self.rd, self.lu)])
 
     def flush(self):
-        if self.pos_file is not None:
-            with open(self.pos_file, 'ab') as f:
-                for pos in self._pos:
-                    dill.dump(pos, f)
-            self._pos.clear()
-        if self.value_file is not None:
-            with open(self.value_file, 'ab') as f:
-                for value in self._value:
-                    dill.dump(value, f)
-            self._value.clear()
+        with self._lock:
+            if self.pos_file is not None:
+                with open(self.pos_file, 'ab') as f:
+                    for pos in self._pos:
+                        dill.dump(pos, f)
+                self._pos.clear()
+            if self.value_file is not None:
+                with open(self.value_file, 'ab') as f:
+                    for value in self._value:
+                        dill.dump(value, f)
+                self._value.clear()
 
     def append(self, pos, value):
         self.lu = tuple([min(i, j) for i, j in zip(pos, self.lu)])
@@ -68,25 +90,27 @@ class BufferList():
 
     def value(self):
         v = []
-        if self.value_file is not None:
-            with open(self.value_file, 'rb') as f:
-                while True:
-                    try:
-                        v.append(dill.load(f))
-                    except EOFError:
-                        break
+        if self.value_file is not None and self.value_file.exists():
+            with self._lock:
+                with open(self.value_file, 'rb') as f:
+                    while True:
+                        try:
+                            v.append(dill.load(f))
+                        except EOFError:
+                            break
         v.extend(self._value)
         return v
 
     def pos(self):
         p = []
-        if self.pos_file is not None:
-            with open(self.pos_file, 'rb') as f:
-                while True:
-                    try:
-                        p.append(dill.load(f))
-                    except EOFError:
-                        break
+        if self.pos_file is not None and self.pos_file.exists():
+            with self._lock:
+                with open(self.pos_file, 'rb') as f:
+                    while True:
+                        try:
+                            p.append(dill.load(f))
+                        except EOFError:
+                            break
         p.extend(self._pos)
         return p
 
