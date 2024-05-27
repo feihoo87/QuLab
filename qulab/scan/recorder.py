@@ -1,4 +1,5 @@
 import asyncio
+import os
 import pickle
 import sys
 import time
@@ -19,7 +20,16 @@ from .models import Record as RecordInDB
 from .models import Session, create_engine, create_tables, sessionmaker, utcnow
 
 _notgiven = object()
-datapath = Path.home() / 'qulab' / 'data'
+
+try:
+    default_record_port = int(os.getenv('QULAB_RECORD_PORT', 6789))
+except:
+    default_record_port = 6789
+
+if os.getenv('QULAB_RECORD_PATH'):
+    datapath = Path(os.getenv('QULAB_RECORD_PATH'))
+else:
+    datapath = Path.home() / 'qulab' / 'data'
 datapath.mkdir(parents=True, exist_ok=True)
 
 record_cache = {}
@@ -463,7 +473,9 @@ async def main(port, datapath, url, timeout=1, buffer=1024, interval=60):
 
 
 @click.command()
-@click.option('--port', default=6789, help='Port of the server.')
+@click.option('--port',
+              default=os.getenv('QULAB_RECORD_PORT', 6789),
+              help='Port of the server.')
 @click.option('--datapath', default=datapath, help='Path of the data.')
 @click.option('--url', default=None, help='URL of the database.')
 @click.option('--timeout', default=1, help='Timeout of ping.')

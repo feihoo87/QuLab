@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import uuid
+import warnings
 from graphlib import TopologicalSorter
 from pathlib import Path
 from types import MethodType
@@ -21,7 +22,7 @@ from tqdm.notebook import tqdm
 from ..sys.rpc.zmq_socket import ZMQContextManager
 from .expression import Env, Expression, Symbol
 from .optimize import NgOptimizer
-from .recorder import Record
+from .recorder import Record, default_record_port
 from .utils import async_zip, call_function
 
 __process_uuid = uuid.uuid1()
@@ -171,7 +172,8 @@ class Scan():
     def __init__(self,
                  app: str = 'task',
                  tags: tuple[str] = (),
-                 database: str | Path | None = 'tcp://127.0.0.1:6789',
+                 database: str | Path
+                 | None = f'tcp://127.0.0.1:{default_record_port}',
                  mixin=None):
         self.id = task_uuid()
         self.record = None
@@ -183,13 +185,19 @@ class Scan():
             'consts': {},
             'functions': {},
             'optimizers': {},
+            'namespace': {},
             'actions': {},
             'dependents': {},
             'order': {},
             'filters': {},
             'total': {},
             'database': database,
-            'hiden': [r'^__.*', r'.*__$']
+            'hiden': [r'^__.*', r'.*__$'],
+            'entry': {
+                'env': {},
+                'shell': '',
+                'cmds': []
+            },
         }
         self._current_level = 0
         self._variables = {}
@@ -282,22 +290,6 @@ class Scan():
             return True
 
     async def create_record(self):
-        import __main__
-        from IPython import get_ipython
-
-        ipy = get_ipython()
-        if ipy is not None:
-            scripts = ('ipython', ipy.user_ns['In'])
-        else:
-            try:
-                scripts = ('shell',
-                           [sys.executable, __main__.__file__, *sys.argv[1:]])
-            except:
-                scripts = ('', [])
-
-        self.description['ctime'] = datetime.datetime.now()
-        self.description['scripts'] = scripts
-        self.description['env'] = {k: v for k, v in os.environ.items()}
         if self._sock is not None:
             await self._sock.send_pyobj({
                 'task':
@@ -346,6 +338,10 @@ class Scan():
         self.description['filters'][level].append(func)
 
     def set(self, name: str, value):
+        try:
+            dill.dumps(value)
+        except:
+            raise ValueError('value is not serializable.')
         if isinstance(value, Expression):
             self.add_depends(name, value.symbols())
             self.description['functions'][name] = value
@@ -416,7 +412,8 @@ class Scan():
         assymbly(self.description)
         task = asyncio.create_task(self._update_progress())
         self._task_pool.append(task)
-        self._variables = self.description['consts'].copy()
+        self._variables = {'self': self}
+        self._variables.update(self.description['consts'])
         for level, total in self.description['total'].items():
             if total == np.inf:
                 total = None
@@ -461,17 +458,14 @@ class Scan():
         assymbly(self.description)
         async with ZMQContextManager(zmq.DEALER, connect=server) as socket:
             await socket.send_pyobj({
-                'method': 'create',
+                'method': 'submit',
                 'description': dill.dumps(self.description)
             })
             self.id = await socket.recv_pyobj()
-
-    async def get_record(self, server='tcp://127.0.0.1:6788'):
-        async with ZMQContextManager(zmq.DEALER, connect=server) as socket:
             await socket.send_pyobj({'method': 'get_record_id', 'id': self.id})
             record_id = await socket.recv_pyobj()
-            return Record(record_id, self.description['database'],
-                          self.description)
+            self.record = Record(record_id, self.description['database'],
+                                 self.description)
 
     def cancel(self):
         if self._main_task is not None:
@@ -561,7 +555,72 @@ class Scan():
             return await awaitable
 
 
+class Unpicklable:
+
+    def __init__(self, obj):
+        self.type = str(type(obj))
+        self.id = id(obj)
+
+    def __repr__(self):
+        return f'<Unpicklable: {self.type} at 0x{id(self):x}>'
+
+
+class TooLarge:
+
+    def __init__(self, obj):
+        self.type = str(type(obj))
+        self.id = id(obj)
+
+    def __repr__(self):
+        return f'<TooLarge: {self.type} at 0x{id(self):x}>'
+
+
+def dump_globals(ns=None, *, size_limit=10 * 1024 * 1024, warn=False):
+    import __main__
+
+    if ns is None:
+        ns = __main__.__dict__
+
+    namespace = {}
+
+    for name, value in ns.items():
+        try:
+            buf = dill.dumps(value)
+        except:
+            namespace[name] = Unpicklable(value)
+            if warn:
+                warnings.warn(f'Unpicklable: {name} {type(value)}')
+        if len(buf) > size_limit:
+            namespace[name] = TooLarge(value)
+            if warn:
+                warnings.warn(f'TooLarge: {name} {type(value)}')
+        else:
+            namespace[name] = buf
+
+    return namespace
+
+
 def assymbly(description):
+    import __main__
+    from IPython import get_ipython
+
+    description['namespace'] = dump_globals()
+
+    ipy = get_ipython()
+    if ipy is not None:
+        description['entry']['shell'] = 'ipython'
+        description['entry']['cmds'] = ipy.user_ns['In']
+    else:
+        try:
+            description['entry']['shell'] = 'shell'
+            description['entry']['cmds'] = [
+                sys.executable, __main__.__file__, *sys.argv[1:]
+            ]
+        except:
+            pass
+
+    description['entry']['env'] = {k: v for k, v in os.environ.items()}
+
     mapping = {
         label: level
         for level, label in enumerate(

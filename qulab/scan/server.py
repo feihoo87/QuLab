@@ -37,7 +37,7 @@ async def handle(request: Request):
     match request.method:
         case 'ping':
             await reply(request, 'pong')
-        case 'create':
+        case 'submit':
             description = dill.loads(msg['description'])
             task = Scan()
             task.description = description
@@ -46,8 +46,13 @@ async def handle(request: Request):
             await reply(request, task.id)
         case 'get_record_id':
             task = pool.get(msg['id'])
-            await task.done()
-            await reply(request, task.record.id)
+            for _ in range(10):
+                if task.record:
+                    await reply(request, task.record.id)
+                    break
+                await asyncio.sleep(1)
+            else:
+                await reply(request, None)
         case _:
             logger.error(f"Unknown method: {msg['method']}")
 
