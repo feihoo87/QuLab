@@ -121,7 +121,7 @@ class BufferList():
         self.lu = tuple([min(i, j) for i, j in zip(pos, self.lu)])
         self.rd = tuple([max(i + 1, j) for i, j in zip(pos, self.rd)])
         self._list.append((pos, value))
-        if len(self._list) > 100:
+        if len(self._list) > 1000:
             self.flush()
 
     def _iter_file(self):
@@ -137,9 +137,10 @@ class BufferList():
 
     def iter(self):
         for pos, value in itertools.chain(self._iter_file(), self._list):
-            if self._slice is None or all(
-                [index_in_slice(s, i) for s, i in zip(self._slice, pos)]):
+            if not self._slice:
                 yield pos, value
+            elif all([index_in_slice(s, i) for s, i in zip(self._slice, pos)]):
+                yield pos, value[self._slice[len(pos):]]
 
     def value(self):
         d = []
@@ -305,8 +306,12 @@ class Record():
                     'key': key
                 })
                 ret = socket.recv_pyobj()
-                if isinstance(ret, BufferList) and buffer_to_array:
-                    return ret.array()
+                if isinstance(ret, BufferList):
+                    if buffer_to_array:
+                        return ret.array()
+                    else:
+                        ret._database = self.database
+                        return ret
                 else:
                     return ret
         else:
