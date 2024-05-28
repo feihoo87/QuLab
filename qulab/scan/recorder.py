@@ -70,14 +70,15 @@ class BufferList():
         self.lu = ()
         self.rd = ()
         self.file = file
-        self.slice = slice
+        self._slice = slice
         self._lock = Lock()
         self._database = None
 
     def __repr__(self):
-        return f"<BufferList: lu={self.lu}, rd={self.rd}, slice={self.slice}>"
+        return f"<BufferList: lu={self.lu}, rd={self.rd}, slice={self._slice}>"
 
     def __getstate__(self):
+        self.flush()
         if isinstance(self.file, Path):
             file = '/'.join(self.file.parts[-4:])
         else:
@@ -87,15 +88,14 @@ class BufferList():
             '_list': self._list,
             'lu': self.lu,
             'rd': self.rd,
-            'slice': self.slice,
         }
 
     def __setstate__(self, state):
         self.file = state['file']
-        self._list = state['_list']
         self.lu = state['lu']
         self.rd = state['rd']
-        self.slice = state['slice']
+        self._list = state['_list']
+        self._slice = None
         self._lock = Lock()
         self._database = None
 
@@ -104,8 +104,10 @@ class BufferList():
         return tuple([i - j for i, j in zip(self.rd, self.lu)])
 
     def flush(self):
-        with self._lock:
-            if self.file is not None:
+        if not self._list:
+            return
+        if isinstance(self.file, Path):
+            with self._lock:
                 with open(self.file, 'ab') as f:
                     for item in self._list:
                         dill.dump(item, f)
@@ -119,7 +121,7 @@ class BufferList():
         self.lu = tuple([min(i, j) for i, j in zip(pos, self.lu)])
         self.rd = tuple([max(i + 1, j) for i, j in zip(pos, self.rd)])
         self._list.append((pos, value))
-        if len(self._list) > 1000:
+        if len(self._list) > 100:
             self.flush()
 
     def _iter_file(self):
@@ -135,8 +137,8 @@ class BufferList():
 
     def iter(self):
         for pos, value in itertools.chain(self._iter_file(), self._list):
-            if self.slice is None or all(
-                [index_in_slice(s, i) for s, i in zip(self.slice, pos)]):
+            if self._slice is None or all(
+                [index_in_slice(s, i) for s, i in zip(self._slice, pos)]):
                 yield pos, value
 
     def value(self):
