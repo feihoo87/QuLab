@@ -322,6 +322,7 @@ class Record():
                     })
                     lst = socket.recv_pyobj()
                     ret._list = lst
+                    ret._slice = slice
                     if buffer_to_array:
                         return ret.array()
                     else:
@@ -337,6 +338,7 @@ class Record():
             if isinstance(d, BufferList):
                 if isinstance(d.file, str):
                     d.file = self._file.parent.parent.parent.parent / d.file
+                d._slice = slice
                 if buffer_to_array:
                     return d.array()
                 else:
