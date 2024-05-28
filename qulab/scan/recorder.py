@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import os
 import pickle
 import sys
@@ -7,6 +8,7 @@ import uuid
 from collections import defaultdict
 from pathlib import Path
 from threading import Lock
+from types import EllipsisType
 
 import click
 import dill
@@ -44,35 +46,58 @@ def random_path(base):
             return path
 
 
+def index_in_slice(slice_obj: slice | int, index: int):
+    if isinstance(slice_obj, int):
+        return slice_obj == index
+    start, stop, step = slice_obj.start, slice_obj.stop, slice_obj.step
+    if start is None:
+        start = 0
+    if step is None:
+        step = 1
+    if stop is None:
+        stop = sys.maxsize
+
+    if step > 0:
+        return start <= index < stop and (index - start) % step == 0
+    else:
+        return stop < index <= start and (index - start) % step == 0
+
+
 class BufferList():
 
-    def __init__(self, pos_file=None, value_file=None):
-        self._pos = []
-        self._value = []
+    def __init__(self, file=None, slice=None):
+        self._list = []
         self.lu = ()
         self.rd = ()
-        self.pos_file = pos_file
-        self.value_file = value_file
+        self.file = file
+        self.slice = slice
         self._lock = Lock()
+        self._database = None
+
+    def __repr__(self):
+        return f"<BufferList: lu={self.lu}, rd={self.rd}, slice={self.slice}>"
 
     def __getstate__(self):
+        if isinstance(self.file, Path):
+            file = '/'.join(self.file.parts[-4:])
+        else:
+            file = self.file
         return {
-            'pos_file': self.pos_file,
-            'value_file': self.value_file,
-            '_pos': self._pos,
-            '_value': self._value,
+            'file': file,
+            '_list': self._list,
             'lu': self.lu,
-            'rd': self.rd
+            'rd': self.rd,
+            'slice': self.slice,
         }
 
     def __setstate__(self, state):
-        self.pos_file = state['pos_file']
-        self.value_file = state['value_file']
-        self._pos = state['_pos']
-        self._value = state['_value']
+        self.file = state['file']
+        self._list = state['_list']
         self.lu = state['lu']
         self.rd = state['rd']
+        self.slice = state['slice']
         self._lock = Lock()
+        self._database = None
 
     @property
     def shape(self):
@@ -80,16 +105,11 @@ class BufferList():
 
     def flush(self):
         with self._lock:
-            if self.pos_file is not None:
-                with open(self.pos_file, 'ab') as f:
-                    for pos in self._pos:
-                        dill.dump(pos, f)
-                self._pos.clear()
-            if self.value_file is not None:
-                with open(self.value_file, 'ab') as f:
-                    for value in self._value:
-                        dill.dump(value, f)
-                self._value.clear()
+            if self.file is not None:
+                with open(self.file, 'ab') as f:
+                    for item in self._list:
+                        dill.dump(item, f)
+                self._list.clear()
 
     def append(self, pos, value, dims=None):
         if dims is not None:
@@ -98,44 +118,89 @@ class BufferList():
             pos = tuple([pos[i] for i in dims])
         self.lu = tuple([min(i, j) for i, j in zip(pos, self.lu)])
         self.rd = tuple([max(i + 1, j) for i, j in zip(pos, self.rd)])
-        self._pos.append(pos)
-        self._value.append(value)
-        if len(self._value) > 1000:
+        self._list.append((pos, value))
+        if len(self._list) > 1000:
             self.flush()
 
-    def value(self):
-        v = []
-        if self.value_file is not None and self.value_file.exists():
+    def _iter_file(self):
+        if self.file is not None and self.file.exists():
             with self._lock:
-                with open(self.value_file, 'rb') as f:
+                with open(self.file, 'rb') as f:
                     while True:
                         try:
-                            v.append(dill.load(f))
+                            pos, value = dill.load(f)
+                            yield pos, value
                         except EOFError:
                             break
-        v.extend(self._value)
-        return v
+
+    def iter(self):
+        for pos, value in itertools.chain(self._iter_file(), self._list):
+            if self.slice is None or all(
+                [index_in_slice(s, i) for s, i in zip(self.slice, pos)]):
+                yield pos, value
+
+    def value(self):
+        d = []
+        for pos, value in self.iter():
+            d.append(value)
+        return d
 
     def pos(self):
         p = []
-        if self.pos_file is not None and self.pos_file.exists():
-            with self._lock:
-                with open(self.pos_file, 'rb') as f:
-                    while True:
-                        try:
-                            p.append(dill.load(f))
-                        except EOFError:
-                            break
-        p.extend(self._pos)
+        for pos, value in self.iter():
+            p.append(pos)
         return p
 
+    def items(self):
+        p, d = [], []
+        for pos, value in self.iter():
+            p.append(pos)
+            d.append(value)
+        return p, d
+
     def array(self):
-        pos = np.asarray(self.pos()) - np.asarray(self.lu)
-        data = np.asarray(self.value())
+        pos, data = self.items()
+        pos = np.asarray(pos) - np.asarray(self.lu)
+        data = np.asarray(data)
         inner_shape = data.shape[1:]
         x = np.full(self.shape + inner_shape, np.nan, dtype=data[0].dtype)
         x.__setitem__(tuple(pos.T), data)
         return x
+
+    def _full_slice(self, slice_tuple: slice
+                    | tuple[slice | int | EllipsisType, ...]):
+        if isinstance(slice_tuple, slice):
+            slice_tuple = (slice_tuple, ) + (slice(0, sys.maxsize,
+                                                   1), ) * (len(self.lu) - 1)
+        if slice_tuple is Ellipsis:
+            slice_tuple = (slice(0, sys.maxsize, 1), ) * len(self.lu)
+        else:
+            head, tail = [], []
+            for i, s in enumerate(slice_tuple):
+                if s is Ellipsis:
+                    head = slice_tuple[:i]
+                    tail = slice_tuple[i + 1:]
+                    break
+            slice_tuple = head + (slice(0, sys.maxsize, 1), ) * (
+                len(self.lu) - len(head) - len(tail)) + tail
+        slice_list = []
+        for s in slice_tuple:
+            if isinstance(s, int):
+                slice_list.append(s)
+            else:
+                start, stop, step = s.start, s.stop, s.step
+                if start is None:
+                    start = 0
+                if step is None:
+                    step = 1
+                if stop is None:
+                    stop = sys.maxsize
+                slice_list.append(slice(start, stop, step))
+        return tuple(slice_list)
+
+    def __getitem__(self, slice_tuple: slice | EllipsisType
+                    | tuple[slice | int | EllipsisType, ...]):
+        return super().__getitem__(self._full_slice(slice_tuple))
 
 
 class Record():
@@ -149,7 +214,6 @@ class Record():
         self._index = []
         self._pos = []
         self._last_vars = set()
-        self._levels = {}
         self._file = None
         self.independent_variables = {}
         self.constants = {}
@@ -170,7 +234,6 @@ class Record():
         for level, group in self.description['order'].items():
             for names in group:
                 for name in names:
-                    self._levels[name] = level
                     if name not in self.dims:
                         if name not in self.description['dependents']:
                             self.dims[name] = (level, )
@@ -184,6 +247,35 @@ class Record():
             self.database = Path(self.database)
             self._file = random_path(self.database / 'objects')
             self._file.parent.mkdir(parents=True, exist_ok=True)
+
+    def __getstate__(self) -> dict:
+        return {
+            'id': self.id,
+            'database': self.database,
+            'description': self.description,
+            '_keys': self._keys,
+            '_items': self._items,
+            '_index': self._index,
+            '_pos': self._pos,
+            '_last_vars': self._last_vars,
+            'independent_variables': self.independent_variables,
+            'constants': self.constants,
+            'dims': self.dims,
+        }
+
+    def __setstate__(self, state: dict):
+        self.id = state['id']
+        self.database = state['database']
+        self.description = state['description']
+        self._keys = state['_keys']
+        self._items = state['_items']
+        self._index = state['_index']
+        self._pos = state['_pos']
+        self._last_vars = state['_last_vars']
+        self.independent_variables = state['independent_variables']
+        self.constants = state['constants']
+        self.dims = state['dims']
+        self._file = None
 
     def is_local_record(self):
         return not self.is_cache_record() and not self.is_remote_record()
@@ -221,12 +313,13 @@ class Record():
             else:
                 d = self._items.get(key, default)
             if isinstance(d, BufferList):
+                if isinstance(d.file, str):
+                    d.file = self._file.parent.parent.parent.parent / d.file
                 if buffer_to_array:
                     return d.array()
                 else:
                     ret = BufferList()
-                    ret._pos = d.pos()
-                    ret._value = d.value()
+                    ret._list = list(d.iter())
                     ret.lu = d.lu
                     ret.rd = d.rd
                     return ret
@@ -251,8 +344,7 @@ class Record():
             return
 
         for key in set(variables.keys()) - self._last_vars:
-            if key not in self._levels:
-                self._levels[key] = level
+            if key not in self.dims:
                 self.dims[key] = tuple(range(level + 1))
 
         self._last_vars = set(variables.keys())
@@ -276,14 +368,17 @@ class Record():
             self._pos[-1] += 1
 
         for key, value in variables.items():
-            if level == self._levels[key]:
+            if self.dims[key] == ():
+                if key not in self._items:
+                    self._items[key] = value
+            elif level == self.dims[key][-1]:
                 if key not in self._items:
                     if self.is_local_record():
-                        f1 = random_path(self.database / 'objects')
-                        f1.parent.mkdir(parents=True, exist_ok=True)
-                        f2 = random_path(self.database / 'objects')
-                        f2.parent.mkdir(parents=True, exist_ok=True)
-                        self._items[key] = BufferList(f1, f2)
+                        bufferlist_file = random_path(self.database /
+                                                      'objects')
+                        bufferlist_file.parent.mkdir(parents=True,
+                                                     exist_ok=True)
+                        self._items[key] = BufferList(bufferlist_file)
                     else:
                         self._items[key] = BufferList()
                     self._items[key].lu = pos
@@ -291,8 +386,6 @@ class Record():
                     self._items[key].append(pos, value, self.dims[key])
                 elif isinstance(self._items[key], BufferList):
                     self._items[key].append(pos, value, self.dims[key])
-            elif self._levels[key] == -1 and key not in self._items:
-                self._items[key] = value
 
     def flush(self):
         if self.is_remote_record() or self.is_cache_record():
@@ -307,7 +400,7 @@ class Record():
 
     def __repr__(self):
         return f"<Record: id={self.id} app={self.description['app']}, keys={self.keys()}>"
-    
+
     # def _repr_html_(self):
     #     return f"""
     #     <h3>Record: id={self.id}, app={self.description['app']}</h3>
@@ -351,6 +444,7 @@ def get_record(session: Session, id: int, datapath: Path) -> Record:
         path = datapath / 'objects' / record_in_db.file
         with open(path, 'rb') as f:
             record = dill.load(f)
+            record._file = path
     else:
         record = record_cache[id][1]
     clear_cache()
@@ -400,6 +494,12 @@ async def handle(session: Session, request: Request, datapath: Path):
     match request.method:
         case 'ping':
             await reply(request, 'pong')
+        case 'bufferlist_slice':
+            record = get_record(session, msg['record_id'], datapath)
+            bufferlist = record.get(msg['key'],
+                                    buffer_to_array=False,
+                                    slice=msg['slice'])
+            await reply(request, bufferlist)
         case 'record_create':
             description = dill.loads(msg['description'])
             await reply(request, record_create(session, description, datapath))
