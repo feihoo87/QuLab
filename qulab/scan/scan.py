@@ -174,6 +174,7 @@ class Scan():
                  tags: tuple[str] = (),
                  database: str | Path
                  | None = f'tcp://127.0.0.1:{default_record_port}',
+                 dump_globals: bool = False,
                  mixin=None):
         self.id = task_uuid()
         self.record = None
@@ -185,7 +186,7 @@ class Scan():
             'consts': {},
             'functions': {},
             'optimizers': {},
-            'namespace': {},
+            'namespace': {} if dump_globals else None,
             'actions': {},
             'dependents': {},
             'order': {},
@@ -619,7 +620,8 @@ def assymbly(description):
     import __main__
     from IPython import get_ipython
 
-    description['namespace'] = dump_globals()
+    if isinstance(description['namespace'], dict):
+        description['namespace'] = dump_globals()
 
     ipy = get_ipython()
     if ipy is not None:
