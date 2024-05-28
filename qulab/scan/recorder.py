@@ -305,6 +305,16 @@ class Record():
         with open(self._file, 'wb') as f:
             dill.dump(self, f)
 
+    def __repr__(self):
+        return f"<Record: id={self.id} app={self.description['app']}, keys={self.keys()}>"
+    
+    # def _repr_html_(self):
+    #     return f"""
+    #     <h3>Record: id={self.id}, app={self.description['app']}</h3>
+    #     <p>keys={self.keys()}</p>
+    #     <p>dims={self.dims}</p>
+    #     """
+
 
 class Request():
     __slots__ = ['sock', 'identity', 'msg', 'method']
