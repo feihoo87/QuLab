@@ -208,6 +208,7 @@ class Scan():
         self._hide_pattern_re = re.compile('|'.join(self.description['hiden']))
         self._task_queue = asyncio.Queue()
         self._task_pool = []
+        self._single_step = True
 
     def __del__(self):
         try:
@@ -448,6 +449,9 @@ class Scan():
             elif inspect.isawaitable(evt):
                 await evt
         task.cancel()
+        if self._single_step:
+            await self.emit(0, 0, 0, self.variables.copy())
+            await self.emit(-1, 0, 0, {})
         return self.variables
 
     async def done(self):
@@ -504,6 +508,7 @@ class Scan():
             self._current_level += 1
             if await self._filter(variables, self.current_level - 1):
                 yield variables
+                self._single_step = False
                 asyncio.create_task(
                     self.emit(self.current_level - 1, step, position,
                               variables.copy()))
