@@ -4,6 +4,7 @@ import pickle
 import sys
 import time
 import uuid
+from collections import defaultdict
 from pathlib import Path
 from threading import Lock
 
@@ -90,7 +91,11 @@ class BufferList():
                         dill.dump(value, f)
                 self._value.clear()
 
-    def append(self, pos, value):
+    def append(self, pos, value, dims=None):
+        if dims is not None:
+            if any([p != 0 for i, p in enumerate(pos) if i not in dims]):
+                return
+            pos = tuple([pos[i] for i in dims])
         self.lu = tuple([min(i, j) for i, j in zip(pos, self.lu)])
         self.rd = tuple([max(i + 1, j) for i, j in zip(pos, self.rd)])
         self._pos.append(pos)
@@ -148,21 +153,32 @@ class Record():
         self._file = None
         self.independent_variables = {}
         self.constants = {}
-
-        for level, group in self.description['order'].items():
-            for names in group:
-                for name in names:
-                    self._levels[name] = level
+        self.dims = {}
 
         for name, value in self.description['consts'].items():
             if name not in self._items:
                 self._items[name] = value
             self.constants[name] = value
+            self.dims[name] = ()
         for level, range_list in self.description['loops'].items():
             for name, iterable in range_list:
                 if isinstance(iterable, (np.ndarray, list, tuple, range)):
                     self._items[name] = iterable
-                    self.independent_variables[name] = (level, iterable)
+                    self.independent_variables[name] = iterable
+                    self.dims[name] = (level, )
+
+        for level, group in self.description['order'].items():
+            for names in group:
+                for name in names:
+                    self._levels[name] = level
+                    if name not in self.dims:
+                        if name not in self.description['dependents']:
+                            self.dims[name] = (level, )
+                        else:
+                            d = set()
+                            for n in self.description['dependents'][name]:
+                                d.update(self.dims[n])
+                            self.dims[name] = tuple(sorted(d))
 
         if self.is_local_record():
             self.database = Path(self.database)
@@ -237,6 +253,7 @@ class Record():
         for key in set(variables.keys()) - self._last_vars:
             if key not in self._levels:
                 self._levels[key] = level
+                self.dims[key] = tuple(range(level + 1))
 
         self._last_vars = set(variables.keys())
         self._keys.update(variables.keys())
@@ -271,9 +288,9 @@ class Record():
                         self._items[key] = BufferList()
                     self._items[key].lu = pos
                     self._items[key].rd = tuple([i + 1 for i in pos])
-                    self._items[key].append(pos, value)
+                    self._items[key].append(pos, value, self.dims[key])
                 elif isinstance(self._items[key], BufferList):
-                    self._items[key].append(pos, value)
+                    self._items[key].append(pos, value, self.dims[key])
             elif self._levels[key] == -1 and key not in self._items:
                 self._items[key] = value
 

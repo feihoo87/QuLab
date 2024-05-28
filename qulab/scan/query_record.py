@@ -20,7 +20,6 @@ def get_record(id, database='tcp://127.0.0.1:6789'):
                 'record_id': id
             })
             d = dill.loads(socket.recv_pyobj())
-            print(d.keys())
             return Record(id, database, d)
     else:
         from .models import Record as RecordInDB

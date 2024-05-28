@@ -192,7 +192,7 @@ class Scan():
             'filters': {},
             'total': {},
             'database': database,
-            'hiden': [r'^__.*', r'.*__$'],
+            'hiden': ['self', r'^__.*', r'.*__$'],
             'entry': {
                 'env': {},
                 'shell': '',
@@ -223,7 +223,7 @@ class Scan():
     def __getstate__(self) -> dict:
         state = self.__dict__.copy()
         del state['record']
-        del state['sock']
+        del state['_sock']
         del state['_main_task']
         del state['_bar']
         del state['_task_queue']
