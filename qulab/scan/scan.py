@@ -270,7 +270,10 @@ class Scan():
                 }
             })
         else:
-            self.record.append(current_level, step, position, variables)
+            self.record.append(current_level, step, position, {
+                k: v
+                for k, v in variables.items() if not self.hiden(k)
+            })
 
     def hide(self, name: str):
         self.description['hiden'].append(name)
