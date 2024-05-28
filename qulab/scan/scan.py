@@ -440,6 +440,13 @@ class Scan():
             await self.work()
         for level, bar in self._bar.items():
             bar.close()
+
+        while not self._task_queue.empty():
+            evt = self._task_queue.get_nowait()
+            if isinstance(evt, asyncio.Event):
+                evt.set()
+            elif inspect.isawaitable(evt):
+                await evt
         task.cancel()
         return self.variables
 
