@@ -69,6 +69,7 @@ class BufferList():
         self._list = []
         self.lu = ()
         self.rd = ()
+        self.inner_shape = None
         self.file = file
         self._slice = slice
         self._lock = Lock()
@@ -85,16 +86,17 @@ class BufferList():
             file = self.file
         return {
             'file': file,
-            '_list': self._list,
             'lu': self.lu,
             'rd': self.rd,
+            'inner_shape': self.inner_shape,
         }
 
     def __setstate__(self, state):
         self.file = state['file']
         self.lu = state['lu']
         self.rd = state['rd']
-        self._list = state['_list']
+        self.inner_shape = state['inner_shape']
+        self._list = []
         self._slice = None
         self._lock = Lock()
         self._database = None
@@ -120,12 +122,17 @@ class BufferList():
             pos = tuple([pos[i] for i in dims])
         self.lu = tuple([min(i, j) for i, j in zip(pos, self.lu)])
         self.rd = tuple([max(i + 1, j) for i, j in zip(pos, self.rd)])
+        if hasattr(value, 'shape'):
+            if self.inner_shape is None:
+                self.inner_shape = value.shape
+            elif self.inner_shape != value.shape:
+                self.inner_shape = ()
         self._list.append((pos, value))
         if len(self._list) > 1000:
             self.flush()
 
     def _iter_file(self):
-        if self.file is not None and self.file.exists():
+        if isinstance(self.file, Path) and self.file.exists():
             with self._lock:
                 with open(self.file, 'rb') as f:
                     while True:
@@ -296,7 +303,7 @@ class Record():
     def __getitem__(self, key):
         return self.get(key)
 
-    def get(self, key, default=_notgiven, buffer_to_array=True):
+    def get(self, key, default=_notgiven, buffer_to_array=True, slice=None):
         if self.is_remote_record():
             with ZMQContextManager(zmq.DEALER,
                                    connect=self.database) as socket:
@@ -307,6 +314,14 @@ class Record():
                 })
                 ret = socket.recv_pyobj()
                 if isinstance(ret, BufferList):
+                    socket.send_pyobj({
+                        'method': 'bufferlist_slice',
+                        'record_id': self.id,
+                        'key': key,
+                        'slice': slice
+                    })
+                    lst = socket.recv_pyobj()
+                    ret._list = lst
                     if buffer_to_array:
                         return ret.array()
                     else:
@@ -325,11 +340,7 @@ class Record():
                 if buffer_to_array:
                     return d.array()
                 else:
-                    ret = BufferList()
-                    ret._list = list(d.iter())
-                    ret.lu = d.lu
-                    ret.rd = d.rd
-                    return ret
+                    return d
             else:
                 return d
 
@@ -506,7 +517,7 @@ async def handle(session: Session, request: Request, datapath: Path):
             bufferlist = record.get(msg['key'],
                                     buffer_to_array=False,
                                     slice=msg['slice'])
-            await reply(request, bufferlist)
+            await reply(request, list(bufferlist.iter()))
         case 'record_create':
             description = dill.loads(msg['description'])
             await reply(request, record_create(session, description, datapath))
