@@ -561,10 +561,13 @@ class Scan():
         Returns:
             Promise: A promise object.
         """
-        async with self._sem:
-            task = asyncio.create_task(self._await(awaitable))
-            self._task_queue.put_nowait(task)
-            return Promise(task)
+        if inspect.isawaitable(awaitable):
+            async with self._sem:
+                task = asyncio.create_task(self._await(awaitable))
+                self._task_queue.put_nowait(task)
+                return Promise(task)
+        else:
+            return awaitable
 
     async def _await(self, awaitable: Awaitable):
         async with self._sem:
