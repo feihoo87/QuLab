@@ -437,13 +437,24 @@ class Scan():
             elif inspect.isawaitable(task):
                 await task
 
-    async def _run(self):
+    async def run(self):
         assymbly(self.description)
+        if isinstance(
+                self.description['database'],
+                str) and self.description['database'].startswith("tcp://"):
+            async with ZMQContextManager(
+                    zmq.DEALER,
+                    connect=self.description['database']) as socket:
+                self._sock = socket
+                await self._run()
+        else:
+            await self._run()
+
+    async def _run(self):
         task = asyncio.create_task(self._update_progress())
         self._task_pool.append(task)
         self._variables = {'self': self}
-        await _update_variables(self._variables, self.description['consts'],
-                                self.description['setters'])
+        self._variables.update(self.description['consts'].copy())
         for level, total in self.description['total'].items():
             if total == np.inf:
                 total = None
@@ -458,18 +469,8 @@ class Scan():
                         self.variables[name])
                     if inspect.isawaitable(coro):
                         await coro
-        if isinstance(
-                self.description['database'],
-                str) and self.description['database'].startswith("tcp://"):
-            async with ZMQContextManager(
-                    zmq.DEALER,
-                    connect=self.description['database']) as socket:
-                self._sock = socket
-                self.record = await self.create_record()
-                await self.work()
-        else:
-            self.record = await self.create_record()
-            await self.work()
+        self.record = await self.create_record()
+        await self.work()
         for level, bar in self._bar.items():
             bar.close()
 
@@ -479,7 +480,6 @@ class Scan():
                 evt.set()
             elif inspect.isawaitable(evt):
                 await evt
-        task.cancel()
         if self._single_step:
             for group in self.description['order'].get(-1, []):
                 for name in group:
@@ -488,6 +488,7 @@ class Scan():
                             self.description['getters'][name], self.variables)
             await self.emit(0, 0, 0, self.variables.copy())
             await self.emit(-1, 0, 0, {})
+        task.cancel()
         return self.variables
 
     async def done(self):
@@ -502,7 +503,7 @@ class Scan():
 
     def start(self):
         import asyncio
-        self._main_task = asyncio.create_task(self._run())
+        self._main_task = asyncio.create_task(self.run())
 
     async def submit(self, server='tcp://127.0.0.1:6788'):
         assymbly(self.description)
@@ -739,7 +740,10 @@ def assymbly(description):
 
     levels = {}
     passed = set()
-    all_keys = set()
+    all_keys = set(description['consts'].keys())
+    for key in dependents:
+        all_keys.add(key)
+        all_keys.update(dependents[key])
     for level in reversed(description['loops'].keys()):
         tag = f'#__loop_{level}'
         for key, deps in full_depends.items():
