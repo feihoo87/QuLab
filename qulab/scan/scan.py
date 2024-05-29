@@ -481,6 +481,11 @@ class Scan():
                 await evt
         task.cancel()
         if self._single_step:
+            for group in self.description['order'].get(-1, []):
+                for name in group:
+                    if name in self.description['getters']:
+                        self.variables[name] = await call_function(
+                            self.description['getters'][name], self.variables)
             await self.emit(0, 0, 0, self.variables.copy())
             await self.emit(-1, 0, 0, {})
         return self.variables
