@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import datetime
 import inspect
 import itertools
@@ -711,18 +712,18 @@ def assymbly(description):
             except:
                 pass
 
-    dependents = description['dependents'].copy()
+    dependents = copy.deepcopy(description['dependents'])
 
     for level in levels:
         range_list = description['loops'].get(level, [])
         if level > 0:
             if f'#__loop_{level}' not in description['dependents']:
-                dependents[f'#__loop_{level}'] = []
-            dependents[f'#__loop_{level}'].append(f'#__loop_{level-1}')
+                dependents[f'#__loop_{level}'] = set()
+            dependents[f'#__loop_{level}'].add(f'#__loop_{level-1}')
         for name, _ in range_list:
             if name not in description['dependents']:
-                dependents[name] = []
-            dependents[name].append(f'#__loop_{level}')
+                dependents[name] = set()
+            dependents[name].add(f'#__loop_{level}')
 
     def _get_all_depends(key, graph):
         ret = set()

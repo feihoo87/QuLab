@@ -216,6 +216,8 @@ class BufferList():
 class Record():
 
     def __init__(self, id, database, description=None):
+        from .scan import OptimizeSpace
+
         self.id = id
         self.database = database
         self.description = description
@@ -236,22 +238,29 @@ class Record():
             self.dims[name] = ()
         for level, range_list in self.description['loops'].items():
             for name, iterable in range_list:
-                if isinstance(iterable, (np.ndarray, list, tuple, range)):
+                if isinstance(iterable, OptimizeSpace):
+                    self.dims[name] = tuple(range(level + 1))
+                    continue
+                elif isinstance(iterable, (np.ndarray, list, tuple, range)):
                     self._items[name] = iterable
                     self.independent_variables[name] = iterable
-                    self.dims[name] = (level, )
+                self.dims[name] = (level, )
 
         for level, group in self.description['order'].items():
             for names in group:
                 for name in names:
-                    if name not in self.dims:
-                        if name not in self.description['dependents']:
+                    if name not in self.description['dependents']:
+                        if name not in self.dims:
                             self.dims[name] = (level, )
-                        else:
-                            d = set()
-                            for n in self.description['dependents'][name]:
-                                d.update(self.dims[n])
+                    else:
+                        d = set()
+                        for n in self.description['dependents'][name]:
+                            d.update(self.dims[n])
+                        if name not in self.dims:
                             self.dims[name] = tuple(sorted(d))
+                        else:
+                            self.dims[name] = tuple(
+                                sorted(set(self.dims[name]) | d))
 
         if self.is_local_record():
             self.database = Path(self.database)
