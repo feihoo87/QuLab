@@ -210,6 +210,7 @@ class Scan():
         self._sem = asyncio.Semaphore(100)
         self._bar: dict[int, tqdm] = {}
         self._hide_pattern_re = re.compile('|'.join(self.description['hiden']))
+        self._msg_queue = asyncio.Queue()
         self._task_queue = asyncio.Queue()
         self._task_pool = []
         self._single_step = True
@@ -231,6 +232,7 @@ class Scan():
         del state['_sock']
         del state['_main_task']
         del state['_bar']
+        del state['_msg_queue']
         del state['_task_queue']
         del state['_task_pool']
         del state['_sem']
@@ -243,6 +245,7 @@ class Scan():
         self._main_task = None
         self._bar = {}
         self._task_queue = asyncio.Queue()
+        self._msg_queue = asyncio.Queue()
         self._task_pool = []
         self._sem = asyncio.Semaphore(100)
         for opt in self.description['optimizers'].values():
@@ -438,8 +441,14 @@ class Scan():
             elif inspect.isawaitable(task):
                 await task
 
+    async def _send_msg(self):
+        while True:
+            task = await self._msg_queue.get()
+            await task
+
     async def run(self):
         assymbly(self.description)
+        task = asyncio.create_task(self._send_msg())
         if isinstance(
                 self.description['database'],
                 str) and self.description['database'].startswith("tcp://"):
@@ -450,6 +459,11 @@ class Scan():
                 await self._run()
         else:
             await self._run()
+        while True:
+            if self._msg_queue.empty():
+                break
+            await asyncio.sleep(0.1)
+        task.cancel()
 
     async def _run(self):
         task = asyncio.create_task(self._update_progress())
@@ -548,16 +562,19 @@ class Scan():
             if await self._filter(variables, self.current_level - 1):
                 yield variables
                 self._single_step = False
-                asyncio.create_task(
-                    self.emit(self.current_level - 1, step, position,
-                              variables.copy()))
+                self._msg_queue.put_nowait(
+                    asyncio.create_task(
+                        self.emit(self.current_level - 1, step, position,
+                                  variables.copy())))
                 step += 1
             position += 1
             self._current_level -= 1
             self._task_queue.put_nowait(
                 self._update_progress_bar(self.current_level, 1))
         if self.current_level == 0:
-            await self.emit(self.current_level - 1, 0, 0, {})
+            self._msg_queue.put_nowait(
+                asyncio.create_task(self.emit(self.current_level - 1, 0, 0,
+                                              {})))
             for name, value in self.variables.items():
                 if inspect.isawaitable(value):
                     self.variables[name] = await value
