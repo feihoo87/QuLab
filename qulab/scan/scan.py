@@ -185,6 +185,8 @@ class Scan():
             'loops': {},
             'consts': {},
             'functions': {},
+            'getters': {},
+            'setters': {},
             'optimizers': {},
             'namespace': {} if dump_globals else None,
             'actions': {},
@@ -342,7 +344,7 @@ class Scan():
             self.description['filters'][level] = []
         self.description['filters'][level].append(func)
 
-    def set(self, name: str, value):
+    def set(self, name: str, value, setter: Callable | None = None):
         try:
             dill.dumps(value)
         except:
@@ -355,8 +357,14 @@ class Scan():
             self.description['functions'][name] = value
         else:
             self.description['consts'][name] = value
+        if setter:
+            self.description['setters'][name] = setter
 
-    def search(self, name: str, range, level: int | None = None):
+    def search(self,
+               name: str,
+               range: Iterable | Expression | Callable | OptimizeSpace,
+               level: int | None = None,
+               setter: Callable | None = None):
         if level is not None:
             assert level >= 0, 'level must be greater than or equal to 0.'
         if isinstance(range, OptimizeSpace):
@@ -370,12 +378,23 @@ class Scan():
             self._add_loop_var(name, level, range)
             if isinstance(range, Expression) or callable(range):
                 self.add_depends(name, range.symbols())
+        if setter:
+            self.description['setters'][name] = setter
+
+    def trace(self,
+              name: str,
+              depends: list[str],
+              getter: Callable | None = None):
+        self.add_depends(name, depends)
+        if getter:
+            self.description['getters'][name] = getter
 
     def minimize(self,
                  name: str,
                  level: int,
                  method=NgOptimizer,
                  maxiter=100,
+                 getter: Callable | None = None,
                  **kwds) -> Optimizer:
         assert level >= 0, 'level must be greater than or equal to 0.'
         opt = Optimizer(self,
@@ -386,6 +405,8 @@ class Scan():
                         minimize=True,
                         **kwds)
         self.description['optimizers'][name] = opt
+        if getter:
+            self.description['getters'][name] = getter
         return opt
 
     def maximize(self,
@@ -393,6 +414,7 @@ class Scan():
                  level: int,
                  method=NgOptimizer,
                  maxiter=100,
+                 getter: Callable | None = None,
                  **kwds) -> Optimizer:
         assert level >= 0, 'level must be greater than or equal to 0.'
         opt = Optimizer(self,
@@ -403,6 +425,8 @@ class Scan():
                         minimize=False,
                         **kwds)
         self.description['optimizers'][name] = opt
+        if getter:
+            self.description['getters'][name] = getter
         return opt
 
     async def _update_progress(self):
@@ -418,7 +442,8 @@ class Scan():
         task = asyncio.create_task(self._update_progress())
         self._task_pool.append(task)
         self._variables = {'self': self}
-        self._variables.update(self.description['consts'])
+        await _update_variables(self._variables, self.description['consts'],
+                                self.description['setters'])
         for level, total in self.description['total'].items():
             if total == np.inf:
                 total = None
@@ -428,6 +453,11 @@ class Scan():
                 if name in self.description['functions']:
                     self.variables[name] = await call_function(
                         self.description['functions'][name], self.variables)
+                if name in self.description['setters']:
+                    coro = self.description['setters'][name](
+                        self.variables[name])
+                    if inspect.isawaitable(coro):
+                        await coro
         if isinstance(
                 self.description['database'],
                 str) and self.description['database'].startswith("tcp://"):
@@ -505,7 +535,8 @@ class Scan():
                 self.variables,
                 self.description['loops'].get(self.current_level, []),
                 self.description['order'].get(self.current_level, []),
-                self.description['functions'], self.description['optimizers']):
+                self.description['functions'], self.description['optimizers'],
+                self.description['setters'], self.description['getters']):
             self._current_level += 1
             if await self._filter(variables, self.current_level - 1):
                 yield variables
@@ -744,12 +775,23 @@ def assymbly(description):
     return description
 
 
+async def _update_variables(variables, updates, setters):
+    for name, value in updates.items():
+        if name in setters:
+            coro = setters[name](value)
+            if inspect.isawaitable(coro):
+                await coro
+        variables[name] = value
+
+
 async def _iter_level(variables,
                       iters: list[tuple[str, Iterable | Expression | Callable
                                         | OptimizeSpace]],
                       order: list[list[str]],
                       functions: dict[str, Callable | Expression],
-                      optimizers: dict[str, Optimizer]):
+                      optimizers: dict[str, Optimizer],
+                      setters: dict[str, Callable] = {},
+                      getters: dict[str, Callable] = {}):
     iters_d = {}
     env = Env()
     env.variables = variables
@@ -772,22 +814,31 @@ async def _iter_level(variables,
         maxiter = min(maxiter, opt_cfg.maxiter)
 
     async for args in async_zip(*iters_d.values(), range(maxiter)):
-        variables.update(dict(zip(iters_d.keys(), args[:-1])))
+        await _update_variables(variables, dict(zip(iters_d.keys(),
+                                                    args[:-1])), setters)
         for name, opt in opts.items():
             args = opt.ask()
             opt_cfg = optimizers[name]
-            variables.update({
+            await _update_variables(variables, {
                 n: v
                 for n, v in zip(opt_cfg.dimensions.keys(), args)
-            })
+            }, setters)
 
         for group in order:
             for name in group:
                 if name in functions:
-                    variables[name] = await call_function(
-                        functions[name], variables)
+                    await _update_variables(variables, {
+                        name:
+                        await call_function(functions[name], variables)
+                    }, setters)
 
         yield variables
+
+        for group in order:
+            for name in group:
+                if name in getters:
+                    variables[name] = await call_function(
+                        getters[name], variables)
 
         for name, opt in opts.items():
             opt_cfg = optimizers[name]
