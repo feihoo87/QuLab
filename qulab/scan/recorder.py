@@ -76,7 +76,7 @@ class BufferList():
         self._data_id = None
 
     def __repr__(self):
-        return f"<BufferList: lu={self.lu}, rd={self.rd}, slice={self._slice}>"
+        return f"<BufferList: shape={self.shape}, lu={self.lu}, rd={self.rd}, slice={self._slice}>"
 
     def __getstate__(self):
         self.flush()
