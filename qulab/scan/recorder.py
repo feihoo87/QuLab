@@ -69,11 +69,11 @@ class BufferList():
         self._list = []
         self.lu = ()
         self.rd = ()
-        self.inner_shape = None
+        self.inner_shape = ()
         self.file = file
         self._slice = slice
         self._lock = Lock()
-        self._database = None
+        self._data_id = None
 
     def __repr__(self):
         return f"<BufferList: lu={self.lu}, rd={self.rd}, slice={self._slice}>"
@@ -99,7 +99,7 @@ class BufferList():
         self._list = []
         self._slice = None
         self._lock = Lock()
-        self._database = None
+        self._data_id = None
 
     @property
     def shape(self):
@@ -143,11 +143,27 @@ class BufferList():
                             break
 
     def iter(self):
-        for pos, value in itertools.chain(self._iter_file(), self._list):
-            if not self._slice:
-                yield pos, value
-            elif all([index_in_slice(s, i) for s, i in zip(self._slice, pos)]):
-                yield pos, value[self._slice[len(pos):]]
+        if self._data_id is None:
+            for pos, value in itertools.chain(self._iter_file(), self._list):
+                if not self._slice:
+                    yield pos, value
+                elif all(
+                    [index_in_slice(s, i) for s, i in zip(self._slice, pos)]):
+                    if self.inner_shape:
+                        yield pos, value[self._slice[len(pos):]]
+                    else:
+                        yield pos, value
+        else:
+            server, record_id, key = self._data_id
+            with ZMQContextManager(zmq.DEALER, connect=server) as socket:
+                socket.send_pyobj({
+                    'method': 'bufferlist_slice',
+                    'record_id': record_id,
+                    'key': key,
+                    'slice': self._slice
+                })
+                ret = socket.recv_pyobj()
+                yield from ret
 
     def value(self):
         d = []
@@ -170,47 +186,91 @@ class BufferList():
 
     def array(self):
         pos, data = self.items()
-        pos = np.asarray(pos) - np.asarray(self.lu)
+        if self._slice:
+            pos = np.asarray(pos)
+            lu = tuple(np.min(pos, axis=0))
+            rd = tuple(np.max(pos, axis=0) + 1)
+            pos = np.asarray(pos) - np.asarray(lu)
+            shape = []
+            for k, (s, i, j) in enumerate(zip(self._slice, rd, lu)):
+                if s.step is not None:
+                    pos[:, k] = pos[:, k] / s.step
+                    shape.append(round(np.ceil((i - j) / s.step)))
+                else:
+                    shape.append(i - j)
+            shape = tuple(shape)
+        else:
+            shape = self.shape
+            pos = np.asarray(pos) - np.asarray(self.lu)
         data = np.asarray(data)
         inner_shape = data.shape[1:]
-        x = np.full(self.shape + inner_shape, np.nan, dtype=data[0].dtype)
+        x = np.full(shape + inner_shape, np.nan, dtype=data[0].dtype)
         x.__setitem__(tuple(pos.T), data)
         return x
 
     def _full_slice(self, slice_tuple: slice
                     | tuple[slice | int | EllipsisType, ...]):
+        ndim = len(self.lu)
+        if self.inner_shape:
+            ndim += len(self.inner_shape)
+
         if isinstance(slice_tuple, slice):
-            slice_tuple = (slice_tuple, ) + (slice(0, sys.maxsize,
-                                                   1), ) * (len(self.lu) - 1)
+            slice_tuple = (
+                slice_tuple, ) + (slice(0, sys.maxsize, 1), ) * (ndim - 1)
         if slice_tuple is Ellipsis:
-            slice_tuple = (slice(0, sys.maxsize, 1), ) * len(self.lu)
+            slice_tuple = (slice(0, sys.maxsize, 1), ) * ndim
         else:
-            head, tail = [], []
+            head, tail = (), ()
             for i, s in enumerate(slice_tuple):
                 if s is Ellipsis:
                     head = slice_tuple[:i]
                     tail = slice_tuple[i + 1:]
                     break
-            slice_tuple = head + (slice(0, sys.maxsize, 1), ) * (
-                len(self.lu) - len(head) - len(tail)) + tail
+            else:
+                head = slice_tuple
+                tail = ()
+            slice_tuple = head + (slice(
+                0, sys.maxsize, 1), ) * (ndim - len(head) - len(tail)) + tail
         slice_list = []
-        for s in slice_tuple:
+        contract = []
+        for i, s in enumerate(slice_tuple):
             if isinstance(s, int):
-                slice_list.append(s)
+                if s >= 0:
+                    slice_list.append(slice(s, s + 1, 1))
+                elif i < len(self.lu):
+                    s = self.rd[i] + s
+                    slice_list.append(slice(s, s + 1, 1))
+                else:
+                    slice_list.append(slice(s, s - 1, -1))
+                contract.append(i)
             else:
                 start, stop, step = s.start, s.stop, s.step
                 if start is None:
                     start = 0
+                elif start < 0 and i < len(self.lu):
+                    start = self.rd[i] + start
                 if step is None:
                     step = 1
                 if stop is None:
                     stop = sys.maxsize
+                elif stop < 0 and i < len(self.lu):
+                    stop = self.rd[i] + stop
                 slice_list.append(slice(start, stop, step))
-        return tuple(slice_list)
+        return tuple(slice_list), contract
 
     def __getitem__(self, slice_tuple: slice | EllipsisType
                     | tuple[slice | int | EllipsisType, ...]):
-        return super().__getitem__(self._full_slice(slice_tuple))
+        self._slice, contract = self._full_slice(slice_tuple)
+        ret = self.array()
+        slices = []
+        for i, s in enumerate(self._slice):
+            if i in contract:
+                slices.append(0)
+            elif isinstance(s, slice):
+                slices.append(slice(None, None, 1))
+        ret = ret.__getitem__(tuple(slices))
+        self._slice = None
+        return ret
 
 
 class Record():
@@ -310,9 +370,9 @@ class Record():
         self.flush()
 
     def __getitem__(self, key):
-        return self.get(key)
+        return self.get(key, buffer_to_array=True)
 
-    def get(self, key, default=_notgiven, buffer_to_array=True, slice=None):
+    def get(self, key, default=_notgiven, buffer_to_array=False, slice=None):
         if self.is_remote_record():
             with ZMQContextManager(zmq.DEALER,
                                    connect=self.database) as socket:
@@ -323,19 +383,19 @@ class Record():
                 })
                 ret = socket.recv_pyobj()
                 if isinstance(ret, BufferList):
-                    socket.send_pyobj({
-                        'method': 'bufferlist_slice',
-                        'record_id': self.id,
-                        'key': key,
-                        'slice': slice
-                    })
-                    lst = socket.recv_pyobj()
-                    ret._list = lst
-                    ret._slice = slice
                     if buffer_to_array:
+                        socket.send_pyobj({
+                            'method': 'bufferlist_slice',
+                            'record_id': self.id,
+                            'key': key,
+                            'slice': slice
+                        })
+                        lst = socket.recv_pyobj()
+                        ret._list = lst
+                        ret._slice = slice
                         return ret.array()
                     else:
-                        ret._database = self.database
+                        ret._data_id = self.database, self.id, key
                         return ret
                 else:
                     return ret
