@@ -309,11 +309,11 @@ class Scan():
 
     async def _filter(self, variables: dict[str, Any], level: int = 0):
         try:
-            return all([
-                await call_function(fun, variables) for fun in itertools.chain(
+            return all(await asyncio.gather(*[
+                call_function(fun, variables) for fun in itertools.chain(
                     self.description['filters'].get(level, []),
                     self.description['filters'].get(-1, []))
-            ])
+            ]))
         except:
             return True
 
