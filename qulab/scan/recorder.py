@@ -103,7 +103,8 @@ class BufferList():
 
     @property
     def shape(self):
-        return tuple([i - j for i, j in zip(self.rd, self.lu)])
+        return tuple([i - j
+                      for i, j in zip(self.rd, self.lu)]) + self.inner_shape
 
     def flush(self):
         if not self._list:
@@ -200,7 +201,7 @@ class BufferList():
                     shape.append(i - j)
             shape = tuple(shape)
         else:
-            shape = self.shape
+            shape = tuple([i - j for i, j in zip(self.rd, self.lu)])
             pos = np.asarray(pos) - np.asarray(self.lu)
         data = np.asarray(data)
         inner_shape = data.shape[1:]
