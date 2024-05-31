@@ -8,6 +8,7 @@ import re
 import sys
 import uuid
 import warnings
+from concurrent.futures import ProcessPoolExecutor
 from graphlib import TopologicalSorter
 from pathlib import Path
 from types import MethodType
@@ -157,6 +158,11 @@ class Promise():
         return Promise(self.task, None, attr)
 
 
+def _run_function_in_process(buf):
+    func, args, kwds = dill.loads(buf)
+    return func(*args, **kwds)
+
+
 class Scan():
 
     def __new__(cls, *args, mixin=None, **kwds):
@@ -176,6 +182,8 @@ class Scan():
                  database: str | Path
                  | None = f'tcp://127.0.0.1:{default_record_port}',
                  dump_globals: bool = False,
+                 max_workers: int = 4,
+                 max_promise: int = 100,
                  mixin=None):
         self.id = task_uuid()
         self.record = None
@@ -207,24 +215,21 @@ class Scan():
         self._variables = {}
         self._main_task = None
         self._sock = None
-        self._sem = asyncio.Semaphore(100)
+        self._sem = asyncio.Semaphore(max_promise + 1)
         self._bar: dict[int, tqdm] = {}
         self._hide_pattern_re = re.compile('|'.join(self.description['hiden']))
         self._msg_queue = asyncio.Queue()
-        self._task_queue = asyncio.Queue()
-        self._task_pool = []
+        self._prm_queue = asyncio.Queue()
         self._single_step = True
+        self._max_workers = max_workers
+        self._max_promise = max_promise
+        self._executors = ProcessPoolExecutor(max_workers=max_workers)
 
     def __del__(self):
         try:
             self._main_task.cancel()
         except:
             pass
-        for task in self._task_pool:
-            try:
-                task.cancel()
-            except:
-                pass
 
     def __getstate__(self) -> dict:
         state = self.__dict__.copy()
@@ -233,9 +238,9 @@ class Scan():
         del state['_main_task']
         del state['_bar']
         del state['_msg_queue']
-        del state['_task_queue']
-        del state['_task_pool']
+        del state['_prm_queue']
         del state['_sem']
+        del state['_executors']
         return state
 
     def __setstate__(self, state: dict) -> None:
@@ -244,12 +249,19 @@ class Scan():
         self._sock = None
         self._main_task = None
         self._bar = {}
-        self._task_queue = asyncio.Queue()
+        self._prm_queue = asyncio.Queue()
         self._msg_queue = asyncio.Queue()
-        self._task_pool = []
-        self._sem = asyncio.Semaphore(100)
+        self._sem = asyncio.Semaphore(self._max_promise + 1)
+        self._executors = ProcessPoolExecutor(max_workers=self._max_workers)
         for opt in self.description['optimizers'].values():
             opt.scanner = self
+
+    def __del__(self):
+        try:
+            self._main_task.cancel()
+        except:
+            pass
+        self._executors.shutdown()
 
     @property
     def current_level(self):
@@ -259,8 +271,8 @@ class Scan():
     def variables(self) -> dict[str, Any]:
         return self._variables
 
-    async def emit(self, current_level, step, position, variables: dict[str,
-                                                                        Any]):
+    async def _emit(self, current_level, step, position, variables: dict[str,
+                                                                         Any]):
         for key, value in list(variables.items()):
             if inspect.isawaitable(value) and not self.hiden(key):
                 variables[key] = await value
@@ -282,6 +294,11 @@ class Scan():
                 k: v
                 for k, v in variables.items() if not self.hiden(k)
             })
+
+    def emit(self, current_level, step, position, variables: dict[str, Any]):
+        self._msg_queue.put_nowait(
+            asyncio.create_task(
+                self._emit(current_level, step, position, variables.copy())))
 
     def hide(self, name: str):
         self.description['hiden'].append(name)
@@ -435,20 +452,18 @@ class Scan():
 
     async def _update_progress(self):
         while True:
-            task = await self._task_queue.get()
-            if isinstance(task, asyncio.Event):
-                task.set()
-            elif inspect.isawaitable(task):
-                await task
+            task = await self._prm_queue.get()
+            await task
+            self._prm_queue.task_done()
 
     async def _send_msg(self):
         while True:
             task = await self._msg_queue.get()
             await task
+            self._msg_queue.task_done()
 
     async def run(self):
         assymbly(self.description)
-        task = asyncio.create_task(self._send_msg())
         if isinstance(
                 self.description['database'],
                 str) and self.description['database'].startswith("tcp://"):
@@ -459,51 +474,43 @@ class Scan():
                 await self._run()
         else:
             await self._run()
-        while True:
-            if self._msg_queue.empty():
-                break
-            await asyncio.sleep(0.1)
-        task.cancel()
 
     async def _run(self):
-        task = asyncio.create_task(self._update_progress())
-        self._task_pool.append(task)
+        send_msg = asyncio.create_task(self._send_msg())
+        update_progress_task = asyncio.create_task(self._update_progress())
+
         self._variables = {'self': self}
-        self._variables.update(self.description['consts'].copy())
+
+        await update_variables(self._variables, self.description['consts'],
+                               self.description['setters'])
         for level, total in self.description['total'].items():
             if total == np.inf:
                 total = None
             self._bar[level] = tqdm(total=total)
-        for group in self.description['order'].get(-1, []):
-            for name in group:
-                if name in self.description['functions']:
-                    self.variables[name] = await call_function(
-                        self.description['functions'][name], self.variables)
-                if name in self.description['setters']:
-                    coro = self.description['setters'][name](
-                        self.variables[name])
-                    if inspect.isawaitable(coro):
-                        await coro
+
+        updates = await call_many_functions(
+            self.description['order'].get(-1, []),
+            self.description['functions'], self.variables)
+        await update_variables(self.variables, updates,
+                               self.description['setters'])
+
         self.record = await self.create_record()
         await self.work()
         for level, bar in self._bar.items():
             bar.close()
 
-        while not self._task_queue.empty():
-            evt = self._task_queue.get_nowait()
-            if isinstance(evt, asyncio.Event):
-                evt.set()
-            elif inspect.isawaitable(evt):
-                await evt
         if self._single_step:
-            for group in self.description['order'].get(-1, []):
-                for name in group:
-                    if name in self.description['getters']:
-                        self.variables[name] = await call_function(
-                            self.description['getters'][name], self.variables)
-            await self.emit(0, 0, 0, self.variables.copy())
-            await self.emit(-1, 0, 0, {})
-        task.cancel()
+            self.variables.update(await call_many_functions(
+                self.description['order'].get(-1, []),
+                self.description['getters'], self.variables))
+
+            self.emit(0, 0, 0, self.variables)
+            self.emit(-1, 0, 0, {})
+
+        await self._prm_queue.join()
+        update_progress_task.cancel()
+        await self._msg_queue.join()
+        send_msg.cancel()
         return self.variables
 
     async def done(self):
@@ -550,8 +557,8 @@ class Scan():
             return
         step = 0
         position = 0
-        self._task_queue.put_nowait(
-            self._reset_progress_bar(self.current_level))
+        self._prm_queue.put_nowait(self._reset_progress_bar(
+            self.current_level))
         async for variables in _iter_level(
                 self.variables,
                 self.description['loops'].get(self.current_level, []),
@@ -562,26 +569,18 @@ class Scan():
             if await self._filter(variables, self.current_level - 1):
                 yield variables
                 self._single_step = False
-                self._msg_queue.put_nowait(
-                    asyncio.create_task(
-                        self.emit(self.current_level - 1, step, position,
-                                  variables.copy())))
+                self.emit(self.current_level - 1, step, position, variables)
                 step += 1
             position += 1
             self._current_level -= 1
-            self._task_queue.put_nowait(
+            self._prm_queue.put_nowait(
                 self._update_progress_bar(self.current_level, 1))
         if self.current_level == 0:
-            self._msg_queue.put_nowait(
-                asyncio.create_task(self.emit(self.current_level - 1, 0, 0,
-                                              {})))
+            self.emit(self.current_level - 1, 0, 0, {})
             for name, value in self.variables.items():
                 if inspect.isawaitable(value):
                     self.variables[name] = await value
-            while not self._task_queue.empty():
-                task = self._task_queue.get_nowait()
-                if inspect.isawaitable(task):
-                    await task
+            await self._prm_queue.join()
 
     async def work(self, **kwds):
         if self.current_level in self.description['actions']:
@@ -606,7 +605,8 @@ class Scan():
         """
         self.description['actions'][level] = action
 
-    async def promise(self, awaitable: Awaitable) -> Promise:
+    async def promise(self, awaitable: Awaitable | Callable, *args,
+                      **kwds) -> Promise:
         """
         Promise to calculate asynchronous function and return the result in future.
 
@@ -619,8 +619,19 @@ class Scan():
         if inspect.isawaitable(awaitable):
             async with self._sem:
                 task = asyncio.create_task(self._await(awaitable))
-                self._task_queue.put_nowait(task)
+                self._prm_queue.put_nowait(task)
                 return Promise(task)
+        elif inspect.iscoroutinefunction(awaitable):
+            return await self.promise(awaitable(*args, **kwds))
+        elif callable(awaitable):
+            try:
+                buf = dill.dumps((awaitable, args, kwds))
+                task = asyncio.get_running_loop().run_in_executor(
+                    self._executors, _run_function_in_process, buf)
+                self._prm_queue.put_nowait(task)
+                return Promise(task)
+            except:
+                return awaitable(*args, **kwds)
         else:
             return awaitable
 
@@ -802,13 +813,17 @@ def assymbly(description):
     return description
 
 
-async def _update_variables(variables, updates, setters):
+async def update_variables(variables: dict[str, Any], updates: dict[str, Any],
+                           setters: dict[str, Callable]):
+    coros = []
     for name, value in updates.items():
         if name in setters:
             coro = setters[name](value)
             if inspect.isawaitable(coro):
-                await coro
+                coros.append(coro)
         variables[name] = value
+    if coros:
+        await asyncio.gather(*coros)
 
 
 async def _iter_level(variables,
@@ -841,31 +856,23 @@ async def _iter_level(variables,
         maxiter = min(maxiter, opt_cfg.maxiter)
 
     async for args in async_zip(*iters_d.values(), range(maxiter)):
-        await _update_variables(variables, dict(zip(iters_d.keys(),
-                                                    args[:-1])), setters)
+        await update_variables(variables, dict(zip(iters_d.keys(), args[:-1])),
+                               setters)
         for name, opt in opts.items():
             args = opt.ask()
             opt_cfg = optimizers[name]
-            await _update_variables(variables, {
+            await update_variables(variables, {
                 n: v
                 for n, v in zip(opt_cfg.dimensions.keys(), args)
             }, setters)
 
-        for group in order:
-            for name in group:
-                if name in functions:
-                    await _update_variables(variables, {
-                        name:
-                        await call_function(functions[name], variables)
-                    }, setters)
+        await update_variables(
+            variables, await call_many_functions(order, functions, variables),
+            setters)
 
         yield variables
 
-        for group in order:
-            for name in group:
-                if name in getters:
-                    variables[name] = await call_function(
-                        getters[name], variables)
+        variables.update(await call_many_functions(order, getters, variables))
 
         for name, opt in opts.items():
             opt_cfg = optimizers[name]
@@ -883,10 +890,28 @@ async def _iter_level(variables,
     for name, opt in opts.items():
         opt_cfg = optimizers[name]
         result = opt.get_result()
-        variables.update({
-            n: v
-            for n, v in zip(opt_cfg.dimensions.keys(), result.x)
-        })
+        await update_variables(
+            variables, {
+                name: value
+                for name, value in zip(opt_cfg.dimensions.keys(), result.x)
+            }, setters)
         variables[name] = result.fun
     if opts:
         yield variables
+
+
+async def call_many_functions(order: list[list[str]],
+                              functions: dict[str, Callable],
+                              variables: dict[str, Any]) -> dict[str, Any]:
+    ret = {}
+    for group in order:
+        waited = []
+        coros = []
+        for name in group:
+            if name in functions:
+                waited.append(name)
+                coros.append(call_function(functions[name], variables | ret))
+        if coros:
+            results = await asyncio.gather(*coros)
+            ret.update(dict(zip(waited, results)))
+    return ret
