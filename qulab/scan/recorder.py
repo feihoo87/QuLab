@@ -234,6 +234,7 @@ class BufferList():
                 0, sys.maxsize, 1), ) * (ndim - len(head) - len(tail)) + tail
         slice_list = []
         contract = []
+        reversed = []
         for i, s in enumerate(slice_tuple):
             if isinstance(s, int):
                 if s >= 0:
@@ -246,6 +247,21 @@ class BufferList():
                 contract.append(i)
             else:
                 start, stop, step = s.start, s.stop, s.step
+                if step is None:
+                    step = 1
+                if step < 0 and i < len(self.lu):
+                    step = -step
+                    reversed.append(i)
+                    if start is None and stop is None:
+                        start, stop = 0, sys.maxsize
+                    elif start is None:
+                        start, stop = self.lu[i], sys.maxsize
+                    elif stop is None:
+                        start, stop = 0, start + self.lu[i]
+                    else:
+                        start, stop = stop + self.lu[i] + 1, start + self.lu[
+                            i] + 1
+
                 if start is None:
                     start = 0
                 elif start < 0 and i < len(self.lu):
@@ -256,19 +272,23 @@ class BufferList():
                     stop = sys.maxsize
                 elif stop < 0 and i < len(self.lu):
                     stop = self.rd[i] + stop
+
                 slice_list.append(slice(start, stop, step))
-        return tuple(slice_list), contract
+        return tuple(slice_list), contract, reversed
 
     def __getitem__(self, slice_tuple: slice | EllipsisType
                     | tuple[slice | int | EllipsisType, ...]):
-        self._slice, contract = self._full_slice(slice_tuple)
+        self._slice, contract, reversed = self._full_slice(slice_tuple)
         ret = self.array()
         slices = []
         for i, s in enumerate(self._slice):
             if i in contract:
                 slices.append(0)
             elif isinstance(s, slice):
-                slices.append(slice(None, None, 1))
+                if i in reversed:
+                    slices.append(slice(None, None, -1))
+                else:
+                    slices.append(slice(None, None, 1))
         ret = ret.__getitem__(tuple(slices))
         self._slice = None
         return ret
