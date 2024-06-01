@@ -10,9 +10,10 @@ from IPython.display import display
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
 from .record import Record
+from .scan import default_server
 
 
-def get_record(id, database='tcp://127.0.0.1:6789') -> Record:
+def get_record(id, database=default_server) -> Record:
     if isinstance(database, str) and database.startswith('tcp://'):
         with ZMQContextManager(zmq.DEALER, connect=database) as socket:
             socket.send_pyobj({
@@ -295,7 +296,7 @@ def _on_tags_submit(tags, ui_widgets):
     _update_view(ui_widgets)
 
 
-def lookup(app=None, limit=10, database='tcp://127.0.0.1:6789'):
+def lookup(app=None, limit=10, database=default_server):
     after = widgets.DatePicker()
     before = widgets.DatePicker()
     app_prefix = widgets.Label('App:')
