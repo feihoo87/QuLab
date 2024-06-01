@@ -280,7 +280,6 @@ class Record():
         self.description = description
         self._keys = set()
         self._items = {}
-        self._index = []
         self._pos = []
         self._last_vars = set()
         self._file = None
@@ -328,13 +327,9 @@ class Record():
     def __getstate__(self) -> dict:
         return {
             'id': self.id,
-            'database': self.database,
             'description': self.description,
             '_keys': self._keys,
             '_items': self._items,
-            '_index': self._index,
-            '_pos': self._pos,
-            '_last_vars': self._last_vars,
             'independent_variables': self.independent_variables,
             'constants': self.constants,
             'dims': self.dims,
@@ -342,16 +337,15 @@ class Record():
 
     def __setstate__(self, state: dict):
         self.id = state['id']
-        self.database = state['database']
         self.description = state['description']
         self._keys = state['_keys']
         self._items = state['_items']
-        self._index = state['_index']
-        self._pos = state['_pos']
-        self._last_vars = state['_last_vars']
         self.independent_variables = state['independent_variables']
         self.constants = state['constants']
         self.dims = state['dims']
+        self._pos = []
+        self._last_vars = set()
+        self.database = None
         self._file = None
 
     def is_local_record(self):
@@ -442,17 +436,13 @@ class Record():
 
         if level >= len(self._pos):
             l = level + 1 - len(self._pos)
-            self._index.extend(([0] * (l - 1)) + [step])
             self._pos.extend(([0] * (l - 1)) + [position])
             pos = tuple(self._pos)
         elif level == len(self._pos) - 1:
-            self._index[-1] = step
             self._pos[-1] = position
             pos = tuple(self._pos)
         else:
-            self._index = self._index[:level + 1]
             self._pos = self._pos[:level + 1]
-            self._index[-1] = step + 1
             self._pos[-1] = position
             pos = tuple(self._pos)
             self._pos[-1] += 1

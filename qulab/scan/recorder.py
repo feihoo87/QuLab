@@ -65,6 +65,7 @@ def get_record(session: Session, id: int, datapath: Path) -> Record:
         path = datapath / 'objects' / record_in_db.file
         with open(path, 'rb') as f:
             record = dill.load(f)
+            record.database = datapath
             record._file = path
     else:
         record = record_cache[id][1]
