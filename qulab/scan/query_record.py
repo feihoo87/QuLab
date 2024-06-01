@@ -9,10 +9,10 @@ from IPython.display import display
 
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
-from .recorder import Record
+from .record import Record
 
 
-def get_record(id, database='tcp://127.0.0.1:6789'):
+def get_record(id, database='tcp://127.0.0.1:6789') -> Record:
     if isinstance(database, str) and database.startswith('tcp://'):
         with ZMQContextManager(zmq.DEALER, connect=database) as socket:
             socket.send_pyobj({
@@ -20,7 +20,10 @@ def get_record(id, database='tcp://127.0.0.1:6789'):
                 'record_id': id
             })
             d = dill.loads(socket.recv_pyobj())
-            return Record(id, database, d)
+            d.id = id
+            d.database = database
+            d._file = None
+            return d
     else:
         from .models import Record as RecordInDB
         from .models import create_engine, sessionmaker

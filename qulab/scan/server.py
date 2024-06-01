@@ -1,19 +1,17 @@
 import asyncio
 import pickle
-import sys
-import time
-import uuid
-from pathlib import Path
-from .scan import Scan
+
 import click
 import dill
-import numpy as np
 import zmq
 from loguru import logger
 
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
+from .scan import Scan
+
 pool = {}
+
 
 class Request():
     __slots__ = ['sock', 'identity', 'msg', 'method']

@@ -1,9 +1,57 @@
 import ast
 import asyncio
 import inspect
+import warnings
 from typing import Any, Callable
 
+import dill
+
 from .expression import Env, Expression
+
+
+class Unpicklable:
+
+    def __init__(self, obj):
+        self.type = str(type(obj))
+        self.id = id(obj)
+
+    def __repr__(self):
+        return f'<Unpicklable: {self.type} at 0x{id(self):x}>'
+
+
+class TooLarge:
+
+    def __init__(self, obj):
+        self.type = str(type(obj))
+        self.id = id(obj)
+
+    def __repr__(self):
+        return f'<TooLarge: {self.type} at 0x{id(self):x}>'
+
+
+def dump_globals(ns=None, *, size_limit=10 * 1024 * 1024, warn=False):
+    import __main__
+
+    if ns is None:
+        ns = __main__.__dict__
+
+    namespace = {}
+
+    for name, value in ns.items():
+        try:
+            buf = dill.dumps(value)
+        except:
+            namespace[name] = Unpicklable(value)
+            if warn:
+                warnings.warn(f'Unpicklable: {name} {type(value)}')
+        if len(buf) > size_limit:
+            namespace[name] = TooLarge(value)
+            if warn:
+                warnings.warn(f'TooLarge: {name} {type(value)}')
+        else:
+            namespace[name] = buf
+
+    return namespace
 
 
 def is_valid_identifier(s: str) -> bool:

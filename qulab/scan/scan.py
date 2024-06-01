@@ -1,34 +1,36 @@
 import asyncio
 import copy
-import datetime
 import inspect
 import itertools
 import os
 import re
 import sys
 import uuid
-import warnings
 from concurrent.futures import ProcessPoolExecutor
 from graphlib import TopologicalSorter
 from pathlib import Path
-from types import MethodType
-from typing import Any, Awaitable, Callable, Iterable, Type
+from typing import Any, Awaitable, Callable, Iterable
 
 import dill
 import numpy as np
-import skopt
 import zmq
-from skopt.space import Categorical, Integer, Real
 from tqdm.notebook import tqdm
 
 from ..sys.rpc.zmq_socket import ZMQContextManager
 from .expression import Env, Expression, Symbol
 from .optimize import NgOptimizer
-from .recorder import Record, default_record_port
-from .utils import async_zip, call_function
+from .record import Record
+from .recorder import default_record_port
+from .space import Optimizer, OptimizeSpace, Space
+from .utils import async_zip, call_function, dump_globals
 
 __process_uuid = uuid.uuid1()
 __task_counter = itertools.count()
+
+if os.getenv('QULAB_SERVER'):
+    default_server = os.getenv('QULAB_SERVER')
+else:
+    default_server = f'tcp://127.0.0.1:{default_record_port}'
 
 
 def task_uuid():
@@ -53,79 +55,6 @@ def _get_depends(func: Callable):
         elif param.kind == param.VAR_POSITIONAL:
             raise ValueError('not support VAR_POSITIONAL')
     return args
-
-
-class OptimizeSpace():
-
-    def __init__(self, optimizer: 'Optimizer', space):
-        self.optimizer = optimizer
-        self.space = space
-        self.name = None
-
-    def __len__(self):
-        return self.optimizer.maxiter
-
-
-class Optimizer():
-
-    def __init__(self,
-                 scanner: 'Scan',
-                 name: str,
-                 level: int,
-                 method: str | Type = skopt.Optimizer,
-                 maxiter: int = 1000,
-                 minimize: bool = True,
-                 **kwds):
-        self.scanner = scanner
-        self.method = method
-        self.maxiter = maxiter
-        self.dimensions = {}
-        self.name = name
-        self.level = level
-        self.kwds = kwds
-        self.minimize = minimize
-
-    def create(self):
-        return self.method(list(self.dimensions.values()), **self.kwds)
-
-    def Categorical(self,
-                    categories,
-                    prior=None,
-                    transform=None,
-                    name=None) -> OptimizeSpace:
-        return OptimizeSpace(self,
-                             Categorical(categories, prior, transform, name))
-
-    def Integer(self,
-                low,
-                high,
-                prior="uniform",
-                base=10,
-                transform=None,
-                name=None,
-                dtype=np.int64) -> OptimizeSpace:
-        return OptimizeSpace(
-            self, Integer(low, high, prior, base, transform, name, dtype))
-
-    def Real(self,
-             low,
-             high,
-             prior="uniform",
-             base=10,
-             transform=None,
-             name=None,
-             dtype=float) -> OptimizeSpace:
-        return OptimizeSpace(
-            self, Real(low, high, prior, base, transform, name, dtype))
-
-    def __getstate__(self) -> dict:
-        state = self.__dict__.copy()
-        del state['scanner']
-        return state
-
-    def __setstate__(self, state: dict) -> None:
-        self.__dict__.update(state)
-        self.scanner = None
 
 
 class Promise():
@@ -180,7 +109,7 @@ class Scan():
                  app: str = 'task',
                  tags: tuple[str] = (),
                  database: str | Path
-                 | None = f'tcp://127.0.0.1:{default_record_port}',
+                 | None = default_server,
                  dump_globals: bool = False,
                  max_workers: int = 4,
                  max_promise: int = 100,
@@ -365,7 +294,11 @@ class Scan():
             self.description['filters'][level] = []
         self.description['filters'][level].append(func)
 
-    def set(self, name: str, value, setter: Callable | None = None):
+    def set(self,
+            name: str,
+            value,
+            depends: Iterable[str] | None = None,
+            setter: Callable | None = None):
         try:
             dill.dumps(value)
         except:
@@ -374,9 +307,21 @@ class Scan():
             self.add_depends(name, value.symbols())
             self.description['functions'][name] = value
         elif callable(value):
-            self.add_depends(name, _get_depends(value))
-            self.description['functions'][name] = value
+            if depends:
+                self.add_depends(name, depends)
+                s = ','.join(depends)
+                self.description['functions'][f'_tmp_{name}'] = value
+                self.description['functions'][name] = eval(
+                    f"lambda self, {s}: self.description['functions']['_tmp_{name}']({s})"
+                )
+            else:
+                self.add_depends(name, _get_depends(value))
+                self.description['functions'][name] = value
         else:
+            try:
+                value = Space.fromarray(value)
+            except:
+                pass
             self.description['consts'][name] = value
         if setter:
             self.description['setters'][name] = setter
@@ -396,6 +341,10 @@ class Scan():
         else:
             if level is None:
                 raise ValueError('level must be provided.')
+            try:
+                range = Space.fromarray(range)
+            except:
+                pass
             self._add_loop_var(name, level, range)
             if isinstance(range, Expression) or callable(range):
                 self.add_depends(name, range.symbols())
@@ -481,7 +430,14 @@ class Scan():
 
         self._variables = {'self': self}
 
-        await update_variables(self._variables, self.description['consts'],
+        consts = {}
+        for k, v in self.description['consts'].items():
+            if isinstance(v, Space):
+                consts[k] = v.toarray()
+            else:
+                consts[k] = v
+
+        await update_variables(self._variables, consts,
                                self.description['setters'])
         for level, total in self.description['total'].items():
             if total == np.inf:
@@ -638,51 +594,6 @@ class Scan():
     async def _await(self, awaitable: Awaitable):
         async with self._sem:
             return await awaitable
-
-
-class Unpicklable:
-
-    def __init__(self, obj):
-        self.type = str(type(obj))
-        self.id = id(obj)
-
-    def __repr__(self):
-        return f'<Unpicklable: {self.type} at 0x{id(self):x}>'
-
-
-class TooLarge:
-
-    def __init__(self, obj):
-        self.type = str(type(obj))
-        self.id = id(obj)
-
-    def __repr__(self):
-        return f'<TooLarge: {self.type} at 0x{id(self):x}>'
-
-
-def dump_globals(ns=None, *, size_limit=10 * 1024 * 1024, warn=False):
-    import __main__
-
-    if ns is None:
-        ns = __main__.__dict__
-
-    namespace = {}
-
-    for name, value in ns.items():
-        try:
-            buf = dill.dumps(value)
-        except:
-            namespace[name] = Unpicklable(value)
-            if warn:
-                warnings.warn(f'Unpicklable: {name} {type(value)}')
-        if len(buf) > size_limit:
-            namespace[name] = TooLarge(value)
-            if warn:
-                warnings.warn(f'TooLarge: {name} {type(value)}')
-        else:
-            namespace[name] = buf
-
-    return namespace
 
 
 def assymbly(description):
@@ -845,6 +756,8 @@ async def _iter_level(variables,
                 opts[iter.optimizer.name] = iter.optimizer.create()
         elif isinstance(iter, Expression):
             iters_d[name] = iter.eval(env)
+        elif isinstance(iter, Space):
+            iters_d[name] = iter.toarray()
         elif callable(iter):
             iters_d[name] = await call_function(iter, variables)
         else:
