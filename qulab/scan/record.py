@@ -278,46 +278,10 @@ class Record():
         self.id = id
         self.database = database
         self.description = description
-        self._keys = set()
         self._items = {}
         self._pos = []
         self._last_vars = set()
         self._file = None
-        self.independent_variables = {}
-        self.constants = {}
-        self.dims = {}
-
-        for name, value in self.description['consts'].items():
-            if name not in self._items:
-                self._items[name] = value
-            self.constants[name] = value
-            self.dims[name] = ()
-        for level, range_list in self.description['loops'].items():
-            for name, iterable in range_list:
-                if isinstance(iterable, OptimizeSpace):
-                    self.dims[name] = tuple(range(level + 1))
-                    continue
-                elif isinstance(iterable,
-                                (np.ndarray, list, tuple, range, Space)):
-                    self._items[name] = iterable
-                    self.independent_variables[name] = iterable
-                self.dims[name] = (level, )
-
-        for level, group in self.description['order'].items():
-            for names in group:
-                for name in names:
-                    if name not in self.description['dependents']:
-                        if name not in self.dims:
-                            self.dims[name] = (level, )
-                    else:
-                        d = set()
-                        for n in self.description['dependents'][name]:
-                            d.update(self.dims[n])
-                        if name not in self.dims:
-                            self.dims[name] = tuple(sorted(d))
-                        else:
-                            self.dims[name] = tuple(
-                                sorted(set(self.dims[name]) | d))
 
         if self.is_local_record():
             self.database = Path(self.database)
@@ -328,25 +292,21 @@ class Record():
         return {
             'id': self.id,
             'description': self.description,
-            '_keys': self._keys,
             '_items': self._items,
-            'independent_variables': self.independent_variables,
-            'constants': self.constants,
-            'dims': self.dims,
         }
 
     def __setstate__(self, state: dict):
         self.id = state['id']
         self.description = state['description']
-        self._keys = state['_keys']
         self._items = state['_items']
-        self.independent_variables = state['independent_variables']
-        self.constants = state['constants']
-        self.dims = state['dims']
         self._pos = []
         self._last_vars = set()
         self.database = None
         self._file = None
+
+    @property
+    def axis(self):
+        return self.description.get('axis', {})
 
     def is_local_record(self):
         return not self.is_cache_record() and not self.is_remote_record()
@@ -420,7 +380,7 @@ class Record():
                 })
                 return socket.recv_pyobj()
         else:
-            return list(self._keys)
+            return list(self._items.keys())
 
     def append(self, level, step, position, variables):
         if level < 0:
@@ -428,11 +388,10 @@ class Record():
             return
 
         for key in set(variables.keys()) - self._last_vars:
-            if key not in self.dims:
-                self.dims[key] = tuple(range(level + 1))
+            if key not in self.axis:
+                self.axis[key] = tuple(range(level + 1))
 
         self._last_vars = set(variables.keys())
-        self._keys.update(variables.keys())
 
         if level >= len(self._pos):
             l = level + 1 - len(self._pos)
@@ -448,10 +407,10 @@ class Record():
             self._pos[-1] += 1
 
         for key, value in variables.items():
-            if self.dims[key] == ():
+            if self.axis[key] == ():
                 if key not in self._items:
                     self._items[key] = value
-            elif level == self.dims[key][-1]:
+            elif level == self.axis[key][-1]:
                 if key not in self._items:
                     if self.is_local_record():
                         bufferlist_file = random_path(self.database /
@@ -463,9 +422,9 @@ class Record():
                         self._items[key] = BufferList()
                     self._items[key].lu = pos
                     self._items[key].rd = tuple([i + 1 for i in pos])
-                    self._items[key].append(pos, value, self.dims[key])
+                    self._items[key].append(pos, value, self.axis[key])
                 elif isinstance(self._items[key], BufferList):
-                    self._items[key].append(pos, value, self.dims[key])
+                    self._items[key].append(pos, value, self.axis[key])
 
     def flush(self):
         if self.is_remote_record() or self.is_cache_record():
@@ -485,5 +444,5 @@ class Record():
     #     return f"""
     #     <h3>Record: id={self.id}, app={self.description['app']}</h3>
     #     <p>keys={self.keys()}</p>
-    #     <p>dims={self.dims}</p>
+    #     <p>axis={self.axis}</p>
     #     """

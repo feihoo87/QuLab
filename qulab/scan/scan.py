@@ -14,7 +14,6 @@ from typing import Any, Awaitable, Callable, Iterable
 import dill
 import numpy as np
 import zmq
-from tqdm.notebook import tqdm
 
 from ..sys.rpc.zmq_socket import ZMQContextManager
 from .expression import Env, Expression, Symbol
@@ -23,6 +22,22 @@ from .record import Record
 from .recorder import default_record_port
 from .space import Optimizer, OptimizeSpace, Space
 from .utils import async_zip, call_function, dump_globals
+
+try:
+    from tqdm.notebook import tqdm
+except:
+
+    class tqdm():
+
+        def update(self, n):
+            pass
+
+        def close(self):
+            pass
+
+        def reset(self):
+            pass
+
 
 __process_uuid = uuid.uuid1()
 __task_counter = itertools.count()
@@ -130,6 +145,8 @@ class Scan():
             'actions': {},
             'dependents': {},
             'order': {},
+            'axis': {},
+            'independent_variables': set(),
             'filters': {},
             'total': {},
             'database': database,
@@ -721,6 +738,38 @@ def assymbly(description):
             if ready:
                 description['order'][level].append(ready)
                 keys -= set(ready)
+
+    axis = {}
+    independent_variables = set()
+
+    for name in description['consts']:
+        axis[name] = ()
+    for level, range_list in description['loops'].items():
+        for name, iterable in range_list:
+            if isinstance(iterable, OptimizeSpace):
+                axis[name] = tuple(range(level + 1))
+                continue
+            elif isinstance(iterable, (np.ndarray, list, tuple, range, Space)):
+                independent_variables.add(name)
+            axis[name] = (level, )
+
+    for level, group in description['order'].items():
+        for names in group:
+            for name in names:
+                if name not in description['dependents']:
+                    if name not in axis:
+                        axis[name] = (level, )
+                else:
+                    d = set()
+                    for n in description['dependents'][name]:
+                        d.update(axis[n])
+                    if name not in axis:
+                        axis[name] = tuple(sorted(d))
+                    else:
+                        axis[name] = tuple(sorted(set(axis[name]) | d))
+    description['axis'] = axis
+    description['independent_variables'] = independent_variables
+
     return description
 
 
