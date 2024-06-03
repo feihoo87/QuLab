@@ -40,6 +40,10 @@ def get_record(id, database=default_server) -> Record:
             return record
 
 
+def load_record(file):
+    return Record.load(file)
+
+
 def _format_tag(tag):
     if tag.startswith('!'):
         return f'<code style="color: white; background: red">{tag}</code>'
