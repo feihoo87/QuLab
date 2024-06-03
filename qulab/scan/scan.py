@@ -136,6 +136,7 @@ class Scan():
             'app': app,
             'tags': tags,
             'loops': {},
+            'intrinsic_loops': {},
             'consts': {},
             'functions': {},
             'getters': {},
@@ -345,26 +346,33 @@ class Scan():
 
     def search(self,
                name: str,
-               range: Iterable | Expression | Callable | OptimizeSpace,
+               space: Iterable | Expression | Callable | OptimizeSpace,
                level: int | None = None,
-               setter: Callable | None = None):
+               setter: Callable | None = None,
+               intrinsic: bool = False):
         if level is not None:
-            assert level >= 0, 'level must be greater than or equal to 0.'
-        if isinstance(range, OptimizeSpace):
-            range.name = name
-            range.optimizer.dimensions[name] = range.space
-            self._add_loop_var(name, range.optimizer.level, range)
-            self.add_depends(range.optimizer.name, [name])
+            if not intrinsic:
+                assert level >= 0, 'level must be greater than or equal to 0.'
+        if intrinsic:
+            assert isinstance(space, (np.ndarray, list, tuple, range, Space)), \
+                'space must be an instance of np.ndarray, list, tuple, range or Space.'
+            self.description['intrinsic_loops'][name] = level
+            self.set(name, space)
+        elif isinstance(space, OptimizeSpace):
+            space.name = name
+            space.optimizer.dimensions[name] = space.space
+            self._add_loop_var(name, space.optimizer.level, space)
+            self.add_depends(space.optimizer.name, [name])
         else:
             if level is None:
                 raise ValueError('level must be provided.')
             try:
-                range = Space.fromarray(range)
+                space = Space.fromarray(space)
             except:
                 pass
-            self._add_loop_var(name, level, range)
-            if isinstance(range, Expression) or callable(range):
-                self.add_depends(name, range.symbols())
+            self._add_loop_var(name, level, space)
+            if isinstance(space, Expression) or callable(space):
+                self.add_depends(name, space.symbols())
         if setter:
             self.description['setters'][name] = setter
 
