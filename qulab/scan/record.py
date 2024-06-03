@@ -1,6 +1,7 @@
 import itertools
 import sys
 import uuid
+import zipfile
 from pathlib import Path
 from threading import Lock
 from types import EllipsisType
@@ -436,6 +437,48 @@ class Record():
 
         with open(self._file, 'wb') as f:
             dill.dump(self, f)
+
+    def export(self, file):
+        with zipfile.ZipFile(file,
+                             'w',
+                             compression=zipfile.ZIP_DEFLATED,
+                             compresslevel=9) as z:
+            items = {}
+            for key in self.keys():
+                value = self.get(key)
+                if isinstance(value, BufferList):
+                    v = BufferList()
+                    v.lu = value.lu
+                    v.rd = value.rd
+                    v.inner_shape = value.inner_shape
+                    items[key] = v
+                    with z.open(f'{key}.buf', 'w') as f:
+                        for pos, data in value.iter():
+                            dill.dump((pos, data), f)
+                else:
+                    items[key] = value
+            with z.open('record.pkl', 'w') as f:
+                dill.dump((self.description, items), f)
+
+    @classmethod
+    def load(cls, file):
+        with zipfile.ZipFile(file, 'r') as z:
+            with z.open('record.pkl', 'r') as f:
+                description, items = dill.load(f)
+            record = cls(None, None, description)
+            for key, value in items.items():
+                if isinstance(value, BufferList):
+                    with z.open(f'{key}.buf', 'r') as f:
+                        while True:
+                            try:
+                                pos, data = dill.load(f)
+                                value._list.append((pos, data))
+                            except EOFError:
+                                break
+                    record._items[key] = value
+                else:
+                    record._items[key] = value
+        return record
 
     def __repr__(self):
         return f"<Record: id={self.id} app={self.description['app']}, keys={self.keys()}>"
