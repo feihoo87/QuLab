@@ -28,6 +28,7 @@ else:
 datapath.mkdir(parents=True, exist_ok=True)
 
 record_cache = {}
+CACHE_SIZE = 1024
 
 
 class Request():
@@ -45,11 +46,11 @@ async def reply(req, resp):
 
 
 def clear_cache():
-    if len(record_cache) < 1024:
+    if len(record_cache) < CACHE_SIZE:
         return
 
     for k, (t, _) in zip(sorted(record_cache.items(), key=lambda x: x[1][0]),
-                         range(len(record_cache) - 1024)):
+                         range(len(record_cache) - CACHE_SIZE)):
         del record_cache[k]
 
 
@@ -58,15 +59,20 @@ def flush_cache():
         r.flush()
 
 
+def get_local_record(session: Session, id: int, datapath: Path) -> Record:
+    record_in_db = session.get(RecordInDB, id)
+    record_in_db.atime = utcnow()
+    path = datapath / 'objects' / record_in_db.file
+    with open(path, 'rb') as f:
+        record = dill.load(f)
+        record.database = datapath
+        record._file = path
+    return record
+
+
 def get_record(session: Session, id: int, datapath: Path) -> Record:
     if id not in record_cache:
-        record_in_db = session.get(RecordInDB, id)
-        record_in_db.atime = utcnow()
-        path = datapath / 'objects' / record_in_db.file
-        with open(path, 'rb') as f:
-            record = dill.load(f)
-            record.database = datapath
-            record._file = path
+        record = get_local_record(session, id, datapath)
     else:
         record = record_cache[id][1]
     clear_cache()

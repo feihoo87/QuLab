@@ -14,7 +14,7 @@ from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
 from .space import OptimizeSpace, Space
 
-_notgiven = object()
+_not_given = object()
 
 
 def random_path(base):
@@ -115,6 +115,18 @@ class BufferList():
         if isinstance(self.file, Path) and self.file.exists():
             with self._lock:
                 with open(self.file, 'rb') as f:
+                    while True:
+                        try:
+                            pos, value = dill.load(f)
+                            yield pos, value
+                        except EOFError:
+                            break
+        elif isinstance(
+                self.file, tuple) and len(self.file) == 2 and isinstance(
+                    self.file[0], str) and self.file[0].endswith('.zip'):
+            f, name = self.file
+            with zipfile.ZipFile(f, 'r') as z:
+                with z.open(name, 'r') as f:
                     while True:
                         try:
                             pos, value = dill.load(f)
@@ -328,7 +340,7 @@ class Record():
             ret = ret.toarray()
         return ret
 
-    def get(self, key, default=_notgiven, buffer_to_array=False, slice=None):
+    def get(self, key, default=_not_given, buffer_to_array=False, slice=None):
         if self.is_remote_record():
             with ZMQContextManager(zmq.DEALER,
                                    connect=self.database) as socket:
@@ -356,7 +368,7 @@ class Record():
                 else:
                     return ret
         else:
-            if default is _notgiven:
+            if default is _not_given:
                 d = self._items.get(key)
             else:
                 d = self._items.get(key, default)
@@ -461,23 +473,15 @@ class Record():
                 dill.dump((self.description, items), f)
 
     @classmethod
-    def load(cls, file):
+    def load(cls, file: str):
         with zipfile.ZipFile(file, 'r') as z:
             with z.open('record.pkl', 'r') as f:
                 description, items = dill.load(f)
             record = cls(None, None, description)
             for key, value in items.items():
                 if isinstance(value, BufferList):
-                    with z.open(f'{key}.buf', 'r') as f:
-                        while True:
-                            try:
-                                pos, data = dill.load(f)
-                                value._list.append((pos, data))
-                            except EOFError:
-                                break
-                    record._items[key] = value
-                else:
-                    record._items[key] = value
+                    value.file = file, f'{key}.buf'
+                record._items[key] = value
         return record
 
     def __repr__(self):

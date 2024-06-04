@@ -6,10 +6,13 @@ import dill
 import ipywidgets as widgets
 import zmq
 from IPython.display import display
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
 from .record import Record
+from .recorder import get_local_record
 from .scan import default_server
 
 
@@ -26,18 +29,11 @@ def get_record(id, database=default_server) -> Record:
             d._file = None
             return d
     else:
-        from .models import Record as RecordInDB
-        from .models import create_engine, sessionmaker
-
         db_file = Path(database) / 'data.db'
         engine = create_engine(f'sqlite:///{db_file}')
         Session = sessionmaker(bind=engine)
         with Session() as session:
-            path = Path(database) / 'objects' / session.get(RecordInDB,
-                                                            id).file
-            with open(path, 'rb') as f:
-                record = dill.load(f)
-            return record
+            return get_local_record(session, id, database)
 
 
 def load_record(file):
