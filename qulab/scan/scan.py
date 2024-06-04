@@ -46,6 +46,10 @@ if os.getenv('QULAB_SERVER'):
     default_server = os.getenv('QULAB_SERVER')
 else:
     default_server = f'tcp://127.0.0.1:{default_record_port}'
+if os.getenv('QULAB_EXECUTOR'):
+    default_executor = os.getenv('QULAB_EXECUTOR')
+else:
+    default_executor = default_server
 
 
 def task_uuid():
@@ -508,7 +512,7 @@ class Scan():
         import asyncio
         self._main_task = asyncio.create_task(self.run())
 
-    async def submit(self, server='tcp://127.0.0.1:6788'):
+    async def submit(self, server=default_executor):
         assymbly(self.description)
         async with ZMQContextManager(zmq.DEALER, connect=server) as socket:
             await socket.send_pyobj({
@@ -748,7 +752,7 @@ def assymbly(description):
                 keys -= set(ready)
 
     axis = {}
-    independent_variables = set()
+    independent_variables = set(description['intrinsic_loops'].keys())
 
     for name in description['consts']:
         axis[name] = ()
