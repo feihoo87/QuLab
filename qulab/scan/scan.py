@@ -292,10 +292,10 @@ class Scan():
         else:
             return Symbol(name)
 
-    def _add_loop_var(self, name: str, level: int, range):
+    def _add_search_space(self, name: str, level: int, space):
         if level not in self.description['loops']:
             self.description['loops'][level] = []
-        self.description['loops'][level].append((name, range))
+        self.description['loops'][level].append((name, space))
 
     def add_depends(self, name: str, depends: list[str]):
         if isinstance(depends, str):
@@ -304,7 +304,7 @@ class Scan():
             self.description['dependents'][name] = set()
         self.description['dependents'][name].update(depends)
 
-    def add_filter(self, func: Callable, level: int):
+    def add_filter(self, func: Callable, level: int = -1):
         """
         Add a filter function to the scan.
 
@@ -365,7 +365,7 @@ class Scan():
         elif isinstance(space, OptimizeSpace):
             space.name = name
             space.optimizer.dimensions[name] = space.space
-            self._add_loop_var(name, space.optimizer.level, space)
+            self._add_search_space(name, space.optimizer.level, space)
             self.add_depends(space.optimizer.name, [name])
         else:
             if level is None:
@@ -374,7 +374,7 @@ class Scan():
                 space = Space.fromarray(space)
             except:
                 pass
-            self._add_loop_var(name, level, space)
+            self._add_search_space(name, level, space)
             if isinstance(space, Expression) or callable(space):
                 self.add_depends(name, space.symbols())
         if setter:
