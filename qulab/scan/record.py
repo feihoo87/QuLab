@@ -489,7 +489,32 @@ class Record():
                 else:
                     items[key] = value
             with z.open('record.pkl', 'w') as f:
+                self.description['entry']['scripts'] = self.scripts()
                 dill.dump((self.description, items), f)
+
+    def scripts(self, session=None):
+        scripts = self.description['entry']['scripts']
+        if isinstance(scripts, list):
+            return scripts
+        else:
+            cell_id = scripts
+
+        if self.is_remote_record():
+            with ZMQContextManager(zmq.DEALER,
+                                   connect=self.database) as socket:
+                socket.send_pyobj({
+                    'method': 'notebook_history',
+                    'cell_id': cell_id
+                })
+                return socket.recv_pyobj()
+        elif self.is_local_record():
+            from .models import Cell
+            assert session is not None, "session is required for local record"
+            cell = session.get(Cell, cell_id)
+            return [
+                cell.input.text
+                for cell in cell.notebook.cells[1:cell.index + 2]
+            ]
 
     @classmethod
     def load(cls, file: str):
