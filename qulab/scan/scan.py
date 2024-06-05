@@ -135,7 +135,17 @@ async def save_input_cells(notebook_id,
         return await socket.recv_pyobj()
 
 
-async def get_ipython_history(cell_id, database=default_server, socket=None):
+async def get_ipython_history(record_or_cell_id,
+                              *,
+                              database=default_server,
+                              socket=None):
+    if isinstance(record_or_cell_id, Record):
+        cell_id = record_or_cell_id.description['entry']['scripts']
+    elif isinstance(record_or_cell_id, int):
+        cell_id = record_or_cell_id
+    else:
+        raise ValueError(
+            'record_or_cell_id must be an instance of Record or an integer.')
     async with ZMQContextManager(zmq.DEALER, connect=database,
                                  socket=socket) as socket:
         await socket.send_pyobj({
