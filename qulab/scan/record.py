@@ -95,6 +95,11 @@ class BufferList():
                         dill.dump(item, f)
                 self._list.clear()
 
+    def delete(self):
+        if isinstance(self.file, Path):
+            self.file.unlink()
+            self.file = None
+
     def append(self, pos, value, dims=None):
         if dims is not None:
             if any([p != 0 for i, p in enumerate(pos) if i not in dims]):
@@ -449,6 +454,20 @@ class Record():
 
         with open(self._file, 'wb') as f:
             dill.dump(self, f)
+
+    def delete(self):
+        if self.is_remote_record():
+            with ZMQContextManager(zmq.DEALER,
+                                   connect=self.database) as socket:
+                socket.send_pyobj({
+                    'method': 'record_delete',
+                    'record_id': self.id
+                })
+        elif self.is_local_record():
+            for key, value in self._items.items():
+                if isinstance(value, BufferList):
+                    value.delete()
+            self._file.unlink()
 
     def export(self, file):
         with zipfile.ZipFile(file,

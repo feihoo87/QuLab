@@ -445,9 +445,9 @@ class Record(Base):
 
     app = Column(String)
     file = Column(String)
+    content_type = Column(String, default='application/pickle')
     key = Column(String)
-    config = Column(JSON)
-    task_hash = Column(LargeBinary(32))
+    config = Column(String)
 
     parent = relationship("Record",
                           remote_side=[id],

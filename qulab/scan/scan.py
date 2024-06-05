@@ -3,7 +3,9 @@ import copy
 import inspect
 import itertools
 import os
+import platform
 import re
+import subprocess
 import sys
 import uuid
 from concurrent.futures import ProcessPoolExecutor
@@ -41,6 +43,7 @@ except:
 
 __process_uuid = uuid.uuid1()
 __task_counter = itertools.count()
+__notebook_id = None
 
 if os.getenv('QULAB_SERVER'):
     default_server = os.getenv('QULAB_SERVER')
@@ -50,6 +53,96 @@ if os.getenv('QULAB_EXECUTOR'):
     default_executor = os.getenv('QULAB_EXECUTOR')
 else:
     default_executor = default_server
+
+
+def yapf_reformat(cell_text):
+    try:
+        import isort
+        import yapf.yapflib.yapf_api
+
+        fname = f"f{uuid.uuid1().hex}"
+
+        def wrap(source):
+            lines = [f"async def {fname}():"]
+            for line in source.split('\n'):
+                lines.append("    " + line)
+            return '\n'.join(lines)
+
+        def unwrap(source):
+            lines = []
+            for line in source.split('\n'):
+                if line.startswith(f"async def {fname}():"):
+                    continue
+                lines.append(line[4:])
+            return '\n'.join(lines)
+
+        cell_text = re.sub('^%', '#%#', cell_text, flags=re.M)
+        reformated_text = unwrap(
+            yapf.yapflib.yapf_api.FormatCode(wrap(isort.code(cell_text)))[0])
+        return re.sub('^#%#', '%', reformated_text, flags=re.M)
+    except:
+        return cell_text
+
+
+def get_installed_packages():
+    result = subprocess.run([sys.executable, '-m', 'pip', 'freeze'],
+                            stdout=subprocess.PIPE,
+                            text=True)
+
+    lines = result.stdout.split('\n')
+    packages = []
+    for line in lines:
+        if line:
+            packages.append(line)
+    return packages
+
+
+def get_system_info():
+    info = {
+        'OS': platform.uname()._asdict(),
+        'Python': sys.version,
+        'PythonExecutable': sys.executable,
+        'PythonPath': sys.path,
+        'packages': get_installed_packages()
+    }
+    return info
+
+
+def current_notebook():
+    return __notebook_id
+
+
+async def create_notebook(name: str, database=default_server, socket=None):
+    global __notebook_id
+
+    async with ZMQContextManager(zmq.DEALER, connect=database,
+                                 socket=socket) as socket:
+        await socket.send_pyobj({'method': 'notebook_create', 'name': name})
+        __notebook_id = await socket.recv_pyobj()
+
+
+async def save_input_cells(notebook_id,
+                           input_cells,
+                           database=default_server,
+                           socket=None):
+    async with ZMQContextManager(zmq.DEALER, connect=database,
+                                 socket=socket) as socket:
+        await socket.send_pyobj({
+            'method': 'notebook_extend',
+            'notebook_id': notebook_id,
+            'input_cells': input_cells
+        })
+        return await socket.recv_pyobj()
+
+
+async def get_ipython_history(cell_id, database=default_server, socket=None):
+    async with ZMQContextManager(zmq.DEALER, connect=database,
+                                 socket=socket) as socket:
+        await socket.send_pyobj({
+            'method': 'notebook_history',
+            'cell_id': cell_id
+        })
+        return await socket.recv_pyobj()
 
 
 def task_uuid():
@@ -135,7 +228,6 @@ class Scan():
                  mixin=None):
         self.id = task_uuid()
         self.record = None
-        self.namespace = {}
         self.description = {
             'app': app,
             'tags': tags,
@@ -157,9 +249,11 @@ class Scan():
             'database': database,
             'hiden': ['self', r'^__.*', r'.*__$'],
             'entry': {
+                'system': get_system_info(),
                 'env': {},
                 'shell': '',
-                'cmds': []
+                'cmds': [],
+                'scripts': []
             },
         }
         self._current_level = 0
@@ -287,8 +381,6 @@ class Scan():
     def get(self, name: str):
         if name in self.description['consts']:
             return self.description['consts'][name]
-        elif name in self.namespace:
-            return self.namespace.get(name)
         else:
             return Symbol(name)
 
@@ -442,6 +534,14 @@ class Scan():
 
     async def run(self):
         assymbly(self.description)
+        if current_notebook() is None:
+            await create_notebook('untitle', self.description['database'],
+                                  self._sock)
+        cell_id = await save_input_cells(current_notebook(),
+                                         self.description['entry']['scripts'],
+                                         self.description['database'],
+                                         self._sock)
+        self.description['entry']['scripts'] = cell_id
         if isinstance(
                 self.description['database'],
                 str) and self.description['database'].startswith("tcp://"):
@@ -635,13 +735,21 @@ def assymbly(description):
     ipy = get_ipython()
     if ipy is not None:
         description['entry']['shell'] = 'ipython'
-        description['entry']['cmds'] = ipy.user_ns['In']
+        description['entry']['scripts'] = [
+            yapf_reformat(cell_text) for cell_text in ipy.user_ns['In']
+        ]
     else:
         try:
             description['entry']['shell'] = 'shell'
             description['entry']['cmds'] = [
                 sys.executable, __main__.__file__, *sys.argv[1:]
             ]
+            description['entry']['scripts'] = []
+            try:
+                with open(__main__.__file__) as f:
+                    description['entry']['scripts'].append(f.read())
+            except:
+                pass
         except:
             pass
 

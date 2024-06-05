@@ -98,7 +98,8 @@ class ZMQContextManager:
                  public_keys_location: Optional[str] = None,
                  secret_key: Optional[bytes] = None,
                  public_key: Optional[bytes] = None,
-                 server_public_key: Optional[bytes] = None):
+                 server_public_key: Optional[bytes] = None,
+                 socket: Optional[zmq.Socket] = None):
         self.socket_type = socket_type
         if bind is None and connect is None:
             raise ValueError("Either 'bind' or 'connect' must be specified.")
@@ -129,6 +130,7 @@ class ZMQContextManager:
         self.auth = None
         self.context = None
         self.socket = None
+        self._external_socket = socket
 
     def _create_socket(self, asyncio=False) -> zmq.Socket:
         """
@@ -138,6 +140,8 @@ class ZMQContextManager:
         Returns:
             zmq.Socket: The configured ZeroMQ socket.
         """
+        if self._external_socket:
+            return self._external_socket
         if asyncio:
             self.context = zmq.asyncio.Context()
         else:
@@ -185,6 +189,8 @@ class ZMQContextManager:
         Closes the ZeroMQ socket and the context, and stops the authenticator
         if it was started.
         """
+        if self._external_socket:
+            return
         if self.observer:
             self.observer.stop()
             self.observer.join()

@@ -11,10 +11,12 @@ from loguru import logger
 
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
-from .curd import query_record, remove_tags, tag, update_tags
+from .curd import (create_cell, create_notebook, query_record, remove_tags,
+                   tag, update_tags)
+from .models import Cell, Notebook
 from .models import Record as RecordInDB
 from .models import Session, create_engine, create_tables, sessionmaker, utcnow
-from .record import Record
+from .record import BufferList, Record
 
 try:
     default_record_port = int(os.getenv('QULAB_RECORD_PORT', 6789))
@@ -62,6 +64,10 @@ def flush_cache():
 def get_local_record(session: Session, id: int, datapath: Path) -> Record:
     record_in_db = session.get(RecordInDB, id)
     record_in_db.atime = utcnow()
+
+    if record_in_db.file.endswith('.zip'):
+        return Record.load(datapath / 'objects' / record_in_db.file)
+
     path = datapath / 'objects' / record_in_db.file
     with open(path, 'rb') as f:
         record = dill.load(f)
@@ -115,6 +121,14 @@ def record_append(session: Session, record_id: int, level: int, step: int,
         raise
 
 
+def record_delete(session: Session, record_id: int, datapath: Path):
+    record = get_local_record(session, record_id, datapath)
+    record.delete()
+    record_in_db = session.get(RecordInDB, record_id)
+    session.delete(record_in_db)
+    session.commit()
+
+
 @logger.catch
 async def handle(session: Session, request: Request, datapath: Path):
 
@@ -162,6 +176,36 @@ async def handle(session: Session, request: Request, datapath: Path):
             update_tags(session, msg['record_id'], msg['tags'], True)
         case 'record_replace_tags':
             update_tags(session, msg['record_id'], msg['tags'], False)
+        case 'notebook_create':
+            notebook = create_notebook(session, msg['name'])
+            session.commit()
+            await reply(request, notebook.id)
+        case 'notebook_extend':
+            notebook = session.get(Notebook, msg['notebook_id'])
+            inputCells = msg.get('input_cells', [""])
+            aready_saved = len(notebook.cells)
+            if len(inputCells) > aready_saved:
+                for cell in inputCells[aready_saved:]:
+                    cell = create_cell(session, notebook, cell)
+                session.commit()
+                await reply(request, cell.id)
+            else:
+                await reply(request, None)
+        case 'notebook_history':
+            cell = session.get(Cell, msg['cell_id'])
+            if cell:
+                await reply(request, [
+                    cell.input.text
+                    for cell in cell.notebook.cells[1:cell.index + 2]
+                ])
+            else:
+                await reply(request, None)
+        case 'config_get':
+            print(msg['config_id'])
+        case 'config_update':
+            print(msg['config_id'], msg['update'])
+            new_id = msg['config_id'] + 1
+            await reply(request, new_id)
         case _:
             logger.error(f"Unknown method: {msg['method']}")
 

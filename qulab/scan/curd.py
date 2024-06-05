@@ -6,7 +6,8 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.session import Session
 from waveforms.dicttree import foldDict
 
-from .models import Comment, Record, Report, Sample, Tag
+from .models import (Cell, Comment, InputText, Notebook, Record, Report,
+                     Sample, Tag)
 
 
 def tag(session: Session, tag_text: str) -> Tag:
@@ -142,3 +143,34 @@ def remove_tags(session: Session, record_id: int, tags: Sequence[str]):
         session.rollback()
         return False
     return True
+
+
+def create_notebook(session: Session, notebook_name: str) -> Notebook:
+    """Create a notebook in the database."""
+    notebook = Notebook(name=notebook_name)
+    session.add(notebook)
+    return notebook
+
+
+def create_input_text(session: Session, input_text: str) -> InputText:
+    """Create an input text in the database."""
+    input = InputText()
+    input.text = input_text
+    try:
+        input = session.query(InputText).filter(
+            InputText.hash == input.hash,
+            InputText.text_field == input_text).one()
+    except NoResultFound:
+        session.add(input)
+    return input
+
+
+def create_cell(session: Session, notebook: Notebook, input_text: str) -> Cell:
+    """Create a cell in the database."""
+    cell = Cell()
+    cell.notebook = notebook
+    cell.input = create_input_text(session, input_text)
+    cell.index = len(notebook.cells) - 1
+    session.add(cell)
+    notebook.atime = cell.ctime
+    return cell
