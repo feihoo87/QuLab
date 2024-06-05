@@ -302,9 +302,9 @@ async def main(port, datapath, url, timeout=1, buffer=1024, interval=60):
 @click.option('--interval',
               default=60,
               help='Interval of flush cache, in unit of second.')
-def record(port, datapath, url, timeout, buffer, interval):
+def server(port, datapath, url, timeout, buffer, interval):
     asyncio.run(main(port, Path(datapath), url, timeout, buffer, interval))
 
 
 if __name__ == "__main__":
-    record()
+    server()
