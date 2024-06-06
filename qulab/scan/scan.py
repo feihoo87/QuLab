@@ -365,7 +365,7 @@ class Scan():
 
     def hiden(self, name: str) -> bool:
         return bool(
-            self._hide_pattern_re.match(name)) and not name.startswith('**')
+            self._hide_pattern_re.match(name)) and not name.startswith('*')
 
     async def _filter(self, variables: dict[str, Any], level: int = 0):
         try:
@@ -1029,7 +1029,11 @@ async def _unpack(key, variables):
         x = await x
     if key.startswith('**'):
         assert isinstance(x, dict), f"Should promise a dict for `**` symbol."
-        variables.update(x)
+        if "{key}" in key:
+            for k, v in x.items():
+                variables[key[2:].format(key=k)] = v
+        else:
+            variables.update(x)
     elif key.startswith('*'):
         assert isinstance(
             x, (list, tuple,
