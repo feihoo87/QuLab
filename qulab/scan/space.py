@@ -23,11 +23,11 @@ class Space():
         return len(self.toarray())
 
     @classmethod
-    def fromarray(cls, array):
-        if isinstance(array, Space):
-            return array
-        if isinstance(array, (list, tuple)):
-            array = np.array(array)
+    def fromarray(cls, space):
+        if isinstance(space, Space):
+            return space
+        if isinstance(space, (list, tuple)):
+            array = np.array(space)
         try:
             a = np.linspace(array[0], array[-1], len(array), dtype=array.dtype)
             if np.allclose(a, array):
@@ -81,7 +81,7 @@ class Space():
                            dtype=array.dtype)
         except:
             pass
-        return array
+        return space
 
     def toarray(self):
         return getattr(np, self.function)(*self.args, **self.kwds)
