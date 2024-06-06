@@ -204,15 +204,18 @@ async def handle(session: Session, request: Request, datapath: Path):
             else:
                 await reply(request, None)
         case 'config_get':
-            config = get_config(session, msg['config_id'], base=datapath)
+            config = get_config(session,
+                                msg['config_id'],
+                                base=datapath / 'objects')
             session.commit()
             await reply(request, config)
         case 'config_update':
             config = create_config(session,
                                    msg['update'],
-                                   base=datapath,
+                                   base=datapath / 'objects',
                                    filename='/'.join(
-                                       random_path(datapath).parts[-4:]))
+                                       random_path(datapath /
+                                                   'objects').parts[-4:]))
             session.commit()
             await reply(request, config.id)
         case 'submit':

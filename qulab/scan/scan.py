@@ -355,8 +355,7 @@ class Scan():
 
     def emit(self, current_level, step, position, variables: dict[str, Any]):
         self._msg_queue.put_nowait(
-            asyncio.create_task(
-                self._emit(current_level, step, position, variables.copy())))
+            self._emit(current_level, step, position, variables.copy()))
 
     def hide(self, name: str):
         self.description['hiden'].append(name)
