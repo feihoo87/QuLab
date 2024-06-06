@@ -11,13 +11,12 @@ from loguru import logger
 
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
-from .curd import (create_cell, create_notebook, query_record, remove_tags,
-                   tag, update_tags)
+from .curd import (create_cell, create_config, create_notebook, get_config,
+                   query_record, remove_tags, tag, update_tags)
 from .models import Cell, Notebook
 from .models import Record as RecordInDB
 from .models import Session, create_engine, create_tables, sessionmaker, utcnow
-from .record import BufferList, Record
-from .scan import Scan
+from .record import BufferList, Record, random_path
 
 try:
     default_record_port = int(os.getenv('QULAB_RECORD_PORT', 6789))
@@ -97,6 +96,7 @@ def record_create(session: Session, description: dict, datapath: Path) -> int:
     if 'tags' in description:
         record_in_db.tags = [tag(session, t) for t in description['tags']]
     record_in_db.file = '/'.join(record._file.parts[-4:])
+    record_in_db.config_id = description['config']
     record._file = datapath / 'objects' / record_in_db.file
     session.add(record_in_db)
     try:
@@ -204,12 +204,19 @@ async def handle(session: Session, request: Request, datapath: Path):
             else:
                 await reply(request, None)
         case 'config_get':
-            print(msg['config_id'])
+            config = get_config(session, msg['config_id'], base=datapath)
+            session.commit()
+            await reply(request, config)
         case 'config_update':
-            print(msg['config_id'], msg['update'])
-            new_id = msg['config_id'] + 1
-            await reply(request, new_id)
+            config = create_config(session,
+                                   msg['update'],
+                                   base=datapath,
+                                   filename='/'.join(
+                                       random_path(datapath).parts[-4:]))
+            session.commit()
+            await reply(request, config.id)
         case 'submit':
+            from .scan import Scan
             description = dill.loads(msg['description'])
             task = Scan()
             task.description = description

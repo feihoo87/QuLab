@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
 from .record import Record
-from .recorder import get_local_record
+from .server import get_local_record
 from .scan import default_server
 
 

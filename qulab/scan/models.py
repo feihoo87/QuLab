@@ -1,11 +1,9 @@
 import hashlib
 import pickle
-import time
 from datetime import datetime, timezone
 from functools import singledispatchmethod
-from typing import Optional
 
-from sqlalchemy import (JSON, Column, DateTime, Float, ForeignKey, Integer,
+from sqlalchemy import (Column, DateTime, Float, ForeignKey, Integer,
                         LargeBinary, String, Table, Text, create_engine)
 from sqlalchemy.orm import (backref, declarative_base, relationship,
                             sessionmaker)
@@ -325,7 +323,7 @@ class InputText(Base):
     __tablename__ = 'inputs'
 
     id = Column(Integer, primary_key=True)
-    hash = Column(LargeBinary(20))
+    hash = Column(LargeBinary(20), index=True)
     text_field = Column(Text, unique=True)
 
     @property
@@ -432,6 +430,22 @@ class SampleTransfer(Base):
     comments = relationship("Comment", secondary=sample_transfer_comments)
 
 
+class Config(Base):
+    __tablename__ = 'configs'
+
+    id = Column(Integer, primary_key=True)
+    hash = Column(LargeBinary(20), index=True)
+    file = Column(String)
+    content_type = Column(String, default='application/pickle')
+    ctime = Column(DateTime, default=utcnow)
+    atime = Column(DateTime, default=utcnow)
+
+    records = relationship("Record", back_populates="config")
+
+    def __init__(self, data: bytes) -> None:
+        self.hash = hashlib.sha1(data).digest()
+
+
 class Record(Base):
     __tablename__ = 'records'
 
@@ -440,6 +454,7 @@ class Record(Base):
     mtime = Column(DateTime, default=utcnow)
     atime = Column(DateTime, default=utcnow)
     user_id = Column(Integer, ForeignKey('users.id'))
+    config_id = Column(Integer, ForeignKey('configs.id'))
     parent_id = Column(Integer, ForeignKey('records.id'))
     cell_id = Column(Integer, ForeignKey('cells.id'))
 
@@ -447,7 +462,6 @@ class Record(Base):
     file = Column(String)
     content_type = Column(String, default='application/pickle')
     key = Column(String)
-    config = Column(String)
 
     parent = relationship("Record",
                           remote_side=[id],
@@ -456,6 +470,7 @@ class Record(Base):
                             remote_side=[parent_id],
                             back_populates="parent")
 
+    config = relationship("Config", back_populates="records")
     user = relationship("User")
     samples = relationship("Sample",
                            secondary=sample_records,

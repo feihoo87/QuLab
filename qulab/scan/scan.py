@@ -2,7 +2,9 @@ import asyncio
 import copy
 import inspect
 import itertools
+import lzma
 import os
+import pickle
 import platform
 import re
 import subprocess
@@ -21,7 +23,7 @@ from ..sys.rpc.zmq_socket import ZMQContextManager
 from .expression import Env, Expression, Symbol
 from .optimize import NgOptimizer
 from .record import Record
-from .recorder import default_record_port
+from .server import default_record_port
 from .space import Optimizer, OptimizeSpace, Space
 from .utils import async_zip, call_function, dump_globals
 
@@ -135,6 +137,25 @@ async def save_input_cells(notebook_id,
         return await socket.recv_pyobj()
 
 
+async def create_config(config: dict, database=default_server, socket=None):
+    async with ZMQContextManager(zmq.DEALER, connect=database,
+                                 socket=socket) as socket:
+        buf = lzma.compress(pickle.dumps(config))
+        await socket.send_pyobj({'method': 'config_update', 'update': buf})
+        return await socket.recv_pyobj()
+
+
+async def get_config(config_id: int, database=default_server, socket=None):
+    async with ZMQContextManager(zmq.DEALER, connect=database,
+                                 socket=socket) as socket:
+        await socket.send_pyobj({
+            'method': 'config_get',
+            'config_id': config_id
+        })
+        buf = await socket.recv_pyobj()
+        return pickle.loads(lzma.decompress(buf))
+
+
 def task_uuid():
     return uuid.uuid3(__process_uuid, str(next(__task_counter)))
 
@@ -218,9 +239,11 @@ class Scan():
                  mixin=None):
         self.id = task_uuid()
         self.record = None
+        self.config = None
         self.description = {
             'app': app,
             'tags': tags,
+            'config': None,
             'loops': {},
             'intrinsic_loops': {},
             'consts': {},
@@ -524,6 +547,9 @@ class Scan():
 
     async def run(self):
         assymbly(self.description)
+        if self.config:
+            self.description['config'] = await create_config(
+                self.config, self.description['database'], self._sock)
         if current_notebook() is None:
             await create_notebook('untitle', self.description['database'],
                                   self._sock)

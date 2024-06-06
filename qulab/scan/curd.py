@@ -1,4 +1,7 @@
+import lzma
+import pickle
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Sequence, Type, Union
 
 from sqlalchemy.orm import Query, Session, aliased
@@ -6,8 +9,8 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.session import Session
 from waveforms.dicttree import foldDict
 
-from .models import (Cell, Comment, InputText, Notebook, Record, Report,
-                     Sample, Tag)
+from .models import (Cell, Comment, Config, InputText, Notebook, Record,
+                     Report, Sample, Tag, utcnow)
 
 
 def tag(session: Session, tag_text: str) -> Tag:
@@ -174,3 +177,45 @@ def create_cell(session: Session, notebook: Notebook, input_text: str) -> Cell:
     session.add(cell)
     notebook.atime = cell.ctime
     return cell
+
+
+def create_config(session: Session, config: dict | bytes, base: Path,
+                  filename: str) -> Config:
+    """Create a config in the database."""
+
+    if not isinstance(config, bytes):
+        buf = pickle.dumps(config)
+        buf = lzma.compress(buf)
+        content_type = 'application/pickle+lzma'
+    else:
+        buf = config
+        content_type = 'application/octet-stream'
+    config = Config(buf)
+    config.content_type = content_type
+    for cfg in session.query(Config).filter(Config.hash == config.hash).all():
+        with open(base / cfg.file, 'rb') as f:
+            if f.read() == buf:
+                cfg.atime = utcnow()
+                return cfg
+    else:
+        path = base / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'wb') as f:
+            f.write(buf)
+        config.file = filename
+        session.add(config)
+    return config
+
+
+def get_config(session: Session, config_id: int, base: Path):
+    config = session.get(Config, config_id)
+    if config is None:
+        return None
+    config.atime = utcnow()
+    path = base / config.file
+    with open(path, 'rb') as f:
+        buf = f.read()
+    if config.content_type == 'application/pickle+lzma':
+        buf = lzma.decompress(buf)
+        buf = pickle.loads(buf)
+    return buf
