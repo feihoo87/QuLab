@@ -332,7 +332,17 @@ class Scan():
     async def _emit(self, current_level, step, position, variables: dict[str,
                                                                          Any]):
         for key, value in list(variables.items()):
-            if inspect.isawaitable(value) and not self.hiden(key):
+            if key.startswith('**'):
+                if isinstance(value, dict):
+                    variables.update(value)
+                    del variables[key]
+                elif inspect.isawaitable(value):
+                    d = await value
+                    assert isinstance(
+                        d, dict), f"Should promise a dict for `**` symbol."
+                    variables.update(d)
+                    del variables[key]
+            elif inspect.isawaitable(value) and not self.hiden(key):
                 variables[key] = await value
         if self._sock is not None:
             await self._sock.send_pyobj({
@@ -362,7 +372,8 @@ class Scan():
         self._hide_pattern_re = re.compile('|'.join(self.description['hiden']))
 
     def hiden(self, name: str) -> bool:
-        return bool(self._hide_pattern_re.match(name))
+        return bool(
+            self._hide_pattern_re.match(name)) and not name.startswith('**')
 
     async def _filter(self, variables: dict[str, Any], level: int = 0):
         try:
@@ -971,9 +982,21 @@ async def _iter_level(variables,
 
         variables.update(await call_many_functions(order, getters, variables))
 
+        if opts:
+            for key in list(variables.keys()):
+                if key.startswith('**'):
+                    d = variables[key]
+                    if inspect.isawaitable(d):
+                        d = await d
+                    assert isinstance(
+                        d, dict), f"Should promise a dict for `**` symbol."
+                    variables.update(d)
+                    del variables[key]
+
         for name, opt in opts.items():
             opt_cfg = optimizers[name]
             args = [variables[n] for n in opt_cfg.dimensions.keys()]
+
             if name not in variables:
                 raise ValueError(f'{name} not in variables.')
             fun = variables[name]
