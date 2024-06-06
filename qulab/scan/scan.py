@@ -332,16 +332,8 @@ class Scan():
     async def _emit(self, current_level, step, position, variables: dict[str,
                                                                          Any]):
         for key, value in list(variables.items()):
-            if key.startswith('**'):
-                if isinstance(value, dict):
-                    variables.update(value)
-                    del variables[key]
-                elif inspect.isawaitable(value):
-                    d = await value
-                    assert isinstance(
-                        d, dict), f"Should promise a dict for `**` symbol."
-                    variables.update(d)
-                    del variables[key]
+            if key.startswith('*'):
+                await _unpack(key, variables)
             elif inspect.isawaitable(value) and not self.hiden(key):
                 variables[key] = await value
         if self._sock is not None:
@@ -984,14 +976,8 @@ async def _iter_level(variables,
 
         if opts:
             for key in list(variables.keys()):
-                if key.startswith('**'):
-                    d = variables[key]
-                    if inspect.isawaitable(d):
-                        d = await d
-                    assert isinstance(
-                        d, dict), f"Should promise a dict for `**` symbol."
-                    variables.update(d)
-                    del variables[key]
+                if key.startswith('*'):
+                    await _unpack(key, variables)
 
         for name, opt in opts.items():
             opt_cfg = optimizers[name]
@@ -1035,3 +1021,22 @@ async def call_many_functions(order: list[list[str]],
             results = await asyncio.gather(*coros)
             ret.update(dict(zip(waited, results)))
     return ret
+
+
+async def _unpack(key, variables):
+    x = variables[key]
+    if inspect.isawaitable(x):
+        x = await x
+    if key.startswith('**'):
+        assert isinstance(x, dict), f"Should promise a dict for `**` symbol."
+        variables.update(x)
+    elif key.startswith('*'):
+        assert isinstance(
+            x, (list, tuple,
+                np.ndarray)), f"Should promise a list for `*` symbol."
+        for i, v in enumerate(x):
+            k = key[1:].format(i=i)
+            variables[k] = v
+    else:
+        return
+    del variables[key]
