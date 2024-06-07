@@ -12,8 +12,8 @@ from sqlalchemy.orm import sessionmaker
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
 from .record import Record
-from .server import get_local_record
 from .scan import default_server
+from .server import get_local_record
 
 
 def get_record(id, database=default_server) -> Record:
@@ -24,6 +24,8 @@ def get_record(id, database=default_server) -> Record:
                 'record_id': id
             })
             d = dill.loads(socket.recv_pyobj())
+            if isinstance(d, None):
+                raise ValueError(f'No record with id {id}')
             d.id = id
             d.database = database
             d._file = None

@@ -65,6 +65,8 @@ def flush_cache():
 
 def get_local_record(session: Session, id: int, datapath: Path) -> Record:
     record_in_db = session.get(RecordInDB, id)
+    if record_in_db is None:
+        return None
     record_in_db.atime = utcnow()
 
     if record_in_db.file.endswith('.zip'):
@@ -220,21 +222,33 @@ async def handle(session: Session, request: Request, datapath: Path):
             await reply(request, config.id)
         case 'submit':
             from .scan import Scan
+            finished = [(id, queried) for id, (task, queried) in pool.items()
+                        if not isinstance(task, int) and task.finished()]
+            for id, queried in finished:
+                if not queried:
+                    pool[id] = [pool[id].record.id, False]
+                else:
+                    pool.pop(id)
             description = dill.loads(msg['description'])
             task = Scan()
             task.description = description
             task.start()
-            pool[task.id] = task
+            pool[task.id] = [task, False]
             await reply(request, task.id)
         case 'get_record_id':
-            task = pool.get(msg['id'])
-            for _ in range(10):
-                if task.record:
-                    await reply(request, task.record.id)
-                    break
-                await asyncio.sleep(1)
+            task, queried = pool.get(msg['id'])
+            if isinstance(task, int):
+                await reply(request, task)
+                pool.pop(msg['id'])
             else:
-                await reply(request, None)
+                for _ in range(10):
+                    if task.record:
+                        await reply(request, task.record.id)
+                        pool[msg['id']] = [task, True]
+                        break
+                    await asyncio.sleep(1)
+                else:
+                    await reply(request, None)
         case _:
             logger.error(f"Unknown method: {msg['method']}")
 

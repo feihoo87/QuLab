@@ -145,17 +145,6 @@ async def create_config(config: dict, database=default_server, socket=None):
         return await socket.recv_pyobj()
 
 
-async def get_config(config_id: int, database=default_server, socket=None):
-    async with ZMQContextManager(zmq.DEALER, connect=database,
-                                 socket=socket) as socket:
-        await socket.send_pyobj({
-            'method': 'config_get',
-            'config_id': config_id
-        })
-        buf = await socket.recv_pyobj()
-        return pickle.loads(lzma.decompress(buf))
-
-
 def task_uuid():
     return uuid.uuid3(__process_uuid, str(next(__task_counter)))
 

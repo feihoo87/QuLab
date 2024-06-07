@@ -1,4 +1,6 @@
 import itertools
+import lzma
+import pickle
 import sys
 import uuid
 import zipfile
@@ -12,6 +14,7 @@ import zmq
 
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
+from .curd import get_config
 from .space import OptimizeSpace, Space
 
 _not_given = object()
@@ -325,6 +328,28 @@ class Record():
     @property
     def axis(self):
         return self.description.get('axis', {})
+
+    def config(self, cls=dict, session=None, datapath=None):
+        config_id = self.description.get('config', None)
+        if config_id is None:
+            return None
+        if isinstance(config_id, dict):
+            return cls(config_id)
+        if self.is_remote_record():
+            with ZMQContextManager(zmq.DEALER,
+                                   connect=self.database) as socket:
+                socket.send_pyobj({
+                    'method': 'config_get',
+                    'config_id': config_id
+                })
+                buf = socket.recv_pyobj()
+                return cls(pickle.loads(lzma.decompress(buf)))
+        else:
+            assert session is not None, "session is required for local record"
+            assert datapath is not None, "datapath is required for local record"
+            config = get_config(session, config_id, base=datapath / 'objects')
+            session.commit()
+            return cls(config)
 
     def is_local_record(self):
         return not self.is_cache_record() and not self.is_remote_record()
