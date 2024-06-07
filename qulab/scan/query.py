@@ -24,7 +24,7 @@ def get_record(id, database=default_server) -> Record:
                 'record_id': id
             })
             d = dill.loads(socket.recv_pyobj())
-            if isinstance(d, None):
+            if d is None:
                 raise ValueError(f'No record with id {id}')
             d.id = id
             d.database = database
