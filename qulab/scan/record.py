@@ -157,14 +157,29 @@ class BufferList():
         else:
             server, record_id, key = self._data_id
             with ZMQContextManager(zmq.DEALER, connect=server) as socket:
-                socket.send_pyobj({
-                    'method': 'bufferlist_slice',
-                    'record_id': record_id,
-                    'key': key,
-                    'slice': self._slice
-                })
-                ret = socket.recv_pyobj()
-                yield from ret
+                iter_id = b''
+                start = 0
+                try:
+                    while True:
+                        socket.send_pyobj({
+                            'method': 'bufferlist_iter',
+                            'record_id': record_id,
+                            'iter_id': iter_id,
+                            'key': key,
+                            'slice': self._slice,
+                            'start': start
+                        })
+                        iter_id, lst, finished = socket.recv_pyobj()
+                        start += len(lst)
+                        yield from lst
+                        if finished:
+                            break
+                finally:
+                    if iter_id:
+                        socket.send_pyobj({
+                            'method': 'bufferlist_iter_exit',
+                            'iter_id': iter_id
+                        })
 
     def value(self):
         d = []

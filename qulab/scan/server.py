@@ -2,6 +2,7 @@ import asyncio
 import os
 import pickle
 import time
+import uuid
 from pathlib import Path
 
 import click
@@ -29,7 +30,9 @@ else:
     datapath = Path.home() / 'qulab' / 'data'
 datapath.mkdir(parents=True, exist_ok=True)
 
+namespace = uuid.uuid4()
 record_cache = {}
+buffer_list_cache = {}
 CACHE_SIZE = 1024
 
 pool = {}
@@ -44,6 +47,9 @@ class Request():
         self.msg = pickle.loads(msg)
         self.method = self.msg.get('method', '')
 
+    def __repr__(self):
+        return f"Request({self.method})"
+
 
 async def reply(req, resp):
     await req.sock.send_multipart([req.identity, pickle.dumps(resp)])
@@ -56,6 +62,11 @@ def clear_cache():
     for k, (t, _) in zip(sorted(record_cache.items(), key=lambda x: x[1][0]),
                          range(len(record_cache) - CACHE_SIZE)):
         del record_cache[k]
+
+    for k, (t,
+            _) in zip(sorted(buffer_list_cache.items(), key=lambda x: x[1][0]),
+                      range(len(buffer_list_cache) - CACHE_SIZE)):
+        del buffer_list_cache[k]
 
 
 def flush_cache():
@@ -142,12 +153,37 @@ async def handle(session: Session, request: Request, datapath: Path):
     match request.method:
         case 'ping':
             await reply(request, 'pong')
-        case 'bufferlist_slice':
-            record = get_record(session, msg['record_id'], datapath)
-            bufferlist = record.get(msg['key'],
-                                    buffer_to_array=False,
-                                    slice=msg['slice'])
-            await reply(request, list(bufferlist.iter()))
+        case 'bufferlist_iter':
+            if msg['iter_id'] in buffer_list_cache:
+                it = buffer_list_cache[msg['iter_id']][1]
+                iter_id = msg['iter_id']
+            else:
+                iter_id = uuid.uuid3(namespace, str(time.time_ns())).bytes
+                record = get_record(session, msg['record_id'], datapath)
+                bufferlist = record.get(msg['key'],
+                                        buffer_to_array=False,
+                                        slice=msg['slice'])
+                it = bufferlist.iter()
+                for _, _ in zip(range(msg['start']), it):
+                    pass
+            current_time = time.time()
+            ret, end = [], False
+            while time.time() - current_time < 0.02:
+                try:
+                    ret.append(next(it))
+                except StopIteration:
+                    end = True
+                    break
+            await reply(request, (iter_id, ret, end))
+            buffer_list_cache[iter_id] = time.time(), it
+            clear_cache()
+        case 'bufferlist_iter_exit':
+            try:
+                it = buffer_list_cache.pop(msg['iter_id'])[1]
+                it.throw(Exception)
+            except:
+                pass
+            clear_cache()
         case 'record_create':
             description = dill.loads(msg['description'])
             await reply(request, record_create(session, description, datapath))
@@ -253,11 +289,17 @@ async def handle(session: Session, request: Request, datapath: Path):
             logger.error(f"Unknown method: {msg['method']}")
 
 
-async def _handle(session: Session, request: Request, datapath: Path):
+async def handle_with_timeout(session: Session, request: Request,
+                              datapath: Path, timeout: float):
     try:
-        await handle(session, request, datapath)
-    except:
-        await reply(request, 'error')
+        await asyncio.wait_for(handle(session, request, datapath),
+                               timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.warning(
+            f"Task handling request {request} timed out and was cancelled.")
+        await reply(request, 'timeout')
+    except Exception as e:
+        await reply(request, f'{e!r}')
 
 
 async def serv(port,
@@ -280,7 +322,8 @@ async def serv(port,
                 identity, msg = await sock.recv_multipart()
                 received += len(msg)
                 req = Request(sock, identity, msg)
-                asyncio.create_task(_handle(session, req, datapath))
+                asyncio.create_task(
+                    handle_with_timeout(session, req, datapath, timeout=60.0))
                 if received > buffer_size or time.time(
                 ) - last_flush_time > interval:
                     flush_cache()
