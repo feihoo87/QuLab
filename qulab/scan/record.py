@@ -304,6 +304,14 @@ class Record():
         self._last_vars = set()
         self._file = None
 
+        for name, value in self.description['intrinsic_loops'].items():
+            self._items[name] = value
+
+        for level, range_list in description['loops'].items():
+            for name, iterable in range_list:
+                if name in self.description['independent_variables']:
+                    self._items[name] = iterable
+
         if self.is_local_record():
             self.database = Path(self.database)
             self._file = random_path(self.database / 'objects')
@@ -395,6 +403,11 @@ class Record():
                     else:
                         ret._data_id = self.database, self.id, key
                         return ret
+                elif isinstance(ret, Space):
+                    if buffer_to_array:
+                        return ret.toarray()
+                    else:
+                        return ret
                 else:
                     return ret
         else:
@@ -408,6 +421,11 @@ class Record():
                 d._slice = slice
                 if buffer_to_array:
                     return d.array()
+                else:
+                    return d
+            elif isinstance(d, Space):
+                if buffer_to_array:
+                    return d.toarray()
                 else:
                     return d
             else:
@@ -516,6 +534,8 @@ class Record():
             with z.open('record.pkl', 'w') as f:
                 self.description['entry']['scripts'] = self.scripts()
                 dill.dump((self.description, items), f)
+            with z.open('config.pkl', 'w') as f:
+                f.write(dill.dumps(self.config()))
 
     def scripts(self, session=None):
         scripts = self.description['entry']['scripts']

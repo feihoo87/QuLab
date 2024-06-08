@@ -28,6 +28,8 @@ class Space():
             return space
         if isinstance(space, (list, tuple)):
             array = np.array(space)
+        elif isinstance(space, np.ndarray):
+            array = space
         try:
             a = np.linspace(array[0], array[-1], len(array), dtype=array.dtype)
             if np.allclose(a, array):
