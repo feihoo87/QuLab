@@ -225,6 +225,7 @@ class Scan():
                  dump_globals: bool = False,
                  max_workers: int = 4,
                  max_promise: int = 100,
+                 max_message: int = 1000,
                  mixin=None):
         self.id = task_uuid()
         self.record = None
@@ -265,11 +266,12 @@ class Scan():
         self._sem = asyncio.Semaphore(max_promise + 1)
         self._bar: dict[int, tqdm] = {}
         self._hide_pattern_re = re.compile('|'.join(self.description['hiden']))
-        self._msg_queue = asyncio.Queue()
+        self._msg_queue = asyncio.Queue(max_message)
         self._prm_queue = asyncio.Queue()
         self._single_step = True
         self._max_workers = max_workers
         self._max_promise = max_promise
+        self._max_message = max_message
         self._executors = ProcessPoolExecutor(max_workers=max_workers)
 
     def __del__(self):
@@ -297,7 +299,7 @@ class Scan():
         self._main_task = None
         self._bar = {}
         self._prm_queue = asyncio.Queue()
-        self._msg_queue = asyncio.Queue()
+        self._msg_queue = asyncio.Queue(self._max_message)
         self._sem = asyncio.Semaphore(self._max_promise + 1)
         self._executors = ProcessPoolExecutor(max_workers=self._max_workers)
         for opt in self.description['optimizers'].values():
@@ -344,8 +346,9 @@ class Scan():
                 for k, v in variables.items() if not self.hiden(k)
             })
 
-    def emit(self, current_level, step, position, variables: dict[str, Any]):
-        self._msg_queue.put_nowait(
+    async def emit(self, current_level, step, position, variables: dict[str,
+                                                                        Any]):
+        await self._msg_queue.put(
             self._emit(current_level, step, position, variables.copy()))
 
     def hide(self, name: str):
@@ -561,7 +564,7 @@ class Scan():
             await self._run()
 
     async def _run(self):
-        send_msg = asyncio.create_task(self._send_msg())
+        send_msg_task = asyncio.create_task(self._send_msg())
         update_progress_task = asyncio.create_task(self._update_progress())
 
         self._variables = {'self': self}
@@ -596,13 +599,13 @@ class Scan():
                 self.description['order'].get(-1, []),
                 self.description['getters'], self.variables))
 
-            self.emit(0, 0, 0, self.variables)
-            self.emit(-1, 0, 0, {})
+            await self.emit(0, 0, 0, self.variables)
+            await self.emit(-1, 0, 0, {})
 
         await self._prm_queue.join()
         update_progress_task.cancel()
         await self._msg_queue.join()
-        send_msg.cancel()
+        send_msg_task.cancel()
         return self.variables
 
     async def done(self):
@@ -661,14 +664,15 @@ class Scan():
             if await self._filter(variables, self.current_level - 1):
                 yield variables
                 self._single_step = False
-                self.emit(self.current_level - 1, step, position, variables)
+                await self.emit(self.current_level - 1, step, position,
+                                variables)
                 step += 1
             position += 1
             self._current_level -= 1
             self._prm_queue.put_nowait(
                 self._update_progress_bar(self.current_level, 1))
         if self.current_level == 0:
-            self.emit(self.current_level - 1, 0, 0, {})
+            await self.emit(self.current_level - 1, 0, 0, {})
             for name, value in self.variables.items():
                 if inspect.isawaitable(value):
                     self.variables[name] = await value
