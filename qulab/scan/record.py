@@ -115,7 +115,8 @@ class BufferList():
                 self.inner_shape = value.shape
             elif self.inner_shape != value.shape:
                 self.inner_shape = ()
-        self._list.append((pos, value))
+        with self._lock:
+            self._list.append((pos, value))
         if len(self._list) > 1000:
             self.flush()
 
