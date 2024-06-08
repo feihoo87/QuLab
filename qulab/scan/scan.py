@@ -626,11 +626,14 @@ class Scan():
         assymbly(self.description)
         async with ZMQContextManager(zmq.DEALER, connect=server) as socket:
             await socket.send_pyobj({
-                'method': 'submit',
+                'method': 'task_submit',
                 'description': dill.dumps(self.description)
             })
             self.id = await socket.recv_pyobj()
-            await socket.send_pyobj({'method': 'get_record_id', 'id': self.id})
+            await socket.send_pyobj({
+                'method': 'task_get_record_id',
+                'id': self.id
+            })
             record_id = await socket.recv_pyobj()
             self.record = Record(record_id, self.description['database'],
                                  self.description)

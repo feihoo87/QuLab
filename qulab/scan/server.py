@@ -256,7 +256,7 @@ async def handle(session: Session, request: Request, datapath: Path):
                                                    'objects').parts[-4:]))
             session.commit()
             await reply(request, config.id)
-        case 'submit':
+        case 'task_submit':
             from .scan import Scan
             finished = [(id, queried) for id, (task, queried) in pool.items()
                         if not isinstance(task, int) and task.finished()]
@@ -271,7 +271,7 @@ async def handle(session: Session, request: Request, datapath: Path):
             task.start()
             pool[task.id] = [task, False]
             await reply(request, task.id)
-        case 'get_record_id':
+        case 'task_get_record_id':
             task, queried = pool.get(msg['id'])
             if isinstance(task, int):
                 await reply(request, task)
@@ -285,6 +285,13 @@ async def handle(session: Session, request: Request, datapath: Path):
                     await asyncio.sleep(1)
                 else:
                     await reply(request, None)
+        case 'task_get_progress':
+            task, _ = pool.get(msg['id'])
+            if isinstance(task, int):
+                await reply(request, 1)
+            else:
+                await reply(request,
+                            [(bar.n, bar.total) for bar in task._bar.values()])
         case _:
             logger.error(f"Unknown method: {msg['method']}")
 
