@@ -200,7 +200,7 @@ class BufferList():
             d.append(value)
         return p, d
 
-    def array(self):
+    def toarray(self):
         pos, data = self.items()
         if self._slice:
             pos = np.asarray(pos)
@@ -294,7 +294,7 @@ class BufferList():
     def __getitem__(self, slice_tuple: slice | EllipsisType
                     | tuple[slice | int | EllipsisType, ...]):
         self._slice, contract, reversed = self._full_slice(slice_tuple)
-        ret = self.array()
+        ret = self.toarray()
         slices = []
         for i, s in enumerate(self._slice):
             if i in contract:
@@ -389,8 +389,8 @@ class Record():
         self.flush()
 
     def __getitem__(self, key):
-        ret = self.get(key, buffer_to_array=True)
-        if isinstance(ret, Space):
+        ret = self.get(key)
+        if isinstance(ret, (BufferList, Space)):
             ret = ret.toarray()
         return ret
 
@@ -405,23 +405,9 @@ class Record():
                 })
                 ret = socket.recv_pyobj()
                 if isinstance(ret, BufferList):
-                    if buffer_to_array:
-                        socket.send_pyobj({
-                            'method': 'bufferlist_slice',
-                            'record_id': self.id,
-                            'key': key,
-                            'slice': slice
-                        })
-                        lst = socket.recv_pyobj()
-                        ret._list = lst
-                        ret._slice = slice
-                        return ret.array()
-                    else:
-                        ret._data_id = self.database, self.id, key
-                        return ret
-                elif isinstance(ret, Space):
-                    if buffer_to_array:
-                        return ret.toarray()
+                    ret._data_id = self.database, self.id, key
+                    if slice:
+                        return ret[slice]
                     else:
                         return ret
                 else:
@@ -436,7 +422,7 @@ class Record():
                     d.file = self._file.parent.parent.parent.parent / d.file
                 d._slice = slice
                 if buffer_to_array:
-                    return d.array()
+                    return d.toarray()
                 else:
                     return d
             elif isinstance(d, Space):
