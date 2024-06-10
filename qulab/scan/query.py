@@ -16,9 +16,13 @@ from .scan import default_server
 from .server import get_local_record
 
 
-def get_record(id, database=default_server) -> Record:
+def get_record(id,
+               database=default_server,
+               socket=None,
+               session=None) -> Record:
     if isinstance(database, str) and database.startswith('tcp://'):
-        with ZMQContextManager(zmq.DEALER, connect=database) as socket:
+        with ZMQContextManager(zmq.DEALER, connect=database,
+                               socket=socket) as socket:
             socket.send_pyobj({
                 'method': 'record_description',
                 'record_id': id
@@ -29,12 +33,16 @@ def get_record(id, database=default_server) -> Record:
             d.id = id
             d.database = database
             d._file = None
+            d._sock = socket
             return d
     else:
-        db_file = Path(database) / 'data.db'
-        engine = create_engine(f'sqlite:///{db_file}')
-        Session = sessionmaker(bind=engine)
-        with Session() as session:
+        if session is None:
+            db_file = Path(database) / 'data.db'
+            engine = create_engine(f'sqlite:///{db_file}')
+            Session = sessionmaker(bind=engine)
+            with Session() as session:
+                return get_local_record(session, id, database)
+        else:
             return get_local_record(session, id, database)
 
 

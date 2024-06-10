@@ -130,7 +130,12 @@ class ZMQContextManager:
         self.auth = None
         self.context = None
         self.socket = None
-        self._external_socket = socket
+        self._external_socket = None
+        try:
+            if not socket.closed:
+                self._external_socket = socket
+        except:
+            pass
 
     def _create_socket(self, asyncio=False) -> zmq.Socket:
         """

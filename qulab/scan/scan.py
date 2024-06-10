@@ -555,9 +555,9 @@ class Scan():
         if isinstance(
                 self.description['database'],
                 str) and self.description['database'].startswith("tcp://"):
-            async with ZMQContextManager(
-                    zmq.DEALER,
-                    connect=self.description['database']) as socket:
+            async with ZMQContextManager(zmq.DEALER,
+                                         connect=self.description['database'],
+                                         socket=self._sock) as socket:
                 self._sock = socket
                 await self._run()
         else:
@@ -624,7 +624,9 @@ class Scan():
 
     async def submit(self, server=default_executor):
         assymbly(self.description)
-        async with ZMQContextManager(zmq.DEALER, connect=server) as socket:
+        async with ZMQContextManager(zmq.DEALER,
+                                     connect=server,
+                                     socket=self._sock) as socket:
             await socket.send_pyobj({
                 'method': 'task_submit',
                 'description': dill.dumps(self.description)

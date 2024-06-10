@@ -56,6 +56,7 @@ class BufferList():
         self._slice = slice
         self._lock = Lock()
         self._data_id = None
+        self._sock = None
 
     def __repr__(self):
         return f"<BufferList: shape={self.shape}, lu={self.lu}, rd={self.rd}, slice={self._slice}>"
@@ -82,6 +83,7 @@ class BufferList():
         self._slice = None
         self._lock = Lock()
         self._data_id = None
+        self._sock = None
 
     @property
     def shape(self):
@@ -156,7 +158,9 @@ class BufferList():
                         yield pos, value
         else:
             server, record_id, key = self._data_id
-            with ZMQContextManager(zmq.DEALER, connect=server) as socket:
+            with ZMQContextManager(zmq.DEALER,
+                                   connect=server,
+                                   socket=self._sock) as socket:
                 iter_id = b''
                 start = 0
                 try:
@@ -319,6 +323,7 @@ class Record():
         self._pos = []
         self._last_vars = set()
         self._file = None
+        self._sock = None
 
         for name, value in self.description['intrinsic_loops'].items():
             self._items[name] = value
@@ -348,6 +353,7 @@ class Record():
         self._last_vars = set()
         self.database = None
         self._file = None
+        self._sock = None
 
     @property
     def axis(self):
@@ -361,7 +367,8 @@ class Record():
             return cls(config_id)
         if self.is_remote_record():
             with ZMQContextManager(zmq.DEALER,
-                                   connect=self.database) as socket:
+                                   connect=self.database,
+                                   socket=self._sock) as socket:
                 socket.send_pyobj({
                     'method': 'config_get',
                     'config_id': config_id
@@ -374,6 +381,31 @@ class Record():
             config = get_config(session, config_id, base=datapath / 'objects')
             session.commit()
             return cls(config)
+
+    def scripts(self, session=None):
+        scripts = self.description['entry']['scripts']
+        if isinstance(scripts, list):
+            return scripts
+        else:
+            cell_id = scripts
+
+        if self.is_remote_record():
+            with ZMQContextManager(zmq.DEALER,
+                                   connect=self.database,
+                                   socket=self._sock) as socket:
+                socket.send_pyobj({
+                    'method': 'notebook_history',
+                    'cell_id': cell_id
+                })
+                return socket.recv_pyobj()
+        elif self.is_local_record():
+            from .models import Cell
+            assert session is not None, "session is required for local record"
+            cell = session.get(Cell, cell_id)
+            return [
+                cell.input.text
+                for cell in cell.notebook.cells[1:cell.index + 2]
+            ]
 
     def is_local_record(self):
         return not self.is_cache_record() and not self.is_remote_record()
@@ -389,15 +421,13 @@ class Record():
         self.flush()
 
     def __getitem__(self, key):
-        ret = self.get(key)
-        if isinstance(ret, (BufferList, Space)):
-            ret = ret.toarray()
-        return ret
+        return self.get(key, buffer_to_array=True)
 
-    def get(self, key, default=_not_given, buffer_to_array=False, slice=None):
+    def get(self, key, default=_not_given, buffer_to_array=False):
         if self.is_remote_record():
             with ZMQContextManager(zmq.DEALER,
-                                   connect=self.database) as socket:
+                                   connect=self.database,
+                                   socket=self._sock) as socket:
                 socket.send_pyobj({
                     'method': 'record_getitem',
                     'record_id': self.id,
@@ -406,10 +436,13 @@ class Record():
                 ret = socket.recv_pyobj()
                 if isinstance(ret, BufferList):
                     ret._data_id = self.database, self.id, key
-                    if slice:
-                        return ret[slice]
+                    ret._sock = socket
+                    if buffer_to_array:
+                        return ret.toarray()
                     else:
                         return ret
+                elif isinstance(ret, Space) and buffer_to_array:
+                    return ret.toarray()
                 else:
                     return ret
         else:
@@ -436,7 +469,8 @@ class Record():
     def keys(self):
         if self.is_remote_record():
             with ZMQContextManager(zmq.DEALER,
-                                   connect=self.database) as socket:
+                                   connect=self.database,
+                                   socket=self._sock) as socket:
                 socket.send_pyobj({
                     'method': 'record_keys',
                     'record_id': self.id
@@ -503,7 +537,8 @@ class Record():
     def delete(self):
         if self.is_remote_record():
             with ZMQContextManager(zmq.DEALER,
-                                   connect=self.database) as socket:
+                                   connect=self.database,
+                                   socket=self._sock) as socket:
                 socket.send_pyobj({
                     'method': 'record_delete',
                     'record_id': self.id
@@ -539,35 +574,14 @@ class Record():
             with z.open('config.pkl', 'w') as f:
                 f.write(dill.dumps(self.config()))
 
-    def scripts(self, session=None):
-        scripts = self.description['entry']['scripts']
-        if isinstance(scripts, list):
-            return scripts
-        else:
-            cell_id = scripts
-
-        if self.is_remote_record():
-            with ZMQContextManager(zmq.DEALER,
-                                   connect=self.database) as socket:
-                socket.send_pyobj({
-                    'method': 'notebook_history',
-                    'cell_id': cell_id
-                })
-                return socket.recv_pyobj()
-        elif self.is_local_record():
-            from .models import Cell
-            assert session is not None, "session is required for local record"
-            cell = session.get(Cell, cell_id)
-            return [
-                cell.input.text
-                for cell in cell.notebook.cells[1:cell.index + 2]
-            ]
-
     @classmethod
     def load(cls, file: str):
         with zipfile.ZipFile(file, 'r') as z:
             with z.open('record.pkl', 'r') as f:
                 description, items = dill.load(f)
+            with z.open('config.pkl', 'r') as f:
+                config = dill.load(f)
+            description['config'] = config
             record = cls(None, None, description)
             for key, value in items.items():
                 if isinstance(value, BufferList):
