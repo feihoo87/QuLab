@@ -310,7 +310,10 @@ class Scan():
             self._main_task.cancel()
         except:
             pass
-        self._executors.shutdown()
+        try:
+            self._executors.shutdown()
+        except:
+            pass
 
     @property
     def current_level(self):
@@ -323,7 +326,7 @@ class Scan():
     async def _emit(self, current_level, step, position, variables: dict[str,
                                                                          Any]):
         for key, value in list(variables.items()):
-            if key.startswith('*'):
+            if key.startswith('*') or ',' in key:
                 await _unpack(key, variables)
             elif inspect.isawaitable(value) and not self.hiden(key):
                 variables[key] = await value
@@ -356,8 +359,8 @@ class Scan():
         self._hide_pattern_re = re.compile('|'.join(self.description['hiden']))
 
     def hiden(self, name: str) -> bool:
-        return bool(
-            self._hide_pattern_re.match(name)) and not name.startswith('*')
+        return bool(self._hide_pattern_re.match(name)) or name.startswith(
+            '*') or ',' in name
 
     async def _filter(self, variables: dict[str, Any], level: int = 0):
         try:
@@ -444,6 +447,11 @@ class Scan():
             except:
                 pass
             self.description['consts'][name] = value
+
+        if ',' in name:
+            for key in name.split(','):
+                if not key.startswith('*'):
+                    self.add_depends(key, [name])
         if setter:
             self.description['setters'][name] = setter
 
@@ -974,7 +982,7 @@ async def _iter_level(variables,
 
         if opts:
             for key in list(variables.keys()):
-                if key.startswith('*'):
+                if key.startswith('*') or ',' in key:
                     await _unpack(key, variables)
 
         for name, opt in opts.items():
@@ -1026,7 +1034,8 @@ async def _unpack(key, variables):
     if inspect.isawaitable(x):
         x = await x
     if key.startswith('**'):
-        assert isinstance(x, dict), f"Should promise a dict for `**` symbol."
+        assert isinstance(
+            x, dict), f"Should promise a dict for `**` symbol. {key}"
         if "{key}" in key:
             for k, v in x.items():
                 variables[key[2:].format(key=k)] = v
@@ -1035,10 +1044,44 @@ async def _unpack(key, variables):
     elif key.startswith('*'):
         assert isinstance(
             x, (list, tuple,
-                np.ndarray)), f"Should promise a list for `*` symbol."
+                np.ndarray)), f"Should promise a list for `*` symbol. {key}"
         for i, v in enumerate(x):
             k = key[1:].format(i=i)
             variables[k] = v
+    elif ',' in key:
+        keys1, keys2 = [], []
+        args = None
+        for k in key.split(','):
+            if k.startswith('*'):
+                if args is None:
+                    args = k
+                else:
+                    raise ValueError(f'Only one `*` symbol is allowed. {key}')
+            elif args is None:
+                keys1.append(k)
+            else:
+                keys2.append(k)
+        assert isinstance(
+            x,
+            (list, tuple,
+             np.ndarray)), f"Should promise a list for multiple symbols. {key}"
+        if args is None:
+            assert len(keys1) == len(
+                x), f"Length of keys and values should be equal. {key}"
+            for k, v in zip(keys1, x):
+                variables[k] = v
+        else:
+            assert len(keys1) + len(keys2) <= len(
+                x), f"Too many values for unpacking. {key}"
+            for k, v in zip(keys1, x[:len(keys1)]):
+                variables[k] = v
+            end = -len(keys2) if keys2 else None
+            for i, v in enumerate(x[len(keys1):end]):
+                k = args[1:].format(i=i)
+                variables[k] = v
+            if keys2:
+                for k, v in zip(keys2, x[end:]):
+                    variables[k] = v
     else:
         return
     del variables[key]

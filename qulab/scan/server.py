@@ -161,8 +161,9 @@ async def handle(session: Session, request: Request, datapath: Path):
                 iter_id = uuid.uuid3(namespace, str(time.time_ns())).bytes
                 record = get_record(session, msg['record_id'], datapath)
                 bufferlist = record.get(msg['key'],
-                                        buffer_to_array=False,
-                                        slice=msg['slice'])
+                                        buffer_to_array=False)
+                if msg['slice']:
+                    bufferlist._slice = msg['slice']
                 it = bufferlist.iter()
                 for _, _ in zip(range(msg['start']), it):
                     pass
