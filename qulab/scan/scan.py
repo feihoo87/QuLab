@@ -911,7 +911,10 @@ def assymbly(description):
                         axis[name] = tuple(sorted(d))
                     else:
                         axis[name] = tuple(sorted(set(axis[name]) | d))
-    description['axis'] = axis
+    description['axis'] = {
+        k: tuple([x for x in v if x >= 0])
+        for k, v in axis.items()
+    }
     description['independent_variables'] = independent_variables
 
     return description
