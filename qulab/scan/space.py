@@ -147,7 +147,7 @@ class Optimizer():
                 high,
                 prior="uniform",
                 base=10,
-                transform=None,
+                transform="normalize",
                 name=None,
                 dtype=np.int64) -> OptimizeSpace:
         return OptimizeSpace(
@@ -158,7 +158,7 @@ class Optimizer():
              high,
              prior="uniform",
              base=10,
-             transform=None,
+             transform="normalize",
              name=None,
              dtype=float) -> OptimizeSpace:
         return OptimizeSpace(
