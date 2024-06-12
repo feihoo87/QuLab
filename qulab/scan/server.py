@@ -160,8 +160,7 @@ async def handle(session: Session, request: Request, datapath: Path):
             else:
                 iter_id = uuid.uuid3(namespace, str(time.time_ns())).bytes
                 record = get_record(session, msg['record_id'], datapath)
-                bufferlist = record.get(msg['key'],
-                                        buffer_to_array=False)
+                bufferlist = record.get(msg['key'], buffer_to_array=False)
                 if msg['slice']:
                     bufferlist._slice = msg['slice']
                 it = bufferlist.iter()
@@ -329,7 +328,11 @@ async def serv(port,
             while True:
                 identity, msg = await sock.recv_multipart()
                 received += len(msg)
-                req = Request(sock, identity, msg)
+                try:
+                    req = Request(sock, identity, msg)
+                except:
+                    logger.exception('bad request')
+                    continue
                 asyncio.create_task(
                     handle_with_timeout(session, req, datapath, timeout=60.0))
                 if received > buffer_size or time.time(
