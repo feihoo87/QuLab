@@ -406,6 +406,8 @@ class Scan():
     def add_depends(self, name: str, depends: list[str]):
         if isinstance(depends, str):
             depends = [depends]
+        if 'self' in depends:
+            depends.append('config')
         if name not in self.description['dependents']:
             self.description['dependents'][name] = set()
         self.description['dependents'][name].update(depends)
