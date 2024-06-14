@@ -226,10 +226,11 @@ class Scan():
                  max_workers: int = 4,
                  max_promise: int = 100,
                  max_message: int = 1000,
+                 config: dict | None = None,
                  mixin=None):
         self.id = task_uuid()
         self.record = None
-        self.config = {}
+        self.config = {} if config is None else copy.deepcopy(config)
         self.description = {
             'app': app,
             'tags': tags,
@@ -543,11 +544,11 @@ class Scan():
             self.description['getters'][name] = getter
         return opt
 
-    def _synchronize_config(self, variables):
-        for key, value in variables.items():
+    def _synchronize_config(self):
+        for key, value in self.variables.items():
             if '.' in key:
                 d = self.config
-                ks = key.split()
+                ks = key.split('.')
                 if not ks:
                     continue
                 for k in ks[:-1]:
@@ -557,6 +558,7 @@ class Scan():
                         d[k] = {}
                         d = d[k]
                 d[ks[-1]] = value
+        return self.config
 
     def _query_config(self, key):
         d = self.config
@@ -589,17 +591,17 @@ class Scan():
                     self.description['config'] = await create_config(
                         self.config, self.description['database'], self._sock)
                 if current_notebook() is None:
-                    await create_notebook('untitle', self.description['database'],
-                                        self._sock)
-                cell_id = await save_input_cells(current_notebook(),
-                                                self.description['entry']['scripts'],
-                                                self.description['database'],
-                                                self._sock)
+                    await create_notebook('untitle',
+                                          self.description['database'],
+                                          self._sock)
+                cell_id = await save_input_cells(
+                    current_notebook(), self.description['entry']['scripts'],
+                    self.description['database'], self._sock)
                 self.description['entry']['scripts'] = cell_id
                 await self._run()
         else:
             if self.config:
-                self.description['config'] = copy.deepcopy(self.config)            
+                self.description['config'] = copy.deepcopy(self.config)
             await self._run()
 
     async def _run(self):
@@ -702,11 +704,12 @@ class Scan():
                 self.variables,
                 self.description['loops'].get(self.current_level, []),
                 self.description['order'].get(self.current_level, []),
-                self.description['functions'], self.description['optimizers'],
-                self.description['setters'], self.description['getters']):
+                self.description['functions']
+                | {'config': self._synchronize_config},
+                self.description['optimizers'], self.description['setters'],
+                self.description['getters']):
             self._current_level += 1
             if await self._filter(variables, self.current_level - 1):
-                self._synchronize_config(variables)
                 yield variables
                 self._single_step = False
                 await self.emit(self.current_level - 1, step, position,
