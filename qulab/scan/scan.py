@@ -229,7 +229,7 @@ class Scan():
                  mixin=None):
         self.id = task_uuid()
         self.record = None
-        self.config = None
+        self.config = {}
         self.description = {
             'app': app,
             'tags': tags,
@@ -250,7 +250,7 @@ class Scan():
             'filters': {},
             'total': {},
             'database': database,
-            'hiden': ['self', r'^__.*', r'.*__$'],
+            'hiden': ['self', 'config', r'^__.*', r'.*__$'],
             'entry': {
                 'system': get_system_info(),
                 'env': {},
@@ -392,7 +392,10 @@ class Scan():
         if name in self.description['consts']:
             return self.description['consts'][name]
         else:
-            return Symbol(name)
+            try:
+                return self._query_config(name)
+            except:
+                return Symbol(name)
 
     def _add_search_space(self, name: str, level: int, space):
         if level not in self.description['loops']:
@@ -448,6 +451,9 @@ class Scan():
                 pass
             self.description['consts'][name] = value
 
+        if '.' in name:
+            self.add_depends('config', [name])
+
         if ',' in name:
             for key in name.split(','):
                 if not key.startswith('*'):
@@ -486,6 +492,8 @@ class Scan():
                 self.add_depends(name, space.symbols())
         if setter:
             self.description['setters'][name] = setter
+        if '.' in name:
+            self.add_depends('config', [name])
 
     def trace(self,
               name: str,
@@ -535,6 +543,27 @@ class Scan():
             self.description['getters'][name] = getter
         return opt
 
+    def _synchronize_config(self, variables):
+        for key, value in variables.items():
+            if '.' in key:
+                d = self.config
+                ks = key.split()
+                if not ks:
+                    continue
+                for k in ks[:-1]:
+                    if k in d:
+                        d = d[k]
+                    else:
+                        d[k] = {}
+                        d = d[k]
+                d[ks[-1]] = value
+
+    def _query_config(self, key):
+        d = self.config
+        for k in key.split('.'):
+            d = d[k]
+        return d
+
     async def _update_progress(self):
         while True:
             task = await self._prm_queue.get()
@@ -549,17 +578,6 @@ class Scan():
 
     async def run(self):
         assymbly(self.description)
-        if self.config:
-            self.description['config'] = await create_config(
-                self.config, self.description['database'], self._sock)
-        if current_notebook() is None:
-            await create_notebook('untitle', self.description['database'],
-                                  self._sock)
-        cell_id = await save_input_cells(current_notebook(),
-                                         self.description['entry']['scripts'],
-                                         self.description['database'],
-                                         self._sock)
-        self.description['entry']['scripts'] = cell_id
         if isinstance(
                 self.description['database'],
                 str) and self.description['database'].startswith("tcp://"):
@@ -567,15 +585,28 @@ class Scan():
                                          connect=self.description['database'],
                                          socket=self._sock) as socket:
                 self._sock = socket
+                if self.config:
+                    self.description['config'] = await create_config(
+                        self.config, self.description['database'], self._sock)
+                if current_notebook() is None:
+                    await create_notebook('untitle', self.description['database'],
+                                        self._sock)
+                cell_id = await save_input_cells(current_notebook(),
+                                                self.description['entry']['scripts'],
+                                                self.description['database'],
+                                                self._sock)
+                self.description['entry']['scripts'] = cell_id
                 await self._run()
         else:
+            if self.config:
+                self.description['config'] = copy.deepcopy(self.config)            
             await self._run()
 
     async def _run(self):
         send_msg_task = asyncio.create_task(self._send_msg())
         update_progress_task = asyncio.create_task(self._update_progress())
 
-        self._variables = {'self': self}
+        self._variables = {'self': self, 'config': self.config}
 
         consts = {}
         for k, v in self.description['consts'].items():
@@ -675,6 +706,7 @@ class Scan():
                 self.description['setters'], self.description['getters']):
             self._current_level += 1
             if await self._filter(variables, self.current_level - 1):
+                self._synchronize_config(variables)
                 yield variables
                 self._single_step = False
                 await self.emit(self.current_level - 1, step, position,
