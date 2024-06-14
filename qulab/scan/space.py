@@ -1,3 +1,4 @@
+import itertools
 from typing import Type
 
 import numpy as np
@@ -107,6 +108,9 @@ class OptimizeSpace():
         self.optimizer = optimizer
         self.space = space
         self.name = None
+        if suggestions is not None and not isinstance(
+                suggestions, (list, tuple, np.ndarray)):
+            suggestions = [suggestions]
         self.suggestions = suggestions
 
     def __len__(self):
@@ -135,8 +139,17 @@ class Optimizer():
 
     def create(self):
         opt = self.method(list(self.dimensions.values()), **self.kwds)
-        for suggestion in zip([self.suggestions[key] for key in self.dimensions]):
-            opt.suggest(*suggestion)
+
+        def rvs(space):
+            while True:
+                yield space.rvs()[0]
+
+        if self.suggestions:
+            for suggestion in zip(*[
+                    self.suggestions.get(key, rvs(space))
+                    for key, space in self.dimensions.items()
+            ]):
+                opt.suggest(*suggestion)
         return opt
 
     def Categorical(self,

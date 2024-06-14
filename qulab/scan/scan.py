@@ -481,7 +481,8 @@ class Scan():
         elif isinstance(space, OptimizeSpace):
             space.name = name
             space.optimizer.dimensions[name] = space.space
-            space.optimizer.suggestions[name] = space.suggestions
+            if space.suggestions:
+                space.optimizer.suggestions[name] = space.suggestions
             self._add_search_space(name, space.optimizer.level, space)
             self.add_depends(space.optimizer.name, [name])
         else:
