@@ -37,6 +37,9 @@ class NgOptimizer():
                            self.config['method'])(self.instrum,
                                                   budget=self.config['budget'])
 
+    def suggest(self, *args, **kwds):
+        self.opt.suggest(*args, **kwds)
+
     def ask(self):
         tmp = self.opt.ask()
         return [
@@ -50,12 +53,13 @@ class NgOptimizer():
         suggested = [
             space.transform(x) for x, space in zip(suggested, self.dimensions)
         ]
-        self.opt.suggest(*suggested)
-        x = self.opt.ask()
+        # self.opt.suggest(*suggested)
+        # x = self.opt.ask()
+        x = self.instrum.spawn_child(new_value=(suggested, {}))
         self.opt.tell(x, value)
 
     def get_result(self, history: bool = False) -> OptimizeResult:
-        recommendation = self.opt.recommend()
+        recommendation = self.opt.provide_recommendation()
         ret = OptimizeResult({
             'x': [
                 space.inverse_transform(x)

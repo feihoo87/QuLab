@@ -103,10 +103,11 @@ def geomspace(start, stop, num=50, endpoint=True):
 
 class OptimizeSpace():
 
-    def __init__(self, optimizer: 'Optimizer', space):
+    def __init__(self, optimizer: 'Optimizer', space, suggestions=None):
         self.optimizer = optimizer
         self.space = space
         self.name = None
+        self.suggestions = suggestions
 
     def __len__(self):
         return self.optimizer.maxiter
@@ -130,17 +131,23 @@ class Optimizer():
         self.level = level
         self.kwds = kwds
         self.minimize = minimize
+        self.suggestions = {}
 
     def create(self):
-        return self.method(list(self.dimensions.values()), **self.kwds)
+        opt = self.method(list(self.dimensions.values()), **self.kwds)
+        for suggestion in zip([self.suggestions[key] for key in self.dimensions]):
+            opt.suggest(*suggestion)
+        return opt
 
     def Categorical(self,
                     categories,
                     prior=None,
                     transform=None,
-                    name=None) -> OptimizeSpace:
+                    name=None,
+                    suggestions=None) -> OptimizeSpace:
         return OptimizeSpace(self,
-                             Categorical(categories, prior, transform, name))
+                             Categorical(categories, prior, transform, name),
+                             suggestions)
 
     def Integer(self,
                 low,
@@ -149,9 +156,11 @@ class Optimizer():
                 base=10,
                 transform="normalize",
                 name=None,
-                dtype=np.int64) -> OptimizeSpace:
+                dtype=np.int64,
+                suggestions=None) -> OptimizeSpace:
         return OptimizeSpace(
-            self, Integer(low, high, prior, base, transform, name, dtype))
+            self, Integer(low, high, prior, base, transform, name, dtype),
+            suggestions)
 
     def Real(self,
              low,
@@ -160,9 +169,11 @@ class Optimizer():
              base=10,
              transform="normalize",
              name=None,
-             dtype=float) -> OptimizeSpace:
+             dtype=float,
+             suggestions=None) -> OptimizeSpace:
         return OptimizeSpace(
-            self, Real(low, high, prior, base, transform, name, dtype))
+            self, Real(low, high, prior, base, transform, name, dtype),
+            suggestions)
 
     def __getstate__(self) -> dict:
         state = self.__dict__.copy()
