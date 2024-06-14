@@ -284,6 +284,9 @@ class Expression():
         return ObjectMethod(self, '__getitem__', other)
 
     def __getattr__(self, other):
+        if isinstance(other, str):
+            if other.startswith('_') or other in self.__dict__:
+                return super().__getattr__(other)
         if isinstance(other, Expression):
             other = other.eval(_default_env)
         return ObjectMethod(self, '__getattr__', other)
