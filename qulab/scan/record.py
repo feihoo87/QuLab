@@ -589,7 +589,9 @@ class Record():
         return record
 
     def __repr__(self):
-        return f"<Record: id={self.id} app={self.description['app']}, keys={self.keys()}>"
+        if self.is_remote_record() and not self._items:
+            self._items = {key: None for key in self.keys()}
+        return f"<Record: id={self.id} app={self.description['app']}, keys={self._items.keys()}>"
 
     # def _repr_html_(self):
     #     return f"""
