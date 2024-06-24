@@ -474,7 +474,9 @@ class Record():
                     'method': 'record_keys',
                     'record_id': self.id
                 })
-                return socket.recv_pyobj()
+                keys = socket.recv_pyobj()
+                self._items = {key: None for key in keys}
+                return keys
         else:
             return list(self._items.keys())
 
