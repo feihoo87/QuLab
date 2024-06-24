@@ -60,7 +60,7 @@ async def reply(req, resp):
 def clear_cache():
     if len(record_cache) < CACHE_SIZE:
         return
-    
+
     logger.debug(f"clear_cache record_cache: {len(record_cache)}")
     for k, (t, _) in zip(sorted(record_cache.items(), key=lambda x: x[1][0]),
                          range(len(record_cache) - CACHE_SIZE)):
@@ -365,21 +365,24 @@ async def serv(port,
         level = 'INFO'
 
     if log == 'stderr':
-        logger.add(sys.stderr, level=level)
+        pass
+        #logger.add(sys.stderr, level=level)
     elif log == 'stdout':
         logger.add(sys.stdout, level=level)
     else:
         logger.add(log, level=level)
 
-    logger.info('Server starting.')
+    logger.debug('Creating socket...')
     async with ZMQContextManager(zmq.ROUTER, bind=f"tcp://*:{port}") as sock:
-        if not url:
+        logger.info(f'Server started at port {port}.')
+        logger.info(f'Data path: {datapath}.')
+        if not url or url == 'sqlite':
             url = 'sqlite:///' + str(datapath / 'data.db')
         engine = create_engine(url)
         create_tables(engine)
         Session = sessionmaker(engine)
         with Session() as session:
-            logger.info('Server started.')
+            logger.info(f'Database connected: {url}.')
             received = 0
             last_flush_time = time.time()
             while True:
@@ -393,7 +396,8 @@ async def serv(port,
                     logger.exception('bad request')
                     continue
                 asyncio.create_task(
-                    handle_with_timeout(session, req, datapath, timeout=60.0))
+                    handle_with_timeout(session, req, datapath,
+                                        timeout=3600.0))
                 if received > buffer_size or time.time(
                 ) - last_flush_time > interval:
                     flush_cache()
@@ -444,14 +448,14 @@ async def main(port,
                     f"{port}", "--datapath", f"{datapath}", "--url", f"{url}",
                     "--timeout", f"{timeout}", "--buffer", f"{buffer}",
                     "--interval", f"{interval}", "--log", f"{log}",
-                    " --no-watch"
                 ]
                 if url:
                     cmd.extend(['--url', url])
                 if debug:
                     cmd.append('--debug')
+                cmd.append("--no-watch")
                 logger.debug(f"starting process: {' '.join(cmd)}")
-                process = subprocess.Popen(cmd.split(),
+                process = subprocess.Popen(cmd,
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE,
                                            cwd=os.getcwd())
@@ -475,7 +479,7 @@ async def main(port,
               default=os.getenv('QULAB_RECORD_PORT', 6789),
               help='Port of the server.')
 @click.option('--datapath', default=datapath, help='Path of the data.')
-@click.option('--url', default='', help='URL of the database.')
+@click.option('--url', default='sqlite', help='URL of the database.')
 @click.option('--timeout', default=1, help='Timeout of ping.')
 @click.option('--buffer', default=1024, help='Buffer size (MB).')
 @click.option('--interval',
@@ -488,7 +492,7 @@ def server(port, datapath, url, timeout, buffer, interval, log, no_watch,
            debug):
     asyncio.run(
         main(port, Path(datapath), url, timeout, buffer, interval, log,
-             no_watch, debug))
+             True, debug))
 
 
 if __name__ == "__main__":
