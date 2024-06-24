@@ -1,6 +1,8 @@
 import asyncio
 import os
 import pickle
+import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -58,33 +60,41 @@ async def reply(req, resp):
 def clear_cache():
     if len(record_cache) < CACHE_SIZE:
         return
-
+    
+    logger.debug(f"clear_cache record_cache: {len(record_cache)}")
     for k, (t, _) in zip(sorted(record_cache.items(), key=lambda x: x[1][0]),
                          range(len(record_cache) - CACHE_SIZE)):
         del record_cache[k]
 
+    logger.debug(f"clear_cache buffer_list_cache: {len(buffer_list_cache)}")
     for k, (t,
             _) in zip(sorted(buffer_list_cache.items(), key=lambda x: x[1][0]),
                       range(len(buffer_list_cache) - CACHE_SIZE)):
         del buffer_list_cache[k]
+    logger.debug(f"clear_cache done.")
 
 
 def flush_cache():
+    logger.debug(f"flush_cache: {len(record_cache)}")
     for k, (t, r) in record_cache.items():
         r.flush()
+    logger.debug(f"flush_cache done.")
 
 
 def get_local_record(session: Session, id: int, datapath: Path) -> Record:
+    logger.debug(f"get_local_record: {id}")
     record_in_db = session.get(RecordInDB, id)
     if record_in_db is None:
         return None
     record_in_db.atime = utcnow()
 
     if record_in_db.file.endswith('.zip'):
+        logger.debug(f"load record from zip: {record_in_db.file}")
         return Record.load(datapath / 'objects' / record_in_db.file)
 
     path = datapath / 'objects' / record_in_db.file
     with open(path, 'rb') as f:
+        logger.debug(f"load record from file: {path}")
         record = dill.load(f)
         record.database = datapath
         record._file = path
@@ -150,11 +160,15 @@ async def handle(session: Session, request: Request, datapath: Path):
 
     msg = request.msg
 
+    if request.method not in ['ping']:
+        logger.debug(f"handle: {request.method}")
+
     match request.method:
         case 'ping':
             await reply(request, 'pong')
         case 'bufferlist_iter':
-            if msg['iter_id'] in buffer_list_cache:
+            logger.debug(f"bufferlist_iter: {msg}")
+            if msg['iter_id'] and msg['iter_id'] in buffer_list_cache:
                 it = buffer_list_cache[msg['iter_id']][1]
                 iter_id = msg['iter_id']
             else:
@@ -174,22 +188,30 @@ async def handle(session: Session, request: Request, datapath: Path):
                 except StopIteration:
                     end = True
                     break
+            logger.debug(f"bufferlist_iter: {iter_id}, {end}")
             await reply(request, (iter_id, ret, end))
+            logger.debug(f"reply bufferlist_iter: {iter_id}, {end}")
             buffer_list_cache[iter_id] = time.time(), it
             clear_cache()
         case 'bufferlist_iter_exit':
+            logger.debug(f"bufferlist_iter_exit: {msg}")
             try:
                 it = buffer_list_cache.pop(msg['iter_id'])[1]
                 it.throw(Exception)
             except:
                 pass
             clear_cache()
+            logger.debug(f"end bufferlist_iter_exit: {msg}")
         case 'record_create':
+            logger.debug(f"record_create")
             description = dill.loads(msg['description'])
             await reply(request, record_create(session, description, datapath))
+            logger.debug(f"reply record_create")
         case 'record_append':
+            logger.debug(f"record_append")
             record_append(session, msg['record_id'], msg['level'], msg['step'],
                           msg['position'], msg['variables'], datapath)
+            logger.debug(f"reply record_append")
         case 'record_description':
             record = get_record(session, msg['record_id'], datapath)
             await reply(request, dill.dumps(record))
@@ -295,6 +317,9 @@ async def handle(session: Session, request: Request, datapath: Path):
         case _:
             logger.error(f"Unknown method: {msg['method']}")
 
+    if request.method not in ['ping']:
+        logger.debug(f"finished handle: {request.method}")
+
 
 async def handle_with_timeout(session: Session, request: Request,
                               datapath: Path, timeout: float):
@@ -311,12 +336,26 @@ async def handle_with_timeout(session: Session, request: Request,
 
 async def serv(port,
                datapath,
-               url=None,
+               url='',
                buffer_size=1024 * 1024 * 1024,
-               interval=60):
+               interval=60,
+               log='stderr',
+               debug=False):
+    if debug:
+        level = 'DEBUG'
+    else:
+        level = 'INFO'
+
+    if log == 'stderr':
+        logger.add(sys.stderr, level=level)
+    elif log == 'stdout':
+        logger.add(sys.stdout, level=level)
+    else:
+        logger.add(log, level=level)
+
     logger.info('Server starting.')
     async with ZMQContextManager(zmq.ROUTER, bind=f"tcp://*:{port}") as sock:
-        if url is None:
+        if not url:
             url = 'sqlite:///' + str(datapath / 'data.db')
         engine = create_engine(url)
         create_tables(engine)
@@ -326,7 +365,9 @@ async def serv(port,
             received = 0
             last_flush_time = time.time()
             while True:
+                logger.debug('Waiting for request...')
                 identity, msg = await sock.recv_multipart()
+                logger.debug('Received request.')
                 received += len(msg)
                 try:
                     req = Request(sock, identity, msg)
@@ -342,31 +383,73 @@ async def serv(port,
                     last_flush_time = time.time()
 
 
-async def watch(port, datapath, url=None, timeout=1, buffer=1024, interval=60):
-    with ZMQContextManager(zmq.DEALER,
-                           connect=f"tcp://127.0.0.1:{port}") as sock:
-        sock.setsockopt(zmq.LINGER, 0)
+async def main(port,
+               datapath,
+               url,
+               timeout=1,
+               buffer=1024,
+               interval=60,
+               log='stderr',
+               no_watch=True,
+               debug=False):
+    if no_watch:
+        logger.info('Server starting...')
+        await serv(port, datapath, url, buffer * 1024 * 1024, interval, log,
+                   debug)
+    else:
+        process = None
+
         while True:
             try:
-                sock.send_pyobj({"method": "ping"})
-                if sock.poll(int(1000 * timeout)):
-                    sock.recv()
-                else:
-                    raise asyncio.TimeoutError()
+                with ZMQContextManager(
+                        zmq.DEALER, connect=f"tcp://127.0.0.1:{port}") as sock:
+                    sock.setsockopt(zmq.LINGER, 0)
+                    sock.send_pyobj({"method": "ping"})
+                    logger.debug('ping.')
+                    if sock.poll(int(1000 * timeout)):
+                        sock.recv()
+                        logger.debug('recv pong.')
+                    else:
+                        logger.debug('timeout.')
+                        raise asyncio.TimeoutError()
             except (zmq.error.ZMQError, asyncio.TimeoutError):
-                return asyncio.create_task(
-                    serv(port, datapath, url, buffer * 1024 * 1024, interval))
+                if process is not None:
+                    logger.debug(
+                        f'killing process... PID={process.pid}, returncode={process.returncode}'
+                    )
+                    process.kill()
+                    logger.debug(
+                        f'killed process. PID={process.pid}, returncode={process.returncode}'
+                    )
+                cmd = [
+                    sys.executable, "-m", "qulab", "server", "--port",
+                    f"{port}", "--datapath", f"{datapath}", "--url", f"{url}",
+                    "--timeout", f"{timeout}", "--buffer", f"{buffer}",
+                    "--interval", f"{interval}", "--log", f"{log}",
+                    " --no-watch"
+                ]
+                if url:
+                    cmd.extend(['--url', url])
+                if debug:
+                    cmd.append('--debug')
+                logger.debug(f"starting process: {' '.join(cmd)}")
+                process = subprocess.Popen(cmd.split(),
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,
+                                           cwd=os.getcwd())
+                logger.debug(
+                    f'process started. PID={process.pid}, returncode={process.returncode}'
+                )
+
+                # Capture and log the output
+                # stdout, stderr = process.communicate(timeout=5)
+                # if stdout:
+                #     logger.info(f'Server stdout: {stdout.decode()}')
+                # if stderr:
+                #     logger.error(f'Server stderr: {stderr.decode()}')
+
+                await asyncio.sleep(5)
             await asyncio.sleep(timeout)
-
-
-async def main(port, datapath, url, timeout=1, buffer=1024, interval=60):
-    task = await watch(port=port,
-                       datapath=datapath,
-                       url=url,
-                       timeout=timeout,
-                       buffer=buffer,
-                       interval=interval)
-    await task
 
 
 @click.command()
@@ -374,14 +457,20 @@ async def main(port, datapath, url, timeout=1, buffer=1024, interval=60):
               default=os.getenv('QULAB_RECORD_PORT', 6789),
               help='Port of the server.')
 @click.option('--datapath', default=datapath, help='Path of the data.')
-@click.option('--url', default=None, help='URL of the database.')
+@click.option('--url', default='', help='URL of the database.')
 @click.option('--timeout', default=1, help='Timeout of ping.')
 @click.option('--buffer', default=1024, help='Buffer size (MB).')
 @click.option('--interval',
               default=60,
               help='Interval of flush cache, in unit of second.')
-def server(port, datapath, url, timeout, buffer, interval):
-    asyncio.run(main(port, Path(datapath), url, timeout, buffer, interval))
+@click.option('--log', default='stderr', help='Log file.')
+@click.option('--no-watch', is_flag=True, help='Watch the server.')
+@click.option('--debug', is_flag=True, help='Debug mode.')
+def server(port, datapath, url, timeout, buffer, interval, log, no_watch,
+           debug):
+    asyncio.run(
+        main(port, Path(datapath), url, timeout, buffer, interval, log,
+             no_watch, debug))
 
 
 if __name__ == "__main__":
