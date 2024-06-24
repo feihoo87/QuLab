@@ -85,17 +85,21 @@ def get_local_record(session: Session, id: int, datapath: Path) -> Record:
     logger.debug(f"get_local_record: {id}")
     record_in_db = session.get(RecordInDB, id)
     if record_in_db is None:
+        logger.debug(f"record not found: {id=}")
         return None
     record_in_db.atime = utcnow()
 
     if record_in_db.file.endswith('.zip'):
         logger.debug(f"load record from zip: {record_in_db.file}")
-        return Record.load(datapath / 'objects' / record_in_db.file)
+        record = Record.load(datapath / 'objects' / record_in_db.file)
+        logger.debug(f"load record from zip done.")
+        return record
 
     path = datapath / 'objects' / record_in_db.file
     with open(path, 'rb') as f:
         logger.debug(f"load record from file: {path}")
         record = dill.load(f)
+        logger.debug(f"load record from file done.")
         record.database = datapath
         record._file = path
     return record
@@ -105,13 +109,16 @@ def get_record(session: Session, id: int, datapath: Path) -> Record:
     if id not in record_cache:
         record = get_local_record(session, id, datapath)
     else:
+        logger.debug(f"get_record from cache: {id=}")
         record = record_cache[id][1]
     clear_cache()
+    logger.debug(f"update lru time for record cache: {id=}")
     record_cache[id] = time.time(), record
     return record
 
 
 def record_create(session: Session, description: dict, datapath: Path) -> int:
+    logger.debug(f"record_create: {description['app']}")
     record = Record(None, datapath, description)
     record_in_db = RecordInDB()
     if 'app' in description:
@@ -121,28 +128,39 @@ def record_create(session: Session, description: dict, datapath: Path) -> int:
     record_in_db.file = '/'.join(record._file.parts[-4:])
     record_in_db.config_id = description['config']
     record._file = datapath / 'objects' / record_in_db.file
+    logger.debug(f"record_create generate random file: {record_in_db.file}")
     session.add(record_in_db)
     try:
         session.commit()
+        logger.debug(f"record_create commited: record.id={record_in_db.id}")
         record.id = record_in_db.id
         clear_cache()
         record_cache[record.id] = time.time(), record
         return record.id
     except:
+        logger.debug(f"record_create rollback")
         session.rollback()
         raise
 
 
 def record_append(session: Session, record_id: int, level: int, step: int,
                   position: int, variables: dict, datapath: Path):
+    logger.debug(f"record_append: {record_id}")
     record = get_record(session, record_id, datapath)
+    logger.debug(f"record_append: {record_id}, {level}, {step}, {position}")
     record.append(level, step, position, variables)
+    logger.debug(f"record_append done.")
     try:
+        logger.debug(f"record_append update SQL database.")
         record_in_db = session.get(RecordInDB, record_id)
+        logger.debug(f"record_append get RecordInDB: {record_in_db}")
         record_in_db.mtime = utcnow()
         record_in_db.atime = utcnow()
+        logger.debug(f"record_append update RecordInDB: {record_in_db}")
         session.commit()
+        logger.debug(f"record_append commited.")
     except:
+        logger.debug(f"record_append rollback.")
         session.rollback()
         raise
 
