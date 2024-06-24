@@ -419,7 +419,7 @@ class Expression():
     def is_const(self, env) -> bool:
         return False
 
-    def value(self, env):
+    def value(self, env=_default_env):
         if self.changed(env):
             self.cache = self.eval(env)
         return self.cache
@@ -612,3 +612,31 @@ class Symbol(Expression):
 
     def __repr__(self) -> str:
         return self.name
+
+
+sin = Symbol('sin')
+cos = Symbol('cos')
+tan = Symbol('tan')
+pi = Symbol('pi')
+e = Symbol('e')
+log = Symbol('log')
+log2 = Symbol('log2')
+log10 = Symbol('log10')
+exp = Symbol('exp')
+sqrt = Symbol('sqrt')
+abs = Symbol('abs')
+sinh = Symbol('sinh')
+cosh = Symbol('cosh')
+tanh = Symbol('tanh')
+arcsin = Symbol('arcsin')
+arccos = Symbol('arccos')
+arctan = Symbol('arctan')
+arctan2 = Symbol('arctan2')
+arcsinh = Symbol('arcsinh')
+arccosh = Symbol('arccosh')
+arctanh = Symbol('arctanh')
+sinc = Symbol('sinc')
+sign = Symbol('sign')
+heaviside = Symbol('heaviside')
+erf = Symbol('erf')
+erfc = Symbol('erfc')
