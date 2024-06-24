@@ -205,6 +205,19 @@ def _run_function_in_process(buf):
     return func(*args, **kwds)
 
 
+def _dump_description(description):
+    d = {}
+    for key, value in description.items():
+        if key in [
+                'intrinsic_loops', 'app', 'tags', 'loops',
+                'independent_variables', 'axis', 'config', 'entry'
+        ]:
+            d[key] = value
+        else:
+            d[key] = dill.dumps(value)
+    return dill.dumps(description)
+
+
 class Scan():
 
     def __new__(cls, *args, mixin=None, **kwds):
@@ -394,9 +407,12 @@ class Scan():
         self.description['entry']['scripts'] = cell_id
 
         await self._sock.send_pyobj({
-            'task': self.id,
-            'method': 'record_create',
-            'description': dill.dumps(self.description)
+            'task':
+            self.id,
+            'method':
+            'record_create',
+            'description':
+            _dump_description(self.description)
         })
 
         record_id = await self._sock.recv_pyobj()
