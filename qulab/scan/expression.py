@@ -210,6 +210,16 @@ class Expression():
             return -self
         return BinaryExpression(other, self, operator.mul)
 
+    def __matmul__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(self, other, operator.matmul)
+
+    def __rmatmul__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(other, self, operator.matmul)
+
     def __truediv__(self, other):
         if isinstance(other, Expression):
             other = other.eval(_default_env)
@@ -225,6 +235,34 @@ class Expression():
         if isinstance(other, ConstType) and other == 0:
             return 0
         return BinaryExpression(other, self, operator.truediv)
+
+    def __floordiv__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 1:
+            return self
+        if isinstance(other, ConstType) and other == -1:
+            return -self
+        return BinaryExpression(self, other, operator.floordiv)
+
+    def __rfloordiv__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 0:
+            return 0
+        return BinaryExpression(other, self, operator.floordiv)
+
+    def __mod__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        if isinstance(other, ConstType) and other == 1:
+            return 0
+        return BinaryExpression(self, other, operator.mod)
+
+    def __rmod__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(other, self, operator.mod)
 
     def __pow__(self, other):
         if isinstance(other, Expression):
@@ -247,6 +285,21 @@ class Expression():
 
     def __pos__(self):
         return UnaryExpression(self, operator.pos)
+
+    def __abs__(self):
+        return UnaryExpression(self, operator.abs)
+
+    def __not__(self):
+        return UnaryExpression(self, operator.not_)
+
+    def __inv__(self):
+        return UnaryExpression(self, operator.inv)
+
+    def __invert__(self):
+        return UnaryExpression(self, operator.invert)
+
+    def __index__(self):
+        return UnaryExpression(self, operator.index)
 
     def __eq__(self, other):
         if isinstance(other, Expression):
@@ -278,6 +331,56 @@ class Expression():
             other = other.eval(_default_env)
         return BinaryExpression(self, other, operator.ge)
 
+    def __and__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(self, other, operator.and_)
+
+    def __rand__(self, other):
+        if isinstance(other, Expression):
+            other
+        return BinaryExpression(other, self, operator.and_)
+
+    def __or__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(self, other, operator.or_)
+
+    def __ror__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(other, self, operator.or_)
+
+    def __lshift__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(self, other, operator.lshift)
+
+    def __rlshift__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(other, self, operator.lshift)
+
+    def __rshift__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(self, other, operator.rshift)
+
+    def __rrshift__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(other, self, operator.rshift)
+
+    def __xor__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(self, other, operator.xor)
+
+    def __rxor__(self, other):
+        if isinstance(other, Expression):
+            other = other.eval(_default_env)
+        return BinaryExpression(other, self, operator.xor)
+
     def __getitem__(self, other):
         if isinstance(other, Expression):
             other = other.eval(_default_env)
@@ -300,6 +403,9 @@ class Expression():
 
     def __round__(self, n=None):
         return self
+
+    def __bool__(self):
+        return True
 
     def eval(self, env):
         raise NotImplementedError
