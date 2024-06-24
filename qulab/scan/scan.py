@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import copy
 import inspect
 import itertools
@@ -377,20 +378,30 @@ class Scan():
             return True
 
     async def create_record(self):
-        if self._sock is not None:
-            await self._sock.send_pyobj({
-                'task':
-                self.id,
-                'method':
-                'record_create',
-                'description':
-                dill.dumps(self.description)
-            })
+        if self._sock is None:
+            return Record(None, self.description['database'], self.description)
 
-            record_id = await self._sock.recv_pyobj()
-            return Record(record_id, self.description['database'],
-                          self.description)
-        return Record(None, self.description['database'], self.description)
+        if self.config:
+            self.description['config'] = await create_config(
+                self.config, self.description['database'], self._sock)
+        if current_notebook() is None:
+            await create_notebook('untitle', self.description['database'],
+                                  self._sock)
+        cell_id = await save_input_cells(current_notebook(),
+                                         self.description['entry']['scripts'],
+                                         self.description['database'],
+                                         self._sock)
+        self.description['entry']['scripts'] = cell_id
+
+        await self._sock.send_pyobj({
+            'task': self.id,
+            'method': 'record_create',
+            'description': dill.dumps(self.description)
+        })
+
+        record_id = await self._sock.recv_pyobj()
+        return Record(record_id, self.description['database'],
+                      self.description)
 
     def get(self, name: str):
         if name in self.description['consts']:
@@ -587,6 +598,26 @@ class Scan():
 
     async def run(self):
         assymbly(self.description)
+
+        @contextlib.asynccontextmanager
+        async def send_msg_and_update_bar(self):
+            send_msg_task = asyncio.create_task(self._send_msg())
+            update_progress_task = asyncio.create_task(self._update_progress())
+            try:
+                yield
+            finally:
+                update_progress_task.cancel()
+                send_msg_task.cancel()
+                while True:
+                    try:
+                        task = self._prm_queue.get_nowait()
+                    except:
+                        break
+                    try:
+                        task.cancel()
+                    except:
+                        pass
+
         if isinstance(
                 self.description['database'],
                 str) and self.description['database'].startswith("tcp://"):
@@ -594,27 +625,15 @@ class Scan():
                                          connect=self.description['database'],
                                          socket=self._sock) as socket:
                 self._sock = socket
-                if self.config:
-                    self.description['config'] = await create_config(
-                        self.config, self.description['database'], self._sock)
-                if current_notebook() is None:
-                    await create_notebook('untitle',
-                                          self.description['database'],
-                                          self._sock)
-                cell_id = await save_input_cells(
-                    current_notebook(), self.description['entry']['scripts'],
-                    self.description['database'], self._sock)
-                self.description['entry']['scripts'] = cell_id
-                await self._run()
+                async with send_msg_and_update_bar(self):
+                    await self._run()
         else:
             if self.config:
                 self.description['config'] = copy.deepcopy(self.config)
-            await self._run()
+            async with send_msg_and_update_bar(self):
+                await self._run()
 
     async def _run(self):
-        send_msg_task = asyncio.create_task(self._send_msg())
-        update_progress_task = asyncio.create_task(self._update_progress())
-
         self._variables = {'self': self, 'config': self.config}
 
         consts = {}
@@ -650,9 +669,7 @@ class Scan():
             await self.emit(-1, 0, 0, {})
 
         await self._prm_queue.join()
-        update_progress_task.cancel()
         await self._msg_queue.join()
-        send_msg_task.cancel()
         return self.variables
 
     async def done(self):
@@ -778,10 +795,10 @@ class Scan():
                 buf = dill.dumps((awaitable, args, kwds))
                 task = asyncio.get_running_loop().run_in_executor(
                     self._executors, _run_function_in_process, buf)
-                self._prm_queue.put_nowait(task)
-                return Promise(task)
             except:
                 return awaitable(*args, **kwds)
+            self._prm_queue.put_nowait(task)
+            return Promise(task)
         else:
             return awaitable
 
