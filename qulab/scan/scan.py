@@ -331,6 +331,9 @@ class Scan():
                 await _unpack(key, variables)
             elif inspect.isawaitable(value) and not self.hiden(key):
                 variables[key] = await value
+
+        if self.record is None:
+            self.record = await self.create_record()
         if self._sock is not None:
             await self._sock.send_pyobj({
                 'task': self.id,
@@ -634,7 +637,6 @@ class Scan():
         await update_variables(self.variables, updates,
                                self.description['setters'])
 
-        self.record = await self.create_record()
         await self.work()
         for level, bar in self._bar.items():
             bar.close()
