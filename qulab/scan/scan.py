@@ -264,6 +264,7 @@ class Scan():
         self._current_level = 0
         self._variables = {}
         self._main_task = None
+        self._background_tasks = ()
         self._sock = None
         self._sem = asyncio.Semaphore(max_promise + 1)
         self._bar: dict[int, tqdm] = {}
@@ -287,6 +288,7 @@ class Scan():
         del state['record']
         del state['_sock']
         del state['_main_task']
+        del state['_background_tasks']
         del state['_bar']
         del state['_msg_queue']
         del state['_prm_queue']
@@ -299,6 +301,7 @@ class Scan():
         self.record = None
         self._sock = None
         self._main_task = None
+        self._background_tasks = ()
         self._bar = {}
         self._prm_queue = asyncio.Queue()
         self._msg_queue = asyncio.Queue(self._max_message)
@@ -603,27 +606,33 @@ class Scan():
             await task
             self._msg_queue.task_done()
 
+    @contextlib.asynccontextmanager
+    async def send_msg_and_update_bar(self):
+        send_msg_task = asyncio.create_task(self._send_msg())
+        update_progress_task = asyncio.create_task(self._update_progress())
+        try:
+            yield (send_msg_task, update_progress_task)
+        finally:
+            update_progress_task.cancel()
+            send_msg_task.cancel()
+            while True:
+                try:
+                    task = self._prm_queue.get_nowait()
+                except:
+                    break
+                try:
+                    task.cancel()
+                except:
+                    pass
+
+    async def _check_background_tasks(self):
+        for task in self._background_tasks:
+            if task.done():
+                await task
+
     async def run(self):
         assymbly(self.description)
-
-        @contextlib.asynccontextmanager
-        async def send_msg_and_update_bar(self):
-            send_msg_task = asyncio.create_task(self._send_msg())
-            update_progress_task = asyncio.create_task(self._update_progress())
-            try:
-                yield
-            finally:
-                update_progress_task.cancel()
-                send_msg_task.cancel()
-                while True:
-                    try:
-                        task = self._prm_queue.get_nowait()
-                    except:
-                        break
-                    try:
-                        task.cancel()
-                    except:
-                        pass
+        self._background_tasks = ()
 
         if isinstance(
                 self.description['database'],
@@ -632,12 +641,14 @@ class Scan():
                                          connect=self.description['database'],
                                          socket=self._sock) as socket:
                 self._sock = socket
-                async with send_msg_and_update_bar(self):
+                async with self.send_msg_and_update_bar() as background_tasks:
+                    self._background_tasks = background_tasks
                     await self._run()
         else:
             if self.config:
                 self.description['config'] = copy.deepcopy(self.config)
-            async with send_msg_and_update_bar(self):
+            async with self.send_msg_and_update_bar() as background_tasks:
+                self._background_tasks = background_tasks
                 await self._run()
 
     async def _run(self):
@@ -662,11 +673,11 @@ class Scan():
             self.description['functions'], self.variables)
         await update_variables(self.variables, updates,
                                self.description['setters'])
-
+        await self._check_background_tasks()
         await self.work()
         for level, bar in self._bar.items():
             bar.close()
-
+        await self._check_background_tasks()
         if self._single_step:
             self.variables.update(await call_many_functions(
                 self.description['order'].get(-1, []),
@@ -674,7 +685,7 @@ class Scan():
 
             await self.emit(0, 0, 0, self.variables)
             await self.emit(-1, 0, 0, {})
-
+        await self._check_background_tasks()
         await self._prm_queue.join()
         await self._msg_queue.join()
         return self.variables
@@ -738,6 +749,7 @@ class Scan():
                 | {'config': self._synchronize_config},
                 self.description['optimizers'], self.description['setters'],
                 self.description['getters']):
+            await self._check_background_tasks()
             self._current_level += 1
             if await self._filter(variables, self.current_level - 1):
                 yield variables
@@ -749,11 +761,13 @@ class Scan():
             self._current_level -= 1
             self._prm_queue.put_nowait(
                 self._update_progress_bar(self.current_level, 1))
+            await self._check_background_tasks()
         if self.current_level == 0:
             await self.emit(self.current_level - 1, 0, 0, {})
             for name, value in self.variables.items():
                 if inspect.isawaitable(value):
                     self.variables[name] = await value
+            await self._check_background_tasks()
             await self._prm_queue.join()
 
     async def work(self, **kwds):
