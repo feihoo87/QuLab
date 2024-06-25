@@ -814,7 +814,7 @@ class Scan():
             return await awaitable
 
 
-def assymbly(description):
+def _get_environment(description):
     import __main__
     from IPython import get_ipython
 
@@ -844,6 +844,10 @@ def assymbly(description):
 
     description['entry']['env'] = {k: v for k, v in os.environ.items()}
 
+    return description
+
+
+def _mapping_levels(description):
     mapping = {
         label: level
         for level, label in enumerate(
@@ -876,8 +880,23 @@ def assymbly(description):
                                                   len(space))
             except:
                 pass
+    return levels
 
+
+def _get_independent_variables(description):
+    independent_variables = set(description['intrinsic_loops'].keys())
+    for level, loops in description['loops'].items():
+        for name, iterable in loops:
+            if isinstance(iterable, (np.ndarray, list, tuple, range, Space)):
+                independent_variables.add(name)
+    return independent_variables
+
+
+def _build_dependents(description, levels, independent_variables):
     dependents = copy.deepcopy(description['dependents'])
+    all_nodes = set(description['dependents'].keys())
+    for key, deps in dependents.items():
+        all_nodes.update(deps)
 
     for level in levels:
         range_list = description['loops'].get(level, [])
@@ -889,6 +908,13 @@ def assymbly(description):
             if name not in description['dependents']:
                 dependents[name] = set()
             dependents[name].add(f'#__loop_{level}')
+
+    after_yield = set()
+    for key in all_nodes:
+        if key not in independent_variables and key not in description[
+                'consts']:
+            if key not in dependents:
+                after_yield.add(key)
 
     def _get_all_depends(key, graph):
         ret = set()
@@ -903,7 +929,13 @@ def assymbly(description):
     full_depends = {}
     for key in dependents:
         full_depends[key] = _get_all_depends(key, dependents)
+        if full_depends[key] & after_yield:
+            after_yield.add(key)
 
+    return dependents, full_depends, after_yield
+
+
+def _build_order(description, levels, dependents, full_depends):
     levels = {}
     passed = set()
     all_keys = set(description['consts'].keys())
@@ -948,8 +980,9 @@ def assymbly(description):
                 description['order'][level].append(ready)
                 keys -= set(ready)
 
+
+def _make_axis(description):
     axis = {}
-    independent_variables = set(description['intrinsic_loops'].keys())
 
     for name in description['consts']:
         axis[name] = ()
@@ -958,8 +991,6 @@ def assymbly(description):
             if isinstance(iterable, OptimizeSpace):
                 axis[name] = tuple(range(level + 1))
                 continue
-            elif isinstance(iterable, (np.ndarray, list, tuple, range, Space)):
-                independent_variables.add(name)
             axis[name] = (level, )
 
     for level, group in description['order'].items():
@@ -980,7 +1011,19 @@ def assymbly(description):
         k: tuple([x for x in v if x >= 0])
         for k, v in axis.items()
     }
+
+
+def assymbly(description):
+    _get_environment(description)
+    levels = _mapping_levels(description)
+    independent_variables = _get_independent_variables(description)
     description['independent_variables'] = independent_variables
+
+    dependents, full_depends, after_yield = _build_dependents(
+        description, levels, independent_variables)
+
+    _build_order(description, levels, dependents, full_depends)
+    _make_axis(description)
 
     return description
 
