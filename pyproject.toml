@@ -45,6 +45,11 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+full = [
+    "uvloop>=0.19.0",
+]
+
 [project.scripts]
 "qulab" = "qulab.__main__:main"
 
