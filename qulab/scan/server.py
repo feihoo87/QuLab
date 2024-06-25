@@ -356,22 +356,7 @@ async def serv(port,
                datapath,
                url='',
                buffer_size=1024 * 1024 * 1024,
-               interval=60,
-               log='stderr',
-               debug=False):
-    if debug:
-        level = 'DEBUG'
-    else:
-        level = 'INFO'
-
-    if log == 'stderr':
-        pass
-        #logger.add(sys.stderr, level=level)
-    elif log == 'stdout':
-        logger.add(sys.stdout, level=level)
-    else:
-        logger.add(log, level=level)
-
+               interval=60):
     logger.debug('Creating socket...')
     async with ZMQContextManager(zmq.ROUTER, bind=f"tcp://*:{port}") as sock:
         logger.info(f'Server started at port {port}.')
@@ -415,9 +400,21 @@ async def main(port,
                no_watch=True,
                debug=False):
     if no_watch:
+        logger.remove()
+        if debug:
+            level = 'DEBUG'
+        else:
+            level = 'INFO'
+        if log == 'stderr':
+            logger.add(sys.stderr, level=level)
+        elif log == 'stdout':
+            logger.add(sys.stdout, level=level)
+        else:
+            logger.add(sys.stderr, level=level)
+            logger.add(log, level=level)
+        logger.debug(f"logging level: {level}")
         logger.info('Server starting...')
-        await serv(port, datapath, url, buffer * 1024 * 1024, interval, log,
-                   debug)
+        await serv(port, datapath, url, buffer * 1024 * 1024, interval)
     else:
         process = None
 
@@ -444,10 +441,24 @@ async def main(port,
                         f'killed process. PID={process.pid}, returncode={process.returncode}'
                     )
                 cmd = [
-                    sys.executable, "-m", "qulab", "server", "--port",
-                    f"{port}", "--datapath", f"{datapath}", "--url", f"{url}",
-                    "--timeout", f"{timeout}", "--buffer", f"{buffer}",
-                    "--interval", f"{interval}", "--log", f"{log}",
+                    sys.executable,
+                    "-m",
+                    "qulab",
+                    "server",
+                    "--port",
+                    f"{port}",
+                    "--datapath",
+                    f"{datapath}",
+                    "--url",
+                    f"{url}",
+                    "--timeout",
+                    f"{timeout}",
+                    "--buffer",
+                    f"{buffer}",
+                    "--interval",
+                    f"{interval}",
+                    "--log",
+                    f"{log}",
                 ]
                 if url:
                     cmd.extend(['--url', url])
@@ -491,8 +502,8 @@ async def main(port,
 def server(port, datapath, url, timeout, buffer, interval, log, no_watch,
            debug):
     asyncio.run(
-        main(port, Path(datapath), url, timeout, buffer, interval, log,
-             True, debug))
+        main(port, Path(datapath), url, timeout, buffer, interval, log, True,
+             debug))
 
 
 if __name__ == "__main__":
