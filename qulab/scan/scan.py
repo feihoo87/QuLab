@@ -607,7 +607,7 @@ class Scan():
             self._msg_queue.task_done()
 
     @contextlib.asynccontextmanager
-    async def send_msg_and_update_bar(self):
+    async def _send_msg_and_update_bar(self):
         send_msg_task = asyncio.create_task(self._send_msg())
         update_progress_task = asyncio.create_task(self._update_progress())
         try:
@@ -641,13 +641,13 @@ class Scan():
                                          connect=self.description['database'],
                                          socket=self._sock) as socket:
                 self._sock = socket
-                async with self.send_msg_and_update_bar() as background_tasks:
+                async with self._send_msg_and_update_bar() as background_tasks:
                     self._background_tasks = background_tasks
                     await self._run()
         else:
             if self.config:
                 self.description['config'] = copy.deepcopy(self.config)
-            async with self.send_msg_and_update_bar() as background_tasks:
+            async with self._send_msg_and_update_bar() as background_tasks:
                 self._background_tasks = background_tasks
                 await self._run()
 
