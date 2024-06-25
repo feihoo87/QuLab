@@ -481,10 +481,7 @@ async def main(port,
                     cmd.append('--debug')
                 cmd.append("--no-watch")
                 logger.debug(f"starting process: {' '.join(cmd)}")
-                process = subprocess.Popen(cmd,
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE,
-                                           cwd=os.getcwd())
+                process = subprocess.Popen(cmd, cwd=os.getcwd())
                 logger.debug(
                     f'process started. PID={process.pid}, returncode={process.returncode}'
                 )
