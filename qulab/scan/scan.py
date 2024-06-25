@@ -6,9 +6,7 @@ import itertools
 import lzma
 import os
 import pickle
-import platform
 import re
-import subprocess
 import sys
 import uuid
 from concurrent.futures import ProcessPoolExecutor
@@ -26,7 +24,8 @@ from .optimize import NgOptimizer
 from .record import Record
 from .server import default_record_port
 from .space import Optimizer, OptimizeSpace, Space
-from .utils import async_zip, call_function, dump_dict, dump_globals
+from .utils import (async_zip, call_function, dump_dict, dump_globals,
+                    get_installed_packages, get_system_info, yapf_reformat)
 
 try:
     from tqdm.notebook import tqdm
@@ -58,57 +57,34 @@ else:
     default_executor = default_server
 
 
-def yapf_reformat(cell_text):
-    try:
-        import isort
-        import yapf.yapflib.yapf_api
+class Promise():
+    __slots__ = ['task', 'key', 'attr']
 
-        fname = f"f{uuid.uuid1().hex}"
+    def __init__(self, task, key=None, attr=None):
+        self.task = task
+        self.key = key
+        self.attr = attr
 
-        def wrap(source):
-            lines = [f"async def {fname}():"]
-            for line in source.split('\n'):
-                lines.append("    " + line)
-            return '\n'.join(lines)
+    def __await__(self):
 
-        def unwrap(source):
-            lines = []
-            for line in source.split('\n'):
-                if line.startswith(f"async def {fname}():"):
-                    continue
-                lines.append(line[4:])
-            return '\n'.join(lines)
+        async def _getitem(task, key):
+            return (await task)[key]
 
-        cell_text = re.sub('^%', '#%#', cell_text, flags=re.M)
-        reformated_text = unwrap(
-            yapf.yapflib.yapf_api.FormatCode(wrap(isort.code(cell_text)))[0])
-        return re.sub('^#%#', '%', reformated_text, flags=re.M)
-    except:
-        return cell_text
+        async def _getattr(task, attr):
+            return getattr(await task, attr)
 
+        if self.key is not None:
+            return _getitem(self.task, self.key).__await__()
+        elif self.attr is not None:
+            return _getattr(self.task, self.attr).__await__()
+        else:
+            return self.task.__await__()
 
-def get_installed_packages():
-    result = subprocess.run([sys.executable, '-m', 'pip', 'freeze'],
-                            stdout=subprocess.PIPE,
-                            text=True)
+    def __getitem__(self, key):
+        return Promise(self.task, key, None)
 
-    lines = result.stdout.split('\n')
-    packages = []
-    for line in lines:
-        if line:
-            packages.append(line)
-    return packages
-
-
-def get_system_info():
-    info = {
-        'OS': platform.uname()._asdict(),
-        'Python': sys.version,
-        'PythonExecutable': sys.executable,
-        'PythonPath': sys.path,
-        'packages': get_installed_packages()
-    }
-    return info
+    def __getattr__(self, attr):
+        return Promise(self.task, None, attr)
 
 
 def current_notebook():
@@ -170,39 +146,179 @@ def _get_depends(func: Callable):
     return args
 
 
-class Promise():
-    __slots__ = ['task', 'key', 'attr']
-
-    def __init__(self, task, key=None, attr=None):
-        self.task = task
-        self.key = key
-        self.attr = attr
-
-    def __await__(self):
-
-        async def _getitem(task, key):
-            return (await task)[key]
-
-        async def _getattr(task, attr):
-            return getattr(await task, attr)
-
-        if self.key is not None:
-            return _getitem(self.task, self.key).__await__()
-        elif self.attr is not None:
-            return _getattr(self.task, self.attr).__await__()
-        else:
-            return self.task.__await__()
-
-    def __getitem__(self, key):
-        return Promise(self.task, key, None)
-
-    def __getattr__(self, attr):
-        return Promise(self.task, None, attr)
-
-
 def _run_function_in_process(buf):
     func, args, kwds = dill.loads(buf)
     return func(*args, **kwds)
+
+
+async def update_variables(variables: dict[str, Any], updates: dict[str, Any],
+                           setters: dict[str, Callable]):
+    coros = []
+    for name, value in updates.items():
+        if name in setters:
+            coro = setters[name](value)
+            if inspect.isawaitable(coro):
+                coros.append(coro)
+        variables[name] = value
+    if coros:
+        await asyncio.gather(*coros)
+
+
+async def _iter_level(variables,
+                      iters: list[tuple[str, Iterable | Expression | Callable
+                                        | OptimizeSpace]],
+                      order: list[list[str]],
+                      functions: dict[str, Callable | Expression],
+                      optimizers: dict[str, Optimizer],
+                      setters: dict[str, Callable] = {},
+                      getters: dict[str, Callable] = {}):
+    iters_d = {}
+    env = Env()
+    env.variables = variables
+    opts = {}
+
+    for name, iter in iters:
+        if isinstance(iter, OptimizeSpace):
+            if iter.optimizer.name not in opts:
+                opts[iter.optimizer.name] = iter.optimizer.create()
+        elif isinstance(iter, Expression):
+            iters_d[name] = iter.eval(env)
+        elif isinstance(iter, Space):
+            iters_d[name] = iter.toarray()
+        elif callable(iter):
+            iters_d[name] = await call_function(iter, variables)
+        else:
+            iters_d[name] = iter
+
+    maxiter = 0xffffffff
+    for name, opt in opts.items():
+        opt_cfg = optimizers[name]
+        maxiter = min(maxiter, opt_cfg.maxiter)
+
+    async for args in async_zip(*iters_d.values(), range(maxiter)):
+        await update_variables(variables, dict(zip(iters_d.keys(), args[:-1])),
+                               setters)
+        for name, opt in opts.items():
+            args = opt.ask()
+            opt_cfg = optimizers[name]
+            await update_variables(variables, {
+                n: v
+                for n, v in zip(opt_cfg.dimensions.keys(), args)
+            }, setters)
+
+        await update_variables(
+            variables, await call_many_functions(order, functions, variables),
+            setters)
+
+        yield variables
+
+        variables.update(await call_many_functions(order, getters, variables))
+
+        if opts:
+            for key in list(variables.keys()):
+                if key.startswith('*') or ',' in key:
+                    await _unpack(key, variables)
+
+        for name, opt in opts.items():
+            opt_cfg = optimizers[name]
+            args = [variables[n] for n in opt_cfg.dimensions.keys()]
+
+            if name not in variables:
+                raise ValueError(f'{name} not in variables.')
+            fun = variables[name]
+            if inspect.isawaitable(fun):
+                fun = await fun
+            if opt_cfg.minimize:
+                opt.tell(args, fun)
+            else:
+                opt.tell(args, -fun)
+
+    for name, opt in opts.items():
+        opt_cfg = optimizers[name]
+        result = opt.get_result()
+        await update_variables(
+            variables, {
+                name: value
+                for name, value in zip(opt_cfg.dimensions.keys(), result.x)
+            }, setters)
+        variables[name] = result.fun
+    if opts:
+        yield variables
+
+
+async def call_many_functions(order: list[list[str]],
+                              functions: dict[str, Callable],
+                              variables: dict[str, Any]) -> dict[str, Any]:
+    ret = {}
+    for group in order:
+        waited = []
+        coros = []
+        for name in group:
+            if name in functions:
+                waited.append(name)
+                coros.append(call_function(functions[name], variables | ret))
+        if coros:
+            results = await asyncio.gather(*coros)
+            ret.update(dict(zip(waited, results)))
+    return ret
+
+
+async def _unpack(key, variables):
+    x = variables[key]
+    if inspect.isawaitable(x):
+        x = await x
+    if key.startswith('**'):
+        assert isinstance(
+            x, dict), f"Should promise a dict for `**` symbol. {key}"
+        if "{key}" in key:
+            for k, v in x.items():
+                variables[key[2:].format(key=k)] = v
+        else:
+            variables.update(x)
+    elif key.startswith('*'):
+        assert isinstance(
+            x, (list, tuple,
+                np.ndarray)), f"Should promise a list for `*` symbol. {key}"
+        for i, v in enumerate(x):
+            k = key[1:].format(i=i)
+            variables[k] = v
+    elif ',' in key:
+        keys1, keys2 = [], []
+        args = None
+        for k in key.split(','):
+            if k.startswith('*'):
+                if args is None:
+                    args = k
+                else:
+                    raise ValueError(f'Only one `*` symbol is allowed. {key}')
+            elif args is None:
+                keys1.append(k)
+            else:
+                keys2.append(k)
+        assert isinstance(
+            x,
+            (list, tuple,
+             np.ndarray)), f"Should promise a list for multiple symbols. {key}"
+        if args is None:
+            assert len(keys1) == len(
+                x), f"Length of keys and values should be equal. {key}"
+            for k, v in zip(keys1, x):
+                variables[k] = v
+        else:
+            assert len(keys1) + len(keys2) <= len(
+                x), f"Too many values for unpacking. {key}"
+            for k, v in zip(keys1, x[:len(keys1)]):
+                variables[k] = v
+            end = -len(keys2) if keys2 else None
+            for i, v in enumerate(x[len(keys1):end]):
+                k = args[1:].format(i=i)
+                variables[k] = v
+            if keys2:
+                for k, v in zip(keys2, x[end:]):
+                    variables[k] = v
+    else:
+        return
+    del variables[key]
 
 
 class Scan():
@@ -1040,173 +1156,3 @@ def assymbly(description):
     _make_axis(description)
 
     return description
-
-
-async def update_variables(variables: dict[str, Any], updates: dict[str, Any],
-                           setters: dict[str, Callable]):
-    coros = []
-    for name, value in updates.items():
-        if name in setters:
-            coro = setters[name](value)
-            if inspect.isawaitable(coro):
-                coros.append(coro)
-        variables[name] = value
-    if coros:
-        await asyncio.gather(*coros)
-
-
-async def _iter_level(variables,
-                      iters: list[tuple[str, Iterable | Expression | Callable
-                                        | OptimizeSpace]],
-                      order: list[list[str]],
-                      functions: dict[str, Callable | Expression],
-                      optimizers: dict[str, Optimizer],
-                      setters: dict[str, Callable] = {},
-                      getters: dict[str, Callable] = {}):
-    iters_d = {}
-    env = Env()
-    env.variables = variables
-    opts = {}
-
-    for name, iter in iters:
-        if isinstance(iter, OptimizeSpace):
-            if iter.optimizer.name not in opts:
-                opts[iter.optimizer.name] = iter.optimizer.create()
-        elif isinstance(iter, Expression):
-            iters_d[name] = iter.eval(env)
-        elif isinstance(iter, Space):
-            iters_d[name] = iter.toarray()
-        elif callable(iter):
-            iters_d[name] = await call_function(iter, variables)
-        else:
-            iters_d[name] = iter
-
-    maxiter = 0xffffffff
-    for name, opt in opts.items():
-        opt_cfg = optimizers[name]
-        maxiter = min(maxiter, opt_cfg.maxiter)
-
-    async for args in async_zip(*iters_d.values(), range(maxiter)):
-        await update_variables(variables, dict(zip(iters_d.keys(), args[:-1])),
-                               setters)
-        for name, opt in opts.items():
-            args = opt.ask()
-            opt_cfg = optimizers[name]
-            await update_variables(variables, {
-                n: v
-                for n, v in zip(opt_cfg.dimensions.keys(), args)
-            }, setters)
-
-        await update_variables(
-            variables, await call_many_functions(order, functions, variables),
-            setters)
-
-        yield variables
-
-        variables.update(await call_many_functions(order, getters, variables))
-
-        if opts:
-            for key in list(variables.keys()):
-                if key.startswith('*') or ',' in key:
-                    await _unpack(key, variables)
-
-        for name, opt in opts.items():
-            opt_cfg = optimizers[name]
-            args = [variables[n] for n in opt_cfg.dimensions.keys()]
-
-            if name not in variables:
-                raise ValueError(f'{name} not in variables.')
-            fun = variables[name]
-            if inspect.isawaitable(fun):
-                fun = await fun
-            if opt_cfg.minimize:
-                opt.tell(args, fun)
-            else:
-                opt.tell(args, -fun)
-
-    for name, opt in opts.items():
-        opt_cfg = optimizers[name]
-        result = opt.get_result()
-        await update_variables(
-            variables, {
-                name: value
-                for name, value in zip(opt_cfg.dimensions.keys(), result.x)
-            }, setters)
-        variables[name] = result.fun
-    if opts:
-        yield variables
-
-
-async def call_many_functions(order: list[list[str]],
-                              functions: dict[str, Callable],
-                              variables: dict[str, Any]) -> dict[str, Any]:
-    ret = {}
-    for group in order:
-        waited = []
-        coros = []
-        for name in group:
-            if name in functions:
-                waited.append(name)
-                coros.append(call_function(functions[name], variables | ret))
-        if coros:
-            results = await asyncio.gather(*coros)
-            ret.update(dict(zip(waited, results)))
-    return ret
-
-
-async def _unpack(key, variables):
-    x = variables[key]
-    if inspect.isawaitable(x):
-        x = await x
-    if key.startswith('**'):
-        assert isinstance(
-            x, dict), f"Should promise a dict for `**` symbol. {key}"
-        if "{key}" in key:
-            for k, v in x.items():
-                variables[key[2:].format(key=k)] = v
-        else:
-            variables.update(x)
-    elif key.startswith('*'):
-        assert isinstance(
-            x, (list, tuple,
-                np.ndarray)), f"Should promise a list for `*` symbol. {key}"
-        for i, v in enumerate(x):
-            k = key[1:].format(i=i)
-            variables[k] = v
-    elif ',' in key:
-        keys1, keys2 = [], []
-        args = None
-        for k in key.split(','):
-            if k.startswith('*'):
-                if args is None:
-                    args = k
-                else:
-                    raise ValueError(f'Only one `*` symbol is allowed. {key}')
-            elif args is None:
-                keys1.append(k)
-            else:
-                keys2.append(k)
-        assert isinstance(
-            x,
-            (list, tuple,
-             np.ndarray)), f"Should promise a list for multiple symbols. {key}"
-        if args is None:
-            assert len(keys1) == len(
-                x), f"Length of keys and values should be equal. {key}"
-            for k, v in zip(keys1, x):
-                variables[k] = v
-        else:
-            assert len(keys1) + len(keys2) <= len(
-                x), f"Too many values for unpacking. {key}"
-            for k, v in zip(keys1, x[:len(keys1)]):
-                variables[k] = v
-            end = -len(keys2) if keys2 else None
-            for i, v in enumerate(x[len(keys1):end]):
-                k = args[1:].format(i=i)
-                variables[k] = v
-            if keys2:
-                for k, v in zip(keys2, x[end:]):
-                    variables[k] = v
-    else:
-        return
-    del variables[key]

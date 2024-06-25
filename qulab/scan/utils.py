@@ -1,6 +1,11 @@
 import ast
 import asyncio
 import inspect
+import platform
+import re
+import subprocess
+import sys
+import uuid
 import warnings
 from typing import Any, Callable
 
@@ -169,3 +174,56 @@ async def call_function(func: Callable | Expression, variables: dict[str,
     if inspect.isawaitable(ret):
         ret = await ret
     return ret
+
+
+def yapf_reformat(cell_text):
+    try:
+        import isort
+        import yapf.yapflib.yapf_api
+
+        fname = f"f{uuid.uuid1().hex}"
+
+        def wrap(source):
+            lines = [f"async def {fname}():"]
+            for line in source.split('\n'):
+                lines.append("    " + line)
+            return '\n'.join(lines)
+
+        def unwrap(source):
+            lines = []
+            for line in source.split('\n'):
+                if line.startswith(f"async def {fname}():"):
+                    continue
+                lines.append(line[4:])
+            return '\n'.join(lines)
+
+        cell_text = re.sub('^%', '#%#', cell_text, flags=re.M)
+        reformated_text = unwrap(
+            yapf.yapflib.yapf_api.FormatCode(wrap(isort.code(cell_text)))[0])
+        return re.sub('^#%#', '%', reformated_text, flags=re.M)
+    except:
+        return cell_text
+
+
+def get_installed_packages():
+    result = subprocess.run([sys.executable, '-m', 'pip', 'freeze'],
+                            stdout=subprocess.PIPE,
+                            text=True)
+
+    lines = result.stdout.split('\n')
+    packages = []
+    for line in lines:
+        if line:
+            packages.append(line)
+    return packages
+
+
+def get_system_info():
+    info = {
+        'OS': platform.uname()._asdict(),
+        'Python': sys.version,
+        'PythonExecutable': sys.executable,
+        'PythonPath': sys.path,
+        'packages': get_installed_packages()
+    }
+    return info
