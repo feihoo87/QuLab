@@ -233,17 +233,23 @@ async def _iter_level(variables,
             else:
                 opt.tell(args, -fun)
 
-    for name, opt in opts.items():
-        opt_cfg = optimizers[name]
-        result = opt.get_result()
-        await update_variables(
-            variables, {
-                name: value
-                for name, value in zip(opt_cfg.dimensions.keys(), result.x)
-            }, setters)
-        variables[name] = result.fun
     if opts:
+        for name, opt in opts.items():
+            opt_cfg = optimizers[name]
+            result = opt.get_result()
+            await update_variables(
+                variables, {
+                    name: value
+                    for name, value in zip(opt_cfg.dimensions.keys(), result.x)
+                }, setters)
+
         yield variables
+
+        variables.update(await call_many_functions(order, getters, variables))
+
+        for key in list(variables.keys()):
+            if key.startswith('*') or ',' in key:
+                await _unpack(key, variables)
 
 
 async def call_many_functions(order: list[list[str]],

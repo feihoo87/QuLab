@@ -72,5 +72,5 @@ class NgOptimizer():
         if history:
             ret.x_iters = self._all_x
             ret.func_vals = self._all_y
-        ret.fun = recommendation.value
+        # ret.fun = recommendation.value
         return ret
