@@ -205,19 +205,6 @@ def _run_function_in_process(buf):
     return func(*args, **kwds)
 
 
-def _dump_description(description):
-    d = {}
-    for key, value in description.items():
-        if key in [
-                'intrinsic_loops', 'app', 'tags', 'loops',
-                'independent_variables', 'axis', 'config', 'entry'
-        ]:
-            d[key] = value
-        else:
-            d[key] = dill.dumps(value)
-    return dill.dumps(description)
-
-
 class Scan():
 
     def __new__(cls, *args, mixin=None, **kwds):
