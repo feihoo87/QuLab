@@ -26,7 +26,7 @@ from .optimize import NgOptimizer
 from .record import Record
 from .server import default_record_port
 from .space import Optimizer, OptimizeSpace, Space
-from .utils import async_zip, call_function, dump_globals
+from .utils import async_zip, call_function, dump_dict, dump_globals
 
 try:
     from tqdm.notebook import tqdm
@@ -412,7 +412,11 @@ class Scan():
             'method':
             'record_create',
             'description':
-            _dump_description(self.description)
+            dump_dict(self.description,
+                      keys=[
+                          'intrinsic_loops', 'app', 'tags', 'loops',
+                          'independent_variables', 'axis', 'config', 'entry'
+                      ])
         })
 
         record_id = await self._sock.recv_pyobj()

@@ -29,6 +29,46 @@ class TooLarge:
         return f'<TooLarge: {self.type} at 0x{id(self):x}>'
 
 
+def dump_dict(d, keys=[]):
+    ret = {}
+
+    for key, value in d.items():
+        if key in keys:
+            ret[key] = value
+            continue
+        if isinstance(value, dict) and isinstance(key, str):
+            ret[key] = dump_dict(value,
+                                 keys=[
+                                     k[len(key) + 1:] for k in keys
+                                     if k.startswith(f'{key}.')
+                                 ])
+        else:
+            try:
+                ret[key] = dill.dumps(value)
+            except:
+                ret[key] = Unpicklable(value)
+
+    return dill.dumps(ret)
+
+
+def load_dict(buff):
+    if isinstance(buff, dict):
+        return {key: load_dict(value) for key, value in buff.items()}
+
+    if not isinstance(buff, bytes):
+        return buff
+
+    try:
+        ret = dill.loads(buff)
+    except:
+        return buff
+
+    if isinstance(ret, dict):
+        return load_dict(ret)
+    else:
+        return ret
+
+
 def dump_globals(ns=None, *, size_limit=10 * 1024 * 1024, warn=False):
     import __main__
 

@@ -20,6 +20,7 @@ from .models import Cell, Notebook
 from .models import Record as RecordInDB
 from .models import Session, create_engine, create_tables, sessionmaker, utcnow
 from .record import BufferList, Record, random_path
+from .utils import dump_dict, load_dict
 
 try:
     default_record_port = int(os.getenv('QULAB_RECORD_PORT', 6789))
@@ -232,7 +233,7 @@ async def handle(session: Session, request: Request, datapath: Path):
             logger.debug(f"end bufferlist_iter_exit: {msg}")
         case 'record_create':
             logger.debug(f"record_create")
-            description = dill.loads(msg['description'])
+            description = load_dict(msg['description'])
             await reply(request, record_create(session, description, datapath))
             logger.debug(f"reply record_create")
         case 'record_append':
