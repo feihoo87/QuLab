@@ -47,7 +47,8 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 full = [
-    "uvloop>=0.19.0",
+    "SQLAlchemy>=2.0.19",
+    "uvloop>=0.19.0"
 ]
 
 [project.scripts]
