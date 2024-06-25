@@ -53,6 +53,16 @@ class Request():
         return f"Request({self.method})"
 
 
+class Response():
+    pass
+
+
+class ErrorResponse(Response):
+
+    def __init__(self, error):
+        self.error = error
+
+
 async def reply(req, resp):
     await req.sock.send_multipart([req.identity, pickle.dumps(resp)])
 
@@ -173,7 +183,7 @@ def record_delete(session: Session, record_id: int, datapath: Path):
     session.commit()
 
 
-@logger.catch
+@logger.catch(reraise=True)
 async def handle(session: Session, request: Request, datapath: Path):
 
     msg = request.msg
@@ -349,7 +359,9 @@ async def handle_with_timeout(session: Session, request: Request,
             f"Task handling request {request} timed out and was cancelled.")
         await reply(request, 'timeout')
     except Exception as e:
-        await reply(request, f'{e!r}')
+        logger.error(f"Task handling request {request} failed: {e!r}")
+        await reply(request, ErrorResponse(f'{e!r}'))
+    logger.debug(f"Task handling request {request} finished.")
 
 
 async def serv(port,
@@ -377,8 +389,11 @@ async def serv(port,
                 received += len(msg)
                 try:
                     req = Request(sock, identity, msg)
-                except:
+                except Exception as e:
                     logger.exception('bad request')
+                    await sock.send_multipart(
+                        [identity,
+                         pickle.dumps(ErrorResponse(f'{e!r}'))])
                     continue
                 asyncio.create_task(
                     handle_with_timeout(session, req, datapath,
@@ -501,9 +516,15 @@ async def main(port,
 @click.option('--debug', is_flag=True, help='Debug mode.')
 def server(port, datapath, url, timeout, buffer, interval, log, no_watch,
            debug):
-    asyncio.run(
-        main(port, Path(datapath), url, timeout, buffer, interval, log, True,
-             debug))
+    try:
+        import uvloop
+        uvloop.run(
+            main(port, Path(datapath), url, timeout, buffer, interval, log,
+                 True, debug))
+    except ImportError:
+        asyncio.run(
+            main(port, Path(datapath), url, timeout, buffer, interval, log,
+                 True, debug))
 
 
 if __name__ == "__main__":
