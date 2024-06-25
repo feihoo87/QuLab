@@ -374,7 +374,7 @@ class Scan():
             'filters': {},
             'total': {},
             'database': database,
-            'hiden': ['self', 'config', r'^__.*', r'.*__$'],
+            'hiden': ['self', 'config', r'^__.*', r'.*__$', r'^#.*'],
             'entry': {
                 'system': get_system_info(),
                 'env': {},
@@ -586,9 +586,9 @@ class Scan():
             if depends:
                 self.add_depends(name, depends)
                 s = ','.join(depends)
-                self.description['functions'][f'_tmp_{name}'] = value
+                self.description['functions'][f'#{name}'] = value
                 self.description['functions'][name] = eval(
-                    f"lambda self, {s}: self.description['functions']['_tmp_{name}']({s})"
+                    f"lambda self, {s}: self.description['functions']['#{name}']({s})"
                 )
             else:
                 self.add_depends(name, _get_depends(value))
