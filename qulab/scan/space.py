@@ -25,12 +25,27 @@ class Space():
 
     @classmethod
     def fromarray(cls, space):
-        if isinstance(space, Space):
+        if isinstance(space, (Space, range, enumerate, tuple)):
             return space
-        if isinstance(space, (list, tuple)):
-            array = np.array(space)
+        if isinstance(space, list):
+            if isinstance(space[0], int):
+                try:
+                    if all(i == j for i, j in zip(
+                            space,
+                            range(space[0], space[-1] + 1, space[1] -
+                                  space[0]))):
+                        return range(space[0], space[-1] + 1,
+                                     space[1] - space[0])
+                except:
+                    return space
+            elif isinstance(space[0], (float, complex, np.ndarray)):
+                array = np.array(space)
+            else:
+                return space
         elif isinstance(space, np.ndarray):
             array = space
+        else:
+            return space
         try:
             a = np.linspace(array[0], array[-1], len(array), dtype=array.dtype)
             if np.allclose(a, array):
