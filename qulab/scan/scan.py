@@ -354,6 +354,7 @@ class Scan():
         self.id = task_uuid()
         self.record = None
         self.config = {} if config is None else copy.deepcopy(config)
+        self._raw_config_copy = copy.deepcopy(self.config)
         self.description = {
             'app': app,
             'tags': tags,
@@ -508,7 +509,7 @@ class Scan():
 
         if self.config:
             self.description['config'] = await create_config(
-                self.config, self.description['database'], self._sock)
+                self._raw_config_copy, self.description['database'], self._sock)
         if current_notebook() is None:
             await create_notebook('untitle', self.description['database'],
                                   self._sock)
@@ -1161,4 +1162,5 @@ def assymbly(description):
     _build_order(description, levels, dependents, full_depends)
     _make_axis(description)
 
+    return description
     return description
