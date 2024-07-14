@@ -769,7 +769,7 @@ class Scan():
                     await self._run()
         else:
             if self.config:
-                self.description['config'] = copy.deepcopy(self.config)
+                self.description['config'] = self._raw_config_copy
             async with self._send_msg_and_update_bar() as background_tasks:
                 self._background_tasks = background_tasks
                 await self._run()
