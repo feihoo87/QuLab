@@ -73,14 +73,15 @@ def clear_cache():
         return
 
     logger.debug(f"clear_cache record_cache: {len(record_cache)}")
-    for k, (t, _) in zip(sorted(record_cache.items(), key=lambda x: x[1][0]),
-                         range(len(record_cache) - CACHE_SIZE)):
+    for (k, (t, r),
+         i) in zip(sorted(record_cache.items(), key=lambda x: x[1][0]),
+                   range(len(record_cache) - CACHE_SIZE)):
         del record_cache[k]
 
     logger.debug(f"clear_cache buffer_list_cache: {len(buffer_list_cache)}")
-    for k, (t,
-            _) in zip(sorted(buffer_list_cache.items(), key=lambda x: x[1][0]),
-                      range(len(buffer_list_cache) - CACHE_SIZE)):
+    for (k, (t, r),
+         i) in zip(sorted(buffer_list_cache.items(), key=lambda x: x[1][0]),
+                   range(len(buffer_list_cache) - CACHE_SIZE)):
         del buffer_list_cache[k]
     logger.debug(f"clear_cache done.")
 
