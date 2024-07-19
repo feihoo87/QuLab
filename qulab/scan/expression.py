@@ -420,6 +420,10 @@ class Expression():
         return False
 
     def value(self, env=_default_env):
+        if isinstance(env, dict):
+            e = Env()
+            e.variables = env
+            env = e
         if self.changed(env):
             self.cache = self.eval(env)
         return self.cache
