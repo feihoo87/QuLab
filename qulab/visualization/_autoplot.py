@@ -239,8 +239,8 @@ def plot_img(x,
     kwds.setdefault('aspect', 'auto')
     kwds.setdefault('interpolation', 'nearest')
 
-    vmin = kwds.get('vmin', np.nanmin(z))
-    vmax = kwds.get('vmax', np.nanmax(z))
+    vmin = kwds.pop('vmin', np.nanmin(z))
+    vmax = kwds.pop('vmax', np.nanmax(z))
     if zscale == 'log':
         kwds.setdefault('norm', LogNorm(vmax=vmax, vmin=vmin))
     elif zscale == 'symlog':
