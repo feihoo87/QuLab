@@ -8,7 +8,6 @@ from sqlalchemy import (Column, DateTime, Float, ForeignKey, Integer,
 from sqlalchemy.orm import (backref, declarative_base, relationship,
                             sessionmaker)
 from sqlalchemy.orm.session import Session
-from waveforms.security import InvalidKey, encryptPassword, verifyPassword
 
 
 def utcnow():
@@ -107,15 +106,15 @@ class User(Base):
     attachments = relationship('Attachment', back_populates='user')
     comments = relationship('Comment', back_populates='user')
 
-    def setPassword(self, password):
-        self.hashed_password = encryptPassword(password)
+    # def setPassword(self, password):
+    #     self.hashed_password = encryptPassword(password)
 
-    def verify(self, password):
-        try:
-            verifyPassword(password, self.hashed_password)
-            return True
-        except InvalidKey:
-            return False
+    # def verify(self, password):
+    #     try:
+    #         verifyPassword(password, self.hashed_password)
+    #         return True
+    #     except InvalidKey:
+    #         return False
 
     def __repr__(self):
         return f"User(name='{self.name}')"
