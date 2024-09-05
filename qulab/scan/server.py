@@ -276,7 +276,10 @@ async def handle(session: Session, request: Request, datapath: Path):
         case 'notebook_extend':
             notebook = session.get(Notebook, msg['notebook_id'])
             inputCells = msg.get('input_cells', [""])
-            aready_saved = len(notebook.cells)
+            try:
+                aready_saved = len(notebook.cells)
+            except:
+                aready_saved = 0
             if len(inputCells) > aready_saved:
                 for cell in inputCells[aready_saved:]:
                     cell = create_cell(session, notebook, cell)
