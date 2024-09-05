@@ -525,13 +525,13 @@ def create_tables(engine, tables_only=False):
     root_role = Role(name='root')
     admin_role = Role(name='admin')
     root_user = User(name='root')
-    root_user.setPassword('123')
+    # root_user.setPassword('123')
     root_user.roles.append(root_role)
     root_user.roles.append(admin_role)
 
     guest_role = Role(name='guest')
     guest_user = User(name='guest')
-    guest_user.setPassword('')
+    # guest_user.setPassword('')
     guest_user.roles.append(guest_role)
 
     t1 = SampleAccountType(name='factory')
