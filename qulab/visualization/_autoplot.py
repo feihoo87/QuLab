@@ -262,7 +262,8 @@ def plot_img(x,
         kwds.pop('origin', None)
         kwds.pop('aspect', None)
         kwds.pop('interpolation', None)
-        pc = ax.pcolormesh(x, y, z, **kwds)
+        shading = kwds.pop('shading', 'nearest')
+        pc = ax.pcolormesh(x, y, z, shading=shading, **kwds)
         xlabel = f"{xlabel} [{x_unit}]" if x_unit else xlabel
         ylabel = f"{ylabel} [{y_unit}]" if y_unit else ylabel
         ax.set_xlabel(xlabel)
