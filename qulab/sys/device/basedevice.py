@@ -12,6 +12,14 @@ Decorator = Callable[[Callable], Callable]
 _buildin_set = set
 
 
+class Source():
+    pass
+
+
+class Sink():
+    pass
+
+
 def action(key: str,
            method: Literal['get', 'set', 'post', 'delete'] = 'get',
            **kwds) -> Decorator:
