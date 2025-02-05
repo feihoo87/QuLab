@@ -158,6 +158,7 @@ def diagnose(node, code_path: str | Path, state_path: str | Path,
     result = check_data(node, code_path, state_path, session_id)
     # in spec case
     if result.in_spec:
+        logger.debug(f'"{node}": Checked! In spec, no need to diagnose')
         return False
     # bad data case
     recalibrated = []
@@ -166,15 +167,12 @@ def diagnose(node, code_path: str | Path, state_path: str | Path,
             diagnose(n, code_path, state_path, session_id)
             for n in get_dependents(node, code_path)
         ]
-    if not any(recalibrated):
+    if not any(recalibrated) and recalibrated:
+        logger.debug(f'"{node}": no dependents recalibrated.')
         return False
     # calibrate
-    if result.fully_calibrated and result.in_spec:
-        pass
-    else:
-        logger.debug(
-            f'recalibrate "{node}" because some dependents recalibrated')
-        result = calibrate(node, code_path, state_path, session_id)
+    logger.debug(f'recalibrate "{node}" because some dependents recalibrated')
+    result = calibrate(node, code_path, state_path, session_id)
     if result.bad_data or not result.in_spec:
         raise CalibrationFailedError(
             f'"{node}": All dependents passed, but calibration failed!')
