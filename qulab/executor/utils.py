@@ -38,7 +38,7 @@ import numpy as np
 
 
 # 多长时间应该检查一次校准实验，单位是秒。
-__timeout__ = 200
+__timeout__ = 7*24*3600
 
 def depends():
     return [{deps!r}]
