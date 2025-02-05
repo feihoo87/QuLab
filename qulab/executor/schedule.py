@@ -59,7 +59,7 @@ def check_state(workflow: str, code_path: str | Path,
     return True
 
 
-def call_analyzer(node, data, history, check=False):
+def call_analyzer(node, data, history, check=False, plot=False):
     if check:
         result = transform.params_to_result(
             node.check_analyze(*data,
@@ -69,13 +69,21 @@ def call_analyzer(node, data, history, check=False):
         result = transform.params_to_result(
             node.analyze(*data, history=transform.result_to_params(history)))
         result.fully_calibrated = True
+        if plot:
+            call_plot(node, result)
     result.data = data
     return result
 
 
+def call_plot(node, result, check=False):
+    if hasattr(node, 'plot') and callable(node.plot):
+        state, params, other = transform.result_to_params(result)
+        node.plot(state, params, other)
+
+
 @functools.lru_cache(maxsize=128)
 def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
-               session_id: str) -> Result:
+               plot: bool, session_id: str) -> Result:
     """
     check data answers two questions:
     Is the parameter associated with this cal in spec,
@@ -109,7 +117,7 @@ def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
         save_result(workflow, result, state_path)
 
         logger.debug(f'Checked "{workflow}" !')
-        result = call_analyzer(node, data, history, check=True)
+        result = call_analyzer(node, data, history, check=True, plot=plot)
         if result.in_spec:
             logger.debug(f'"{workflow}": checked in spec, renewing result')
             renew_result(workflow, state_path)
@@ -124,7 +132,7 @@ def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
         save_result(workflow, result, state_path)
 
         logger.debug(f'Calibrated "{workflow}" !')
-        result = call_analyzer(node, data, history, check=False)
+        result = call_analyzer(node, data, history, check=False, plot=plot)
         save_result(workflow, result, state_path,
                     get_head(workflow, state_path))
 
@@ -133,7 +141,7 @@ def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
 
 @functools.lru_cache(maxsize=128)
 def calibrate(workflow, code_path: str | Path, state_path: str | Path,
-              session_id: str) -> Result:
+              plot: bool, session_id: str) -> Result:
     node = load_workflow(workflow, code_path)
     history = find_result(workflow, state_path)
 
@@ -143,19 +151,19 @@ def calibrate(workflow, code_path: str | Path, state_path: str | Path,
     result.data = data
     save_result(workflow, result, state_path)
     logger.debug(f'Calibrated "{workflow}" !')
-    result = call_analyzer(node, data, history, check=False)
+    result = call_analyzer(node, data, history, check=False, plot=plot)
     save_result(workflow, result, state_path, get_head(workflow, state_path))
     return result
 
 
-def diagnose(node, code_path: str | Path, state_path: str | Path,
+def diagnose(node, code_path: str | Path, state_path: str | Path, plot: bool,
              session_id: str):
     '''
     Returns: True if node or dependent recalibrated.
     '''
     logger.debug(f'diagnose "{node}"')
     # check_data
-    result = check_data(node, code_path, state_path, session_id)
+    result = check_data(node, code_path, state_path, plot, session_id)
     # in spec case
     if result.in_spec:
         logger.debug(f'"{node}": Checked! In spec, no need to diagnose')
@@ -164,7 +172,7 @@ def diagnose(node, code_path: str | Path, state_path: str | Path,
     recalibrated = []
     if result.bad_data:
         recalibrated = [
-            diagnose(n, code_path, state_path, session_id)
+            diagnose(n, code_path, state_path, plot, session_id)
             for n in get_dependents(node, code_path)
         ]
     if not any(recalibrated) and recalibrated:
@@ -172,7 +180,7 @@ def diagnose(node, code_path: str | Path, state_path: str | Path,
         return False
     # calibrate
     logger.debug(f'recalibrate "{node}" because some dependents recalibrated')
-    result = calibrate(node, code_path, state_path, session_id)
+    result = calibrate(node, code_path, state_path, plot, session_id)
     if result.bad_data or not result.in_spec:
         raise CalibrationFailedError(
             f'"{node}": All dependents passed, but calibration failed!')
@@ -189,7 +197,8 @@ def maintain(node,
              code_path: str | Path,
              state_path: str | Path,
              session_id: str | None = None,
-             run: bool = False):
+             run: bool = False,
+             plot: bool = False):
     if session_id is None:
         session_id = uuid.uuid4().hex
     logger.debug(f'run "{node}"' if run else f'maintain "{node}"')
@@ -204,7 +213,7 @@ def maintain(node,
         logger.debug(f'"{node}": In spec, no need to maintain')
         return
     # check_data
-    result = check_data(node, code_path, state_path, session_id)
+    result = check_data(node, code_path, state_path, plot, session_id)
     if result.in_spec:
         if not run:
             logger.debug(f'"{node}": In spec, no need to maintain')
@@ -213,12 +222,12 @@ def maintain(node,
         logger.debug(f'"{node}": Bad data, diagnosing dependents')
         for n in get_dependents(node, code_path):
             logger.debug(f'diagnose "{n}" because of "{node}" bad data')
-            diagnose(n, code_path, state_path, session_id)
+            diagnose(n, code_path, state_path, plot, session_id)
         else:
             logger.debug(f'"{node}": All dependents diagnosed')
     # calibrate
     logger.debug(f'recalibrate "{node}"')
-    result = calibrate(node, code_path, state_path, session_id)
+    result = calibrate(node, code_path, state_path, plot, session_id)
     if result.bad_data or not result.in_spec:
         raise CalibrationFailedError(
             f'"{node}": All dependents passed, but calibration failed!')
@@ -226,9 +235,12 @@ def maintain(node,
     return
 
 
-def run(node, code_path: str | Path, state_path: str | Path):
+def run(node,
+        code_path: str | Path,
+        state_path: str | Path,
+        plot: bool = False):
     logger.debug(f'run "{node}" without dependences.')
-    result = calibrate(node, code_path, state_path)
+    result = calibrate(node, code_path, state_path, plot)
     if result.bad_data or not result.in_spec:
         raise CalibrationFailedError(
             f'"{node}": All dependents passed, but calibration failed!')

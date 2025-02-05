@@ -4,7 +4,8 @@ from pathlib import Path
 import click
 
 from .load import find_unreferenced_workflows
-from .schedule import maintain as maintain_workflow, run as run_workflow
+from .schedule import maintain as maintain_workflow
+from .schedule import run as run_workflow
 from .transform import set_config_api
 from .utils import workflow_template
 
@@ -41,9 +42,10 @@ def create(workflow, code):
 @click.argument('workflow')
 @click.option('--code', '-c', default=None)
 @click.option('--data', '-d', default=None)
-@click.option('--api', '-g', default=None)
+@click.option('--api', '-a', default=None)
+@click.option('--plot', '-p', is_flag=True)
 @click.option('--no-dependents', '-n', is_flag=True)
-def run(workflow, code, data, api, no_dependents):
+def run(workflow, code, data, api, plot, no_dependents):
     """
     Run a workflow.
     """
@@ -56,17 +58,18 @@ def run(workflow, code, data, api, no_dependents):
         data = Path(code) / 'logs'
 
     if no_dependents:
-        run_workflow(workflow, code, data)
+        run_workflow(workflow, code, data, plot=plot)
     else:
-        maintain_workflow(workflow, code, data, run=True)
+        maintain_workflow(workflow, code, data, run=True, plot=plot)
 
 
 @click.command()
 @click.argument('workflow')
 @click.option('--code', '-c', default=None)
 @click.option('--data', '-d', default=None)
-@click.option('--api', '-g', default=None)
-def maintain(workflow, code, data, api):
+@click.option('--api', '-a', default=None)
+@click.option('--plot', '-p', is_flag=True)
+def maintain(workflow, code, data, api, plot):
     """
     Maintain a workflow.
     """
@@ -78,7 +81,7 @@ def maintain(workflow, code, data, api):
     if data is None:
         data = Path(code) / 'logs'
 
-    maintain_workflow(workflow, code, data, run=False)
+    maintain_workflow(workflow, code, data, run=False, plot=plot)
 
 
 cli.add_command(maintain)
