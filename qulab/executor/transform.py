@@ -57,7 +57,7 @@ def params_to_result(params: tuple) -> Result:
     if state in ['In spec', 'OK']:
         result.in_spec = True
         result.bad_data = False
-    elif state == ['Bad data', 'Bad']:
+    elif state in ['Bad data', 'Bad']:
         result.bad_data = True
         result.in_spec = False
     else:
