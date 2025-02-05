@@ -75,6 +75,7 @@ def call_analyzer(node, data, history, check=False, plot=False):
     return result
 
 
+@logger.catch()
 def call_plot(node, result, check=False):
     if hasattr(node, 'plot') and callable(node.plot):
         state, params, other = transform.result_to_params(result)
@@ -205,7 +206,7 @@ def maintain(node,
     # recursive maintain
     for n in get_dependents(node, code_path):
         logger.debug(f'maintain "{n}" because it is depended by "{node}"')
-        maintain(n, code_path, state_path, session_id)
+        maintain(n, code_path, state_path, session_id, plot=plot)
     else:
         logger.debug(f'"{node}": All dependents maintained')
     # check_state
