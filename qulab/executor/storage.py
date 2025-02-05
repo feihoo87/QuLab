@@ -47,12 +47,16 @@ def random_path(base: Path) -> Path:
             return path
 
 
-def save_result(workflow: str, result: Result, base_path: str | Path):
+def save_result(workflow: str,
+                result: Result,
+                base_path: str | Path,
+                path: Path | None = None):
     logger.debug(
         f'Saving result for "{workflow}", {result.in_spec=}, {result.bad_data=}, {result.fully_calibrated=}'
     )
     base_path = Path(base_path)
-    path = random_path(base_path)
+    if path is None:
+        path = random_path(base_path)
     (base_path / 'objects' / path).parent.mkdir(parents=True, exist_ok=True)
     result.previous = get_head(workflow, base_path)
     with open(base_path / 'objects' / path, "wb") as f:

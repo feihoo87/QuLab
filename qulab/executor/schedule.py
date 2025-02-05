@@ -7,8 +7,8 @@ from loguru import logger
 
 from . import transform
 from .load import load_workflow
-from .storage import (Result, find_result, renew_result, revoke_result,
-                      save_result)
+from .storage import (Result, find_result, get_head, renew_result,
+                      revoke_result, save_result)
 
 
 class CalibrationFailedError(Exception):
@@ -59,6 +59,20 @@ def check_state(workflow: str, code_path: str | Path,
     return True
 
 
+def call_analyzer(node, data, history, check=False):
+    if check:
+        result = transform.params_to_result(
+            node.check_analyze(*data,
+                               history=transform.result_to_params(history)))
+        result.fully_calibrated = False
+    else:
+        result = transform.params_to_result(
+            node.analyze(*data, history=transform.result_to_params(history)))
+        result.fully_calibrated = True
+    result.data = data
+    return result
+
+
 @functools.lru_cache(maxsize=128)
 def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
                session_id: str) -> Result:
@@ -90,11 +104,12 @@ def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
             node, 'check_analyze') and callable(node.check_analyze):
         logger.debug(f'Checking "{workflow}" with "check" method ...')
         data = node.check()
-        logger.debug(f'Checked "{workflow}" !')
-        result = transform.params_to_result(
-            node.check_analyze(*data,
-                               history=transform.result_to_params(history)))
+        result = Result()
         result.data = data
+        save_result(workflow, result, state_path)
+
+        logger.debug(f'Checked "{workflow}" !')
+        result = call_analyzer(node, data, history, check=True)
         if result.in_spec:
             logger.debug(f'"{workflow}": checked in spec, renewing result')
             renew_result(workflow, state_path)
@@ -104,12 +119,14 @@ def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
     else:
         logger.debug(f'Checking "{workflow}" with "calibrate" method ...')
         data = node.calibrate()
-        logger.debug(f'Calibrated "{workflow}" !')
-        result = transform.params_to_result(
-            node.analyze(*data, history=transform.result_to_params(history)))
+        result = Result()
         result.data = data
-        result.fully_calibrated = True
         save_result(workflow, result, state_path)
+
+        logger.debug(f'Calibrated "{workflow}" !')
+        result = call_analyzer(node, data, history, check=False)
+        save_result(workflow, result, state_path,
+                    get_head(workflow, state_path))
 
     return result
 
@@ -117,18 +134,17 @@ def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
 @functools.lru_cache(maxsize=128)
 def calibrate(workflow, code_path: str | Path, state_path: str | Path,
               session_id: str) -> Result:
-    result = Result()
     node = load_workflow(workflow, code_path)
     history = find_result(workflow, state_path)
 
     logger.debug(f'Calibrating "{workflow}" ...')
     data = node.calibrate()
-    logger.debug(f'Calibrated "{workflow}" !')
-    result = transform.params_to_result(
-        node.analyze(*data, history=transform.result_to_params(history)))
+    result = Result()
     result.data = data
-    result.fully_calibrated = True
     save_result(workflow, result, state_path)
+    logger.debug(f'Calibrated "{workflow}" !')
+    result = call_analyzer(node, data, history, check=False)
+    save_result(workflow, result, state_path, get_head(workflow, state_path))
     return result
 
 
@@ -212,8 +228,7 @@ def maintain(node,
     return
 
 
-def run(node, code_path: str | Path,
-             state_path: str | Path):
+def run(node, code_path: str | Path, state_path: str | Path):
     logger.debug(f'run "{node}" without dependences.')
     result = calibrate(node, code_path, state_path)
     if result.bad_data or not result.in_spec:
