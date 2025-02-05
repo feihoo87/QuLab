@@ -82,7 +82,7 @@ def call_plot(node, result, check=False):
         node.plot(state, params, other)
 
 
-# @functools.lru_cache(maxsize=128)
+@functools.lru_cache(maxsize=128)
 def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
                plot: bool, session_id: str) -> Result:
     """
@@ -140,7 +140,7 @@ def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
     return result
 
 
-# @functools.lru_cache(maxsize=128)
+@functools.lru_cache(maxsize=128)
 def calibrate(workflow, code_path: str | Path, state_path: str | Path,
               plot: bool, session_id: str) -> Result:
     node = load_workflow(workflow, code_path)
