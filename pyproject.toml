@@ -55,7 +55,7 @@ full = [
 ]
 
 [project.scripts]
-"qulab" = "qulab.__main__:main"
+"qulab" = "qulab.__main__:cli"
 
 [project.urls]
 Homepage = "https://github.com/feihoo87/QuLab"
