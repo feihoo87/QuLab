@@ -7,7 +7,7 @@ from typing import Sequence, Type, Union
 from sqlalchemy.orm import Query, Session, aliased
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.session import Session
-from waveforms.dicttree import foldDict
+from ..dicttree import foldDict
 
 from .models import (Cell, Comment, Config, InputText, Notebook, Record,
                      Report, Sample, Tag, utcnow)
