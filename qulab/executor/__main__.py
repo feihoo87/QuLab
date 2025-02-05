@@ -24,9 +24,9 @@ def create(workflow, code):
     if code is None:
         code = Path.cwd()
 
-    fname = Path(code) / f'{workflow}.py'
+    fname = Path(code) / f'{workflow}'
     if fname.exists():
-        click.echo(f'{workflow}.py already exists')
+        click.echo(f'{workflow} already exists')
         return
 
     fname.parent.mkdir(parents=True, exist_ok=True)
@@ -34,7 +34,7 @@ def create(workflow, code):
 
     with open(fname, 'w') as f:
         f.write(workflow_template(list(deps)))
-    click.echo(f'{workflow}.py created')
+    click.echo(f'{workflow} created')
 
 
 @click.command()
