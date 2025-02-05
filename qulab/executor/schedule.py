@@ -82,7 +82,7 @@ def call_plot(node, result, check=False):
         node.plot(state, params, other)
 
 
-@functools.lru_cache(maxsize=128)
+# @functools.lru_cache(maxsize=128)
 def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
                plot: bool, session_id: str) -> Result:
     """
@@ -140,7 +140,7 @@ def check_data(workflow: str, code_path: str | Path, state_path: str | Path,
     return result
 
 
-@functools.lru_cache(maxsize=128)
+# @functools.lru_cache(maxsize=128)
 def calibrate(workflow, code_path: str | Path, state_path: str | Path,
               plot: bool, session_id: str) -> Result:
     node = load_workflow(workflow, code_path)
@@ -206,7 +206,7 @@ def maintain(node,
     # recursive maintain
     for n in get_dependents(node, code_path):
         logger.debug(f'maintain "{n}" because it is depended by "{node}"')
-        maintain(n, code_path, state_path, session_id, plot=plot)
+        maintain(n, code_path, state_path, session_id, run=False, plot=plot)
     else:
         logger.debug(f'"{node}": All dependents maintained')
     # check_state
