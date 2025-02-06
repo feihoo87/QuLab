@@ -150,7 +150,7 @@ def find_unreferenced_workflows(path: str) -> list[str]:
                 )
                 continue
             try:
-                depends_list = depends_func()
+                depends_list = depends_func()[0]
             except Exception as e:
                 warnings.warn(f"Error calling depends() in {rel_str}: {e}")
                 continue
