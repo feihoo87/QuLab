@@ -1,13 +1,41 @@
+import functools
 import importlib
+import sys, os
 from pathlib import Path
 
 import click
+from loguru import logger
 
 from .load import find_unreferenced_workflows
 from .schedule import maintain as maintain_workflow
 from .schedule import run as run_workflow
 from .transform import set_config_api
 from .utils import workflow_template
+
+
+def log_options(func):
+
+    @click.option("--debug", is_flag=True, help="Enable debug mode.")
+    @click.option("--log", type=str, help="Log file path.")
+    @functools.wraps(func)  # 保持函数元信息
+    def wrapper(*args, log=None, debug=False, **kwargs):
+        print(f"{func} {log=}, {debug=}")
+        if log is None and not debug:
+            logger.remove()
+            logger.add(sys.stderr, level='INFO')
+        elif log is None and debug:
+            logger.remove()
+            logger.add(sys.stderr, level='DEBUG')
+        elif log is not None and not debug:
+            logger.configure(handlers=[dict(sink=log, level='INFO')])
+        elif log is not None and debug:
+            logger.configure(handlers=[
+                dict(sink=log, level='DEBUG'),
+                dict(sink=sys.stderr, level='DEBUG')
+            ])
+        return func(*args, **kwargs)
+
+    return wrapper
 
 
 @click.group()
@@ -17,7 +45,7 @@ def cli():
 
 @click.command()
 @click.argument('workflow')
-@click.option('--code', '-c', default=None)
+@click.option('--code', '-c', default=None, help='The path of the code.')
 def create(workflow, code):
     """
     Create a new workflow file.
@@ -26,6 +54,7 @@ def create(workflow, code):
         code = Path.cwd()
 
     fname = Path(code) / f'{workflow}'
+    fname = Path(os.path.expanduser(fname))
     if fname.exists():
         click.echo(f'{workflow} already exists')
         return
@@ -40,11 +69,15 @@ def create(workflow, code):
 
 @click.command()
 @click.argument('workflow')
-@click.option('--code', '-c', default=None)
-@click.option('--data', '-d', default=None)
-@click.option('--api', '-a', default=None)
-@click.option('--plot', '-p', is_flag=True)
-@click.option('--no-dependents', '-n', is_flag=True)
+@click.option('--code', '-c', default=None, help='The path of the code.')
+@click.option('--data', '-d', default=None, help='The path of the data.')
+@click.option('--api', '-a', default=None, help='The modlule name of the api.')
+@click.option('--plot', '-p', is_flag=True, help='Plot the result.')
+@click.option('--no-dependents',
+              '-n',
+              is_flag=True,
+              help='Do not run dependents.')
+@log_options
 def run(workflow, code, data, api, plot, no_dependents):
     """
     Run a workflow.
@@ -57,6 +90,9 @@ def run(workflow, code, data, api, plot, no_dependents):
     if data is None:
         data = Path(code) / 'logs'
 
+    code = Path(os.path.expanduser(code))
+    data = Path(os.path.expanduser(data))
+
     if no_dependents:
         run_workflow(workflow, code, data, plot=plot)
     else:
@@ -65,10 +101,11 @@ def run(workflow, code, data, api, plot, no_dependents):
 
 @click.command()
 @click.argument('workflow')
-@click.option('--code', '-c', default=None)
-@click.option('--data', '-d', default=None)
-@click.option('--api', '-a', default=None)
-@click.option('--plot', '-p', is_flag=True)
+@click.option('--code', '-c', default=None, help='The path of the code.')
+@click.option('--data', '-d', default=None, help='The path of the data.')
+@click.option('--api', '-a', default=None, help='The modlule name of the api.')
+@click.option('--plot', '-p', is_flag=True, help='Plot the result.')
+@log_options
 def maintain(workflow, code, data, api, plot):
     """
     Maintain a workflow.
@@ -80,6 +117,9 @@ def maintain(workflow, code, data, api, plot):
         code = Path.cwd()
     if data is None:
         data = Path(code) / 'logs'
+
+    code = Path(os.path.expanduser(code))
+    data = Path(os.path.expanduser(data))
 
     maintain_workflow(workflow, code, data, run=False, plot=plot)
 

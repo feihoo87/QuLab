@@ -172,15 +172,29 @@ def diagnose(node, code_path: str | Path, state_path: str | Path, plot: bool,
     # bad data case
     recalibrated = []
     if result.bad_data:
+        logger.debug(f'"{node}": Bad data, diagnosing dependents')
         recalibrated = [
             diagnose(n, code_path, state_path, plot, session_id)
             for n in get_dependents(node, code_path)
         ]
-    if not any(recalibrated) and recalibrated:
+    if not any(recalibrated):
+        if result.bad_data:
+            raise CalibrationFailedError(
+                f'"{node}": bad data but no dependents recalibrated.')
         logger.debug(f'"{node}": no dependents recalibrated.')
-        return False
     # calibrate
-    logger.debug(f'recalibrate "{node}" because some dependents recalibrated')
+    if any(recalibrated):
+        logger.debug(
+            f'recalibrate "{node}" because some dependents recalibrated.')
+    elif not result.in_spec and not result.bad_data:
+        logger.debug(f'recalibrate "{node}" because out of spec.')
+    elif result.in_spec:
+        logger.error(f'Never reach: recalibrate "{node}" because in spec.')
+    elif result.bad_data:
+        logger.error(f'Never reach: recalibrate "{node}" because bad data.')
+    else:
+        logger.error(f'Never reach: recalibrate "{node}"')
+
     result = calibrate(node, code_path, state_path, plot, session_id)
     if result.bad_data or not result.in_spec:
         raise CalibrationFailedError(
@@ -193,7 +207,7 @@ def get_dependents(workflow: str, code_path: str | Path) -> list[str]:
     return [n for n in load_workflow(workflow, code_path).depends()[0]]
 
 
-#@logger.catch(reraise=True)
+@logger.catch(reraise=True)
 def maintain(node,
              code_path: str | Path,
              state_path: str | Path,
@@ -236,6 +250,7 @@ def maintain(node,
     return
 
 
+@logger.catch(reraise=True)
 def run(node,
         code_path: str | Path,
         state_path: str | Path,
