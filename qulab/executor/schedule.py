@@ -51,7 +51,7 @@ def check_state(workflow: WorkflowType, code_path: str | Path,
             f'check_state failed: "{workflow.__workflow_id__}" has bad data')
         return False
     for n in get_dependents(workflow, code_path):
-        r = find_result(n, state_path)
+        r = find_result(n.__workflow_id__, state_path)
         if r is None or r.checked_time > result.checked_time:
             logger.debug(
                 f'check_state failed: "{workflow.__workflow_id__}" has outdated dependencies'
@@ -158,7 +158,7 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
 @functools.lru_cache(maxsize=128)
 def calibrate(workflow: WorkflowType, code_path: str | Path,
               state_path: str | Path, plot: bool, session_id: str) -> Result:
-    history = find_result(workflow, state_path)
+    history = find_result(workflow.__workflow_id__, state_path)
 
     logger.debug(f'Calibrating "{workflow.__workflow_id__}" ...')
     data = workflow.calibrate()
