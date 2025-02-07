@@ -1,6 +1,6 @@
 import click
 
-from .executor.__main__ import create, maintain, run
+from .executor.__main__ import create, get, maintain, run, set
 from .monitor.__main__ import main as monitor
 from .scan.server import server
 from .sys.net.cli import dht
@@ -25,6 +25,8 @@ cli.add_command(server)
 cli.add_command(maintain)
 cli.add_command(run)
 cli.add_command(create)
+cli.add_command(set)
+cli.add_command(get)
 
 if __name__ == '__main__':
     cli()

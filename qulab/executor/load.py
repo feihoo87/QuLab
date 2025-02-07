@@ -1,10 +1,14 @@
+import hashlib
 import inspect
+import pickle
+import re
+import string
 import warnings
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from types import ModuleType
 
-import loguru
+from loguru import logger
 
 from .storage import Result
 
@@ -124,12 +128,15 @@ def find_unreferenced_workflows(path: str) -> list[str]:
     for file_path in root.rglob("*.py"):
         if file_path.name == "__init__.py":
             continue
+        if file_path.name.endswith("_template.py") or re.match(
+                r'.*_tmp_[0-9a-fA-F]{8}.py', file_path.name):
+            continue
         try:
             rel_path = file_path.relative_to(root)
         except ValueError:
             continue
 
-        module = load_workflow(str(rel_path), root)
+        module = load_workflow_from_module(str(rel_path), root)
 
         if is_workflow(module):
             rel_str = str(rel_path)
@@ -140,7 +147,7 @@ def find_unreferenced_workflows(path: str) -> list[str]:
 
     # Check dependencies for each workflow module
     for rel_str in workflows:
-        module = load_workflow(rel_str, root)
+        module = load_workflow_from_module(rel_str, root)
 
         depends_func = getattr(module, "depends", None)
         if depends_func and callable(depends_func):
@@ -156,11 +163,9 @@ def find_unreferenced_workflows(path: str) -> list[str]:
                 continue
 
             if not isinstance(depends_list, list) or not all(
-                isinstance(item, str) for item in depends_list
-            ):
+                    isinstance(item, str) for item in depends_list):
                 warnings.warn(
-                    f"depends() in {rel_str} did not return a list of strings"
-                )
+                    f"depends() in {rel_str} did not return a list of strings")
                 continue
 
             for dep in depends_list:
@@ -178,9 +183,9 @@ def find_unreferenced_workflows(path: str) -> list[str]:
     return unreferenced
 
 
-def load_workflow(file_name: str,
-                  base_path: str | Path,
-                  package='workflows') -> WorkflowType:
+def load_workflow_from_module(file_name: str,
+                              base_path: str | Path,
+                              package='workflows') -> WorkflowType:
     if file_name.startswith('cfg:'):
         return SetConfigWorkflow(file_name[4:])
     base_path = Path(base_path)
@@ -200,3 +205,60 @@ def load_workflow(file_name: str,
     verify_check_method(module)
 
     return module
+
+
+def load_workflow_from_template(file_name: str,
+                                mappping: dict[str, str],
+                                base_path: str | Path,
+                                subtitle: str | None = None,
+                                package='workflows') -> WorkflowType:
+    base_path = Path(base_path)
+    path = Path(file_name)
+
+    with open(base_path / path) as f:
+        content = f.read()
+    template = string.Template(content)
+    content = template.substitute(mappping)
+
+    hash_str = hashlib.md5(pickle.dumps(mappping)).hexdigest()[:8]
+    if subtitle is None:
+        path = path.parent / path.stem.replace('_template',
+                                               f'_tmp{hash_str}.py')
+    else:
+        path = path.parent / path.stem.replace('_template', f'_{subtitle}.py')
+
+    with open(base_path / path, 'w') as f:
+        f.write(content)
+
+    module = load_workflow_from_module(str(path), base_path, package)
+
+    return module
+
+
+def load_workflow(workflow: str | tuple[str, dict],
+                  base_path: str | Path,
+                  package='workflows') -> WorkflowType:
+    if isinstance(workflow, tuple):
+        if len(workflow) == 2:
+            file_name, mapping = workflow
+            w = load_workflow_from_template(file_name, mapping, base_path,
+                                            None, package)
+        elif len(workflow) == 3:
+            file_name, subtitle, mapping = workflow
+            w = load_workflow_from_template(file_name, mapping, base_path,
+                                            subtitle, package)
+        else:
+            raise ValueError(f"Invalid workflow: {workflow}")
+        w.__workflow_id__ = str(Path(w.__file__).relative_to(base_path))
+    elif isinstance(workflow, str):
+        if workflow.startswith('cfg:'):
+            key = workflow[4:]
+            w = SetConfigWorkflow(key)
+            w.__workflow_id__ = workflow
+        else:
+            w = load_workflow_from_module(workflow, base_path, package)
+            w.__workflow_id__ = str(Path(w.__file__).relative_to(base_path))
+    else:
+        raise TypeError(f"Invalid workflow: {workflow}")
+
+    return w
