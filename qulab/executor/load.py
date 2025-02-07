@@ -128,8 +128,8 @@ def find_unreferenced_workflows(path: str) -> list[str]:
     for file_path in root.rglob("*.py"):
         if file_path.name == "__init__.py":
             continue
-        if file_path.name.endswith("_template.py") or re.match(
-                r'.*_tmp_[0-9a-fA-F]{8}.py', file_path.name):
+        if file_path.name == 'template.py' or file_path.name.endswith(
+                "_template.py"):
             continue
         try:
             rel_path = file_path.relative_to(root)
@@ -157,7 +157,7 @@ def find_unreferenced_workflows(path: str) -> list[str]:
                 )
                 continue
             try:
-                depends_list = depends_func()[0]
+                depends_list = [n.__workflow_id__ for n in get_dependents(module, root)]
             except Exception as e:
                 warnings.warn(f"Error calling depends() in {rel_str}: {e}")
                 continue
@@ -222,10 +222,17 @@ def load_workflow_from_template(file_name: str,
 
     hash_str = hashlib.md5(pickle.dumps(mappping)).hexdigest()[:8]
     if subtitle is None:
-        path = path.parent / path.stem.replace('_template',
-                                               f'_tmp{hash_str}.py')
+        if path.stem == 'template':
+            path = path.parent / f'tmp{hash_str}.py'
+        else:
+            path = path.parent / path.stem.replace('_template',
+                                                   f'_tmp{hash_str}.py')
     else:
-        path = path.parent / path.stem.replace('_template', f'_{subtitle}.py')
+        if path.stem == 'template':
+            path = path.parent / f'{subtitle}.py'
+        else:
+            path = path.parent / path.stem.replace('_template',
+                                                   f'_{subtitle}.py')
 
     with open(base_path / path, 'w') as f:
         f.write(content)
@@ -262,3 +269,8 @@ def load_workflow(workflow: str | tuple[str, dict],
         raise TypeError(f"Invalid workflow: {workflow}")
 
     return w
+
+
+def get_dependents(workflow: WorkflowType,
+                   code_path: str | Path) -> list[WorkflowType]:
+    return [load_workflow(n, code_path) for n in workflow.depends()[0]]

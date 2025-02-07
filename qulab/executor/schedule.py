@@ -6,7 +6,7 @@ from pathlib import Path
 from loguru import logger
 
 from . import transform
-from .load import WorkflowType, load_workflow
+from .load import WorkflowType, get_dependents
 from .storage import (Result, find_result, get_head, renew_result,
                       revoke_result, save_result)
 
@@ -228,11 +228,6 @@ def diagnose(workflow: WorkflowType, code_path: str | Path,
         )
     transform.update_parameters(result)
     return True
-
-
-def get_dependents(workflow: WorkflowType,
-                   code_path: str | Path) -> list[WorkflowType]:
-    return [load_workflow(n, code_path) for n in workflow.depends()[0]]
 
 
 @logger.catch(reraise=True)
