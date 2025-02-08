@@ -217,7 +217,23 @@ def load_workflow_from_template(file_name: str,
 
     with open(base_path / path) as f:
         content = f.read()
-    template = string.Template(content)
+
+    def replace(text):
+        """
+        将给定文本中的所有 _D_("var") 替换为 ${var}。
+        
+        Args:
+            text (str): 包含 _D_ 调用的字符串。
+        
+        Returns:
+            str: 已经替换的新字符串。
+        """
+        pattern = re.compile(r'_D_\s*\(\s*(["\'])(\w+)\1\s*\)')
+        replacement = r'${\2}'
+        new_text = re.sub(pattern, replacement, text)
+        return new_text
+    
+    template = string.Template(replace(content))
     content = template.substitute(mappping)
 
     hash_str = hashlib.md5(pickle.dumps(mappping)).hexdigest()[:8]
@@ -233,9 +249,11 @@ def load_workflow_from_template(file_name: str,
         else:
             path = path.parent / path.stem.replace('_template',
                                                    f'_{subtitle}.py')
-
-    with open(base_path / path, 'w') as f:
-        f.write(content)
+            
+    file = base_path / path
+    if not file.exists():
+        with open(file, 'w') as f:
+            f.write(content)
 
     module = load_workflow_from_module(str(path), base_path, package)
 
