@@ -289,8 +289,9 @@ def run(workflow: WorkflowType,
         code_path: str | Path,
         state_path: str | Path,
         plot: bool = False):
+    session_id = uuid.uuid4().hex
     logger.debug(f'run "{workflow.__workflow_id__}" without dependences.')
-    result = calibrate(workflow, code_path, state_path, plot)
+    result = calibrate(workflow, code_path, state_path, plot, session_id=session_id)
     if result.bad_data or not result.in_spec:
         raise CalibrationFailedError(
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
