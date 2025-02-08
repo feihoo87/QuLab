@@ -136,7 +136,7 @@ def find_unreferenced_workflows(path: str) -> list[str]:
         except ValueError:
             continue
 
-        module = load_workflow_from_module(str(rel_path), root)
+        module = load_workflow_from_file(str(rel_path), root)
 
         if is_workflow(module):
             rel_str = str(rel_path)
@@ -147,7 +147,7 @@ def find_unreferenced_workflows(path: str) -> list[str]:
 
     # Check dependencies for each workflow module
     for rel_str in workflows:
-        module = load_workflow_from_module(rel_str, root)
+        module = load_workflow_from_file(rel_str, root)
 
         depends_func = getattr(module, "depends", None)
         if depends_func and callable(depends_func):
@@ -157,7 +157,9 @@ def find_unreferenced_workflows(path: str) -> list[str]:
                 )
                 continue
             try:
-                depends_list = [n.__workflow_id__ for n in get_dependents(module, root)]
+                depends_list = [
+                    n.__workflow_id__ for n in get_dependents(module, root)
+                ]
             except Exception as e:
                 warnings.warn(f"Error calling depends() in {rel_str}: {e}")
                 continue
@@ -183,9 +185,9 @@ def find_unreferenced_workflows(path: str) -> list[str]:
     return unreferenced
 
 
-def load_workflow_from_module(file_name: str,
-                              base_path: str | Path,
-                              package='workflows') -> WorkflowType:
+def load_workflow_from_file(file_name: str,
+                            base_path: str | Path,
+                            package='workflows') -> WorkflowType:
     if file_name.startswith('cfg:'):
         return SetConfigWorkflow(file_name[4:])
     base_path = Path(base_path)
@@ -232,7 +234,7 @@ def load_workflow_from_template(file_name: str,
         replacement = r'${\2}'
         new_text = re.sub(pattern, replacement, text)
         return new_text
-    
+
     template = string.Template(replace(content))
     content = template.substitute(mappping)
 
@@ -249,13 +251,13 @@ def load_workflow_from_template(file_name: str,
         else:
             path = path.parent / path.stem.replace('_template',
                                                    f'_{subtitle}.py')
-            
+
     file = base_path / path
     if not file.exists():
         with open(file, 'w') as f:
             f.write(content)
 
-    module = load_workflow_from_module(str(path), base_path, package)
+    module = load_workflow_from_file(str(path), base_path, package)
 
     return module
 
@@ -281,7 +283,7 @@ def load_workflow(workflow: str | tuple[str, dict],
             w = SetConfigWorkflow(key)
             w.__workflow_id__ = workflow
         else:
-            w = load_workflow_from_module(workflow, base_path, package)
+            w = load_workflow_from_file(workflow, base_path, package)
             w.__workflow_id__ = str(Path(w.__file__).relative_to(base_path))
     else:
         raise TypeError(f"Invalid workflow: {workflow}")
