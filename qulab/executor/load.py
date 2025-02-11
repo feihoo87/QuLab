@@ -15,6 +15,7 @@ from .storage import Result
 
 class SetConfigWorkflow():
     __timeout__ = None
+    __mtime__ = 0
 
     def __init__(self, key):
         self.key = key
@@ -206,6 +207,7 @@ def load_workflow_from_file(file_name: str,
     spec = spec_from_file_location(module_name, base_path / path)
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
+    module.__mtime__ = (base_path / path).stat().st_mtime
 
     if hasattr(module, 'entries'):
         return module
@@ -226,12 +228,15 @@ def load_workflow_from_template(template_path: str,
                                 mappping: dict[str, str],
                                 base_path: str | Path,
                                 target_path: str | None = None,
-                                package='workflows') -> WorkflowType:
+                                package='workflows',
+                                mtime: float = 0) -> WorkflowType:
     base_path = Path(base_path)
     path = Path(template_path)
 
     with open(base_path / path) as f:
         content = f.read()
+
+    mtime = max(Path(template_path).stat().st_mtime, mtime)
 
     def replace(text):
         """
@@ -269,7 +274,7 @@ def load_workflow_from_template(template_path: str,
         with open(file, 'w') as f:
             f.write(content)
     else:
-        if file.stat().st_mtime < Path(template_path).stat().st_mtime:
+        if file.stat().st_mtime < mtime:
             with open(file, 'w') as f:
                 f.write(content)
         else:
@@ -279,22 +284,24 @@ def load_workflow_from_template(template_path: str,
                 )
 
     module = load_workflow_from_file(str(path), base_path, package)
+    module.__mtime__ = max(mtime, module.__mtime__)
 
     return module
 
 
 def load_workflow(workflow: str | tuple[str, dict],
                   base_path: str | Path,
-                  package='workflows') -> WorkflowType:
+                  package='workflows',
+                  mtime: float = 0) -> WorkflowType:
     if isinstance(workflow, tuple):
         if len(workflow) == 2:
             file_name, mapping = workflow
             w = load_workflow_from_template(file_name, mapping, base_path,
-                                            None, package)
+                                            None, package, mtime)
         elif len(workflow) == 3:
             template_path, target_path, mapping = workflow
             w = load_workflow_from_template(template_path, mapping, base_path,
-                                            target_path, package)
+                                            target_path, package, mtime)
         else:
             raise ValueError(f"Invalid workflow: {workflow}")
         w.__workflow_id__ = str(Path(w.__file__).relative_to(base_path))
@@ -314,8 +321,14 @@ def load_workflow(workflow: str | tuple[str, dict],
 
 def get_dependents(workflow: WorkflowType,
                    code_path: str | Path) -> list[WorkflowType]:
-    return [load_workflow(n, code_path) for n in workflow.depends()[0]]
+    return [
+        load_workflow(n, code_path, mtime=workflow.__mtime__)
+        for n in workflow.depends()[0]
+    ]
 
 
 def get_entries(workflow: WorkflowType, code_path: str | Path) -> WorkflowType:
-    return [load_workflow(n, code_path) for n in workflow.entries()]
+    return [
+        load_workflow(n, code_path, mtime=workflow.__mtime__)
+        for n in workflow.entries()
+    ]
