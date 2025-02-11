@@ -119,6 +119,17 @@ def is_workflow(module: ModuleType) -> bool:
         return False
 
 
+def is_template(path: str | Path) -> bool:
+    path = Path(path)
+    if path.name == 'template.py':
+        return True
+    if path.name.endswith('_template.py'):
+        return True
+    if 'templates' in path.parts:
+        return True
+    return False
+
+
 def find_unreferenced_workflows(path: str) -> list[str]:
     root = Path(path).resolve()
     workflows = []
@@ -128,8 +139,7 @@ def find_unreferenced_workflows(path: str) -> list[str]:
     for file_path in root.rglob("*.py"):
         if file_path.name == "__init__.py":
             continue
-        if file_path.name == 'template.py' or file_path.name.endswith(
-                "_template.py"):
+        if is_template(file_path):
             continue
         try:
             rel_path = file_path.relative_to(root)
@@ -209,13 +219,13 @@ def load_workflow_from_file(file_name: str,
     return module
 
 
-def load_workflow_from_template(file_name: str,
+def load_workflow_from_template(template_path: str,
                                 mappping: dict[str, str],
                                 base_path: str | Path,
-                                subtitle: str | None = None,
+                                target_path: str | None = None,
                                 package='workflows') -> WorkflowType:
     base_path = Path(base_path)
-    path = Path(file_name)
+    path = Path(template_path)
 
     with open(base_path / path) as f:
         content = f.read()
@@ -239,23 +249,31 @@ def load_workflow_from_template(file_name: str,
     content = template.substitute(mappping)
 
     hash_str = hashlib.md5(pickle.dumps(mappping)).hexdigest()[:8]
-    if subtitle is None:
+    if target_path is None:
         if path.stem == 'template':
             path = path.parent / f'tmp{hash_str}.py'
-        else:
+        elif path.stem.endswith('_template'):
             path = path.parent / path.stem.replace('_template',
                                                    f'_tmp{hash_str}.py')
-    else:
-        if path.stem == 'template':
-            path = path.parent / f'{subtitle}.py'
         else:
-            path = path.parent / path.stem.replace('_template',
-                                                   f'_{subtitle}.py')
+            path = path.parent / f'{path.stem}_tmp{hash_str}.py'
+    else:
+        path = target_path
 
     file = base_path / path
     if not file.exists():
+        file.parent.mkdir(parents=True, exist_ok=True)
         with open(file, 'w') as f:
             f.write(content)
+    else:
+        if file.stat().st_mtime < Path(template_path).stat().st_mtime:
+            with open(file, 'w') as f:
+                f.write(content)
+        else:
+            if file.read_text() != content:
+                logger.warning(
+                    f"`{file}` already exists and is different from the new one generated from template `{template_path}`"
+                )
 
     module = load_workflow_from_file(str(path), base_path, package)
 
@@ -271,9 +289,9 @@ def load_workflow(workflow: str | tuple[str, dict],
             w = load_workflow_from_template(file_name, mapping, base_path,
                                             None, package)
         elif len(workflow) == 3:
-            file_name, subtitle, mapping = workflow
-            w = load_workflow_from_template(file_name, mapping, base_path,
-                                            subtitle, package)
+            template_path, target_path, mapping = workflow
+            w = load_workflow_from_template(template_path, mapping, base_path,
+                                            target_path, package)
         else:
             raise ValueError(f"Invalid workflow: {workflow}")
         w.__workflow_id__ = str(Path(w.__file__).relative_to(base_path))
