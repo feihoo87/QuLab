@@ -200,6 +200,8 @@ def load_workflow_from_file(file_name: str,
                             package='workflows') -> WorkflowType:
     base_path = Path(base_path)
     path = Path(file_name)
+    if not (base_path / path).exists():
+        raise FileNotFoundError(f"File not found: {base_path / path}")
     module_name = f"{package}.{'.'.join([*path.parts[:-1], path.stem])}"
     spec = spec_from_file_location(module_name, base_path / path)
     module = module_from_spec(spec)
