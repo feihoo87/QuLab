@@ -54,6 +54,7 @@ def create(workflow, code):
     """
     Create a new workflow file.
     """
+    logger.info(f'[CMD]: create {workflow} --code {code}')
     if code is None:
         code = Path.cwd()
 
@@ -82,6 +83,7 @@ def set(key, value, api):
     """
     Set a config.
     """
+    logger.info(f'[CMD]: set {key} {value} --api {api}')
     from . import transform
     if api is not None:
         api = importlib.import_module(api)
@@ -103,6 +105,7 @@ def get(key, api):
     """
     Get a config.
     """
+    logger.info(f'[CMD]: get {key} --api {api}')
     from . import transform
     if api is not None:
         api = importlib.import_module(api)
@@ -123,6 +126,9 @@ def run(workflow, code, data, api, plot, no_dependents):
     """
     Run a workflow.
     """
+    logger.info(
+        f'[CMD]: run {workflow} --code {code} --data {data} --api {api} --plot {plot} --no-dependents {no_dependents}'
+    )
     if api is not None:
         api = importlib.import_module(api)
         set_config_api(api.query_config, api.update_config)
@@ -159,6 +165,9 @@ def maintain(workflow, code, data, api, plot):
     """
     Maintain a workflow.
     """
+    logger.info(
+        f'[CMD]: maintain {workflow} --code {code} --data {data} --api {api} --plot {plot}'
+    )
     if api is not None:
         api = importlib.import_module(api)
         set_config_api(api.query_config, api.update_config)

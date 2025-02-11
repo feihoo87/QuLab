@@ -21,7 +21,7 @@ class SetConfigWorkflow():
         self.key = key
 
     def depends(self):
-        return [[]]
+        return []
 
     def check_state(self, history: Result) -> bool:
         from . import transform
@@ -254,6 +254,10 @@ def load_workflow_from_template(template_path: str,
         return new_text
 
     template = string.Template(replace(content))
+    keys = template.get_identifiers()
+    missing = set(keys) - set(mappping.keys())
+    if missing:
+        raise KeyError(f"{template_path}: Missing keys in mapping: {missing}")
     content = template.substitute(mappping)
 
     hash_str = hashlib.md5(pickle.dumps(mappping)).hexdigest()[:8]
@@ -323,7 +327,7 @@ def get_dependents(workflow: WorkflowType,
                    code_path: str | Path) -> list[WorkflowType]:
     return [
         load_workflow(n, code_path, mtime=workflow.__mtime__)
-        for n in workflow.depends()[0]
+        for n in workflow.depends()
     ]
 
 

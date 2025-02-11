@@ -25,7 +25,7 @@ def dependent_tree(node: str, code_path: str | Path) -> dict[str, list[str]]:
     Returns a dict of nodes and their dependents.
     '''
     tree = {}
-    for n in load_workflow(node, code_path).depends()[0]:
+    for n in load_workflow(node, code_path).depends():
         tree[n] = dependent_tree(n, code_path)
     return tree
 
@@ -43,7 +43,7 @@ import numpy as np
 __timeout__ = 7*24*3600
 
 def depends():
-    return [{deps!r}]
+    return {deps!r}
 
 
 def calibrate():
