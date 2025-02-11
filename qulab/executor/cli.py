@@ -8,7 +8,7 @@ import click
 from loguru import logger
 
 from ..cli.config import ENV_PREFIX, get_config_value, log_options
-from .load import find_unreferenced_workflows, load_workflow
+from .load import find_unreferenced_workflows, get_entries, load_workflow
 from .schedule import maintain as maintain_workflow
 from .schedule import run as run_workflow
 from .transform import set_config_api
@@ -134,14 +134,20 @@ def run(workflow, code, data, api, plot, no_dependents):
     code = Path(os.path.expanduser(code))
     data = Path(os.path.expanduser(data))
 
+    wf = load_workflow(workflow, code)
+
     if no_dependents:
-        run_workflow(load_workflow(workflow, code), code, data, plot=plot)
+        if hasattr(wf, 'entries'):
+            for entry in get_entries(wf, code):
+                run_workflow(entry, code, data, plot=plot)
+        else:
+            run_workflow(wf, code, data, plot=plot)
     else:
-        maintain_workflow(load_workflow(workflow, code),
-                          code,
-                          data,
-                          run=True,
-                          plot=plot)
+        if hasattr(wf, 'entries'):
+            for entry in get_entries(wf, code):
+                maintain_workflow(entry, code, data, run=True, plot=plot)
+        else:
+            maintain_workflow(wf, code, data, run=True, plot=plot)
 
 
 @click.command()
@@ -164,8 +170,9 @@ def maintain(workflow, code, data, api, plot):
     code = Path(os.path.expanduser(code))
     data = Path(os.path.expanduser(data))
 
-    maintain_workflow(load_workflow(workflow, code),
-                      code,
-                      data,
-                      run=False,
-                      plot=plot)
+    wf = load_workflow(workflow, code)
+    if hasattr(wf, 'entries'):
+        for entry in get_entries(wf, code):
+            maintain_workflow(entry, code, data, run=False, plot=plot)
+    else:
+        maintain_workflow(wf, code, data, run=False, plot=plot)

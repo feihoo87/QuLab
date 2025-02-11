@@ -198,14 +198,15 @@ def find_unreferenced_workflows(path: str) -> list[str]:
 def load_workflow_from_file(file_name: str,
                             base_path: str | Path,
                             package='workflows') -> WorkflowType:
-    if file_name.startswith('cfg:'):
-        return SetConfigWorkflow(file_name[4:])
     base_path = Path(base_path)
     path = Path(file_name)
     module_name = f"{package}.{'.'.join([*path.parts[:-1], path.stem])}"
     spec = spec_from_file_location(module_name, base_path / path)
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
+
+    if hasattr(module, 'entries'):
+        return module
 
     if not hasattr(module, '__timeout__'):
         module.__timeout__ = None
@@ -312,3 +313,7 @@ def load_workflow(workflow: str | tuple[str, dict],
 def get_dependents(workflow: WorkflowType,
                    code_path: str | Path) -> list[WorkflowType]:
     return [load_workflow(n, code_path) for n in workflow.depends()[0]]
+
+
+def get_entries(workflow: WorkflowType, code_path: str | Path) -> WorkflowType:
+    return [load_workflow(n, code_path) for n in workflow.entries()]
