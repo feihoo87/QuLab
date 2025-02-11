@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 from loguru import logger
 
+from ..cli.config import ENV_PREFIX, get_config_value, log_options
 from .load import find_unreferenced_workflows, load_workflow
 from .schedule import maintain as maintain_workflow
 from .schedule import run as run_workflow
@@ -14,63 +15,41 @@ from .transform import set_config_api
 from .utils import workflow_template
 
 
-def load_config():
-    import yaml
+def command_option(command_name):
+    """命令专属配置装饰器工厂"""
 
-    config_paths = [
-        Path.home() / ".myapp/config.yaml",  # 用户主目录
-        Path("config.yaml")  # 当前目录
-    ]
-    for path in config_paths:
-        if path.exists():
-            with open(path) as f:
-                return yaml.safe_load(f)
-    return {"defaults": {"log": "default.log", "debug": False}}
+    def decorator(func):
 
+        @click.option(
+            '--code',
+            '-c',
+            default=lambda: get_config_value("code", str, command_name),
+            help='The path of the code.')
+        @click.option(
+            '--data',
+            '-d',
+            default=lambda: get_config_value("data", str, command_name),
+            help='The path of the data.')
+        @click.option(
+            '--api',
+            '-a',
+            default=lambda: get_config_value("api", str, command_name),
+            help='The modlule name of the api.')
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
 
-def get_config_value(option_name):
-    # 1. 尝试从环境变量读取
-    env_value = os.environ.get(f"MYAPP_{option_name.upper()}")
-    if env_value:
-        return env_value
+        return wrapper
 
-    # 2. 尝试从配置文件读取
-    config = load_config()
-    return config["defaults"].get(option_name)
-
-
-def log_options(func):
-
-    @click.option("--debug", is_flag=True, help="Enable debug mode.")
-    @click.option("--log", type=str, help="Log file path.")
-    @functools.wraps(func)  # 保持函数元信息
-    def wrapper(*args, log=None, debug=False, **kwargs):
-        if log is None and not debug:
-            logger.remove()
-            logger.add(sys.stderr, level='INFO')
-        elif log is None and debug:
-            logger.remove()
-            logger.add(sys.stderr, level='DEBUG')
-        elif log is not None and not debug:
-            logger.configure(handlers=[dict(sink=log, level='INFO')])
-        elif log is not None and debug:
-            logger.configure(handlers=[
-                dict(sink=log, level='DEBUG'),
-                dict(sink=sys.stderr, level='DEBUG')
-            ])
-        return func(*args, **kwargs)
-
-    return wrapper
-
-
-@click.group()
-def cli():
-    pass
+    return decorator
 
 
 @click.command()
 @click.argument('workflow')
-@click.option('--code', '-c', default=None, help='The path of the code.')
+@click.option('--code',
+              '-c',
+              default=lambda: get_config_value("code", str, 'create'),
+              help='The path of the code.')
 def create(workflow, code):
     """
     Create a new workflow file.
@@ -95,7 +74,10 @@ def create(workflow, code):
 @click.command()
 @click.argument('key')
 @click.argument('value', type=str)
-@click.option('--api', '-a', default=None, help='The modlule name of the api.')
+@click.option('--api',
+              '-a',
+              default=lambda: get_config_value("api", str, 'set'),
+              help='The modlule name of the api.')
 def set(key, value, api):
     """
     Set a config.
@@ -113,7 +95,10 @@ def set(key, value, api):
 
 @click.command()
 @click.argument('key')
-@click.option('--api', '-a', default=None, help='The modlule name of the api.')
+@click.option('--api',
+              '-a',
+              default=lambda: get_config_value("api", str, 'get'),
+              help='The modlule name of the api.')
 def get(key, api):
     """
     Get a config.
@@ -127,15 +112,13 @@ def get(key, api):
 
 @click.command()
 @click.argument('workflow')
-@click.option('--code', '-c', default=None, help='The path of the code.')
-@click.option('--data', '-d', default=None, help='The path of the data.')
-@click.option('--api', '-a', default=None, help='The modlule name of the api.')
 @click.option('--plot', '-p', is_flag=True, help='Plot the result.')
 @click.option('--no-dependents',
               '-n',
               is_flag=True,
               help='Do not run dependents.')
 @log_options
+@command_option('run')
 def run(workflow, code, data, api, plot, no_dependents):
     """
     Run a workflow.
@@ -163,11 +146,9 @@ def run(workflow, code, data, api, plot, no_dependents):
 
 @click.command()
 @click.argument('workflow')
-@click.option('--code', '-c', default=None, help='The path of the code.')
-@click.option('--data', '-d', default=None, help='The path of the data.')
-@click.option('--api', '-a', default=None, help='The modlule name of the api.')
 @click.option('--plot', '-p', is_flag=True, help='Plot the result.')
 @log_options
+@command_option('maintain')
 def maintain(workflow, code, data, api, plot):
     """
     Maintain a workflow.
@@ -188,13 +169,3 @@ def maintain(workflow, code, data, api, plot):
                       data,
                       run=False,
                       plot=plot)
-
-
-cli.add_command(maintain)
-cli.add_command(run)
-cli.add_command(create)
-cli.add_command(set)
-cli.add_command(get)
-
-if __name__ == '__main__':
-    cli()
