@@ -62,14 +62,17 @@ def log_options(func):
 
     @click.option("--debug",
                   is_flag=True,
-                  default=lambda: get_config_value("debug", bool) or False,
+                  default=get_config_value("debug", bool),
                   help=f"Enable debug mode")
     @click.option("--log",
                   type=click.Path(),
                   default=lambda: get_config_value("log", Path),
                   help=f"Log file path")
     @functools.wraps(func)
-    def wrapper(*args, log=None, debug=False, **kwargs):
+    def wrapper(*args, **kwargs):
+        debug = kwargs.pop("debug")
+        log = kwargs.pop("log")
+        print(debug, log)
         if log is None and not debug:
             logger.remove()
             logger.add(sys.stderr, level='INFO')
