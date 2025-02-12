@@ -34,7 +34,7 @@ def workflow_template(deps: list[str]) -> str:
     return f"""
 from loguru import logger
 
-def _D_(s): pass
+def VAR(s): pass
 
 import numpy as np
 

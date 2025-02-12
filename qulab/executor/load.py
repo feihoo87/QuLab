@@ -1,8 +1,11 @@
+import base64
 import hashlib
 import inspect
+import lzma
 import pickle
 import re
 import string
+import textwrap
 import warnings
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -224,8 +227,24 @@ def load_workflow_from_file(file_name: str,
     return module
 
 
+def encode_mapping(mapping):
+    mapping_bytes = lzma.compress(pickle.dumps(mapping))
+    hash_str = hashlib.md5(mapping_bytes).hexdigest()[:8]
+    mappping_code = '\n'.join(
+        textwrap.wrap(base64.b64encode(mapping_bytes).decode(), 100))
+    return hash_str, mappping_code
+
+
+def decode_mapping(hash_str, mappping_code):
+    mapping_bytes = base64.b64decode(mappping_code.replace('\n', ''))
+    if hash_str != hashlib.md5(mapping_bytes).hexdigest()[:8]:
+        raise ValueError("Hash does not match")
+    mapping = pickle.loads(lzma.decompress(mapping_bytes))
+    return mapping
+
+
 def load_workflow_from_template(template_path: str,
-                                mappping: dict[str, str],
+                                mapping: dict[str, str],
                                 base_path: str | Path,
                                 target_path: str | None = None,
                                 package='workflows',
@@ -237,30 +256,36 @@ def load_workflow_from_template(template_path: str,
         content = f.read()
 
     mtime = max(Path(template_path).stat().st_mtime, mtime)
+    hash_str, mapping_code = encode_mapping(mapping)
 
     def replace(text):
         """
-        将给定文本中的所有 _D_("var") 替换为 ${var}。
+        将给定文本中的所有 VAR("var") 替换为 __VAR_{hash_str}["var"]。
         
         Args:
-            text (str): 包含 _D_ 调用的字符串。
+            text (str): 包含 VAR 调用的字符串。
         
         Returns:
             str: 已经替换的新字符串。
         """
-        pattern = re.compile(r'_D_\s*\(\s*(["\'])(\w+)\1\s*\)')
-        replacement = r'${\2}'
+        pattern = re.compile(r'VAR\s*\(\s*(["\'])(\w+)\1\s*\)')
+        replacement = f'__VAR_{hash_str}' + r'["\2"]'
         new_text = re.sub(pattern, replacement, text)
         return new_text
 
     template = string.Template(replace(content))
     keys = template.get_identifiers()
-    missing = set(keys) - set(mappping.keys())
+    missing = set(keys) - set(mapping.keys())
     if missing:
         raise KeyError(f"{template_path}: Missing keys in mapping: {missing}")
-    content = template.substitute(mappping)
+    content = template.substitute(mapping)
 
-    hash_str = hashlib.md5(pickle.dumps(mappping)).hexdigest()[:8]
+    inject_code = [
+        "from qulab.executor.load import decode_mapping",
+        f"__VAR_{hash_str} = decode_mapping(\"{hash_str}\",",
+        f"\"\"\"{mapping_code}\"\"\")"
+    ]
+    content = '\n'.join(inject_code + [content])
     if target_path is None:
         if path.stem == 'template':
             path = path.parent / f'tmp{hash_str}.py'
