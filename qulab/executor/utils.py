@@ -34,7 +34,7 @@ def workflow_template(deps: list[str]) -> str:
     return f"""
 from loguru import logger
 
-def VAR(s): pass
+def VAR(s): pass  # 没有实际作用，只是用来抑制编辑器的警告。
 
 import numpy as np
 
