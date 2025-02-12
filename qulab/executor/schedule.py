@@ -236,7 +236,8 @@ def maintain(workflow: WorkflowType,
              state_path: str | Path,
              session_id: str | None = None,
              run: bool = False,
-             plot: bool = False):
+             plot: bool = False,
+             update: bool = True):
     if session_id is None:
         session_id = uuid.uuid4().hex
     logger.debug(f'run "{workflow.__workflow_id__}"'
@@ -280,7 +281,8 @@ def maintain(workflow: WorkflowType,
         raise CalibrationFailedError(
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
-    transform.update_parameters(result)
+    if update:
+        transform.update_parameters(result)
     return
 
 
@@ -288,13 +290,19 @@ def maintain(workflow: WorkflowType,
 def run(workflow: WorkflowType,
         code_path: str | Path,
         state_path: str | Path,
-        plot: bool = False):
+        plot: bool = False,
+        update: bool = True):
     session_id = uuid.uuid4().hex
     logger.debug(f'run "{workflow.__workflow_id__}" without dependences.')
-    result = calibrate(workflow, code_path, state_path, plot, session_id=session_id)
+    result = calibrate(workflow,
+                       code_path,
+                       state_path,
+                       plot,
+                       session_id=session_id)
     if result.bad_data or not result.in_spec:
         raise CalibrationFailedError(
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
-    transform.update_parameters(result)
+    if update:
+        transform.update_parameters(result)
     return

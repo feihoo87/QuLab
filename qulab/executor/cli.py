@@ -120,14 +120,15 @@ def get(key, api):
               '-n',
               is_flag=True,
               help='Do not run dependents.')
+@click.option('--update', '-u', is_flag=True)
 @log_options
 @command_option('run')
-def run(workflow, code, data, api, plot, no_dependents):
+def run(workflow, code, data, api, plot, no_dependents, update):
     """
     Run a workflow.
     """
     logger.info(
-        f'[CMD]: run {workflow} --code {code} --data {data} --api {api} --plot {plot} --no-dependents {no_dependents}'
+        f'[CMD]: run {workflow} --code {code} --data {data} --api {api}{" --plot" if plot else ""}{" --no-dependents" if no_dependents else ""}{" --update " if update else ""}'
     )
     if api is not None:
         api = importlib.import_module(api)
@@ -145,15 +146,15 @@ def run(workflow, code, data, api, plot, no_dependents):
     if no_dependents:
         if hasattr(wf, 'entries'):
             for entry in get_entries(wf, code):
-                run_workflow(entry, code, data, plot=plot)
+                run_workflow(entry, code, data, plot=plot, update=update)
         else:
-            run_workflow(wf, code, data, plot=plot)
+            run_workflow(wf, code, data, plot=plot, update=update)
     else:
         if hasattr(wf, 'entries'):
             for entry in get_entries(wf, code):
-                maintain_workflow(entry, code, data, run=True, plot=plot)
+                maintain_workflow(entry, code, data, run=True, plot=plot, update=update)
         else:
-            maintain_workflow(wf, code, data, run=True, plot=plot)
+            maintain_workflow(wf, code, data, run=True, plot=plot, update=update)
 
 
 @click.command()
@@ -166,7 +167,7 @@ def maintain(workflow, code, data, api, plot):
     Maintain a workflow.
     """
     logger.info(
-        f'[CMD]: maintain {workflow} --code {code} --data {data} --api {api} --plot {plot}'
+        f'[CMD]: maintain {workflow} --code {code} --data {data} --api {api}{" --plot" if plot else ""}'
     )
     if api is not None:
         api = importlib.import_module(api)
