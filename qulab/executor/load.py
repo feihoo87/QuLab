@@ -269,7 +269,7 @@ def load_workflow_from_template(template_path: str,
             str: 已经替换的新字符串。
         """
         pattern = re.compile(r'VAR\s*\(\s*(["\'])(\w+)\1\s*\)')
-        replacement = f'__VAR_{hash_str}' + r'["\2"]'
+        replacement = f'__VAR_{hash_str}' + r'[\1\2\1]'
         new_text = re.sub(pattern, replacement, text)
         return new_text
 
