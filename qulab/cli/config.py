@@ -79,7 +79,10 @@ def log_options(func):
             logger.remove()
             logger.add(sys.stderr, level='DEBUG')
         elif log is not None and not debug:
-            logger.configure(handlers=[dict(sink=log, level='INFO')])
+            logger.configure(handlers=[
+                dict(sink=log, level='INFO'),
+                dict(sink=sys.stderr, level='INFO')
+            ])
         elif log is not None and debug:
             logger.configure(handlers=[
                 dict(sink=log, level='DEBUG'),
