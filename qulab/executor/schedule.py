@@ -120,13 +120,13 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
 
     if hasattr(workflow, 'check') and callable(workflow.check) and hasattr(
             workflow, 'check_analyze') and callable(workflow.check_analyze):
-        logger.debug(f'Checking "{workflow}" with "check" method ...')
+        logger.debug(f'Checking "{workflow.__workflow_id__}" with "check" method ...')
         data = workflow.check()
         result = Result()
         result.data = data
         save_result(workflow.__workflow_id__, result, state_path)
 
-        logger.debug(f'Checked "{workflow}" !')
+        logger.debug(f'Checked "{workflow.__workflow_id__}" !')
         result = call_analyzer(workflow, data, history, check=True, plot=plot)
         if result.in_spec:
             logger.debug(
