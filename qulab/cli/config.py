@@ -25,7 +25,7 @@ def _get_config_value(option_name, type_cast=str, command_name=None):
     if env_value := os.getenv(env_var):
         if type_cast is bool:
             return env_value.lower() in ("true", "1", "yes")
-        if "path" in option_name:
+        if "path" in option_name or issubclass(type_cast, Path):
             return os.path.expanduser(env_value)
         return type_cast(env_value)
 
@@ -43,7 +43,7 @@ def _get_config_value(option_name, type_cast=str, command_name=None):
                                       fallback=None):
             if type_cast is bool:
                 return config_value.lower() in ("true", "1", "yes")
-            if "path" in option_name:
+            if "path" in option_name or issubclass(type_cast, Path):
                 return os.path.expanduser(config_value)
             return type_cast(config_value)
 
@@ -66,7 +66,7 @@ def log_options(func):
                   help=f"Enable debug mode")
     @click.option("--log",
                   type=click.Path(),
-                  default=lambda: get_config_value("log"),
+                  default=lambda: get_config_value("log", Path),
                   help=f"Log file path")
     @functools.wraps(func)
     def wrapper(*args, log=None, debug=False, **kwargs):
