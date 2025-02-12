@@ -31,8 +31,7 @@ def dependent_tree(node: str, code_path: str | Path) -> dict[str, list[str]]:
 
 
 def workflow_template(deps: list[str]) -> str:
-    return f"""
-from loguru import logger
+    return f"""from loguru import logger
 
 def VAR(s): pass  # 没有实际作用，只是用来抑制编辑器的警告。
 
