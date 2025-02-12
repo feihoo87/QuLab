@@ -72,7 +72,6 @@ def log_options(func):
     def wrapper(*args, **kwargs):
         debug = kwargs.pop("debug")
         log = kwargs.pop("log")
-        print(debug, log)
         if log is None and not debug:
             logger.remove()
             logger.add(sys.stderr, level='INFO')
