@@ -68,26 +68,29 @@ def log_options(func):
                   type=click.Path(),
                   default=lambda: get_config_value("log", Path),
                   help=f"Log file path")
+    @click.option("--quiet",
+                  is_flag=True,
+                  default=get_config_value("quiet", bool),
+                  help=f"Disable log output")
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        debug = kwargs.pop("debug")
+        debug = bool(kwargs.pop("debug"))
         log = kwargs.pop("log")
-        if log is None and not debug:
-            logger.remove()
-            logger.add(sys.stderr, level='INFO')
-        elif log is None and debug:
-            logger.remove()
-            logger.add(sys.stderr, level='DEBUG')
-        elif log is not None and not debug:
-            logger.configure(handlers=[
-                dict(sink=log, level='INFO'),
-                dict(sink=sys.stderr, level='INFO')
-            ])
-        elif log is not None and debug:
-            logger.configure(handlers=[
-                dict(sink=log, level='DEBUG'),
-                dict(sink=sys.stderr, level='DEBUG')
-            ])
+        quiet = bool(kwargs.pop("quiet"))
+
+        if debug:
+            log_level = "DEBUG"
+        else:
+            log_level = "INFO"
+
+        handlers = []
+        if log is not None:
+            handlers.append(dict(sink=log, level=log_level))
+        if not quiet or debug:
+            handlers.append(dict(sink=sys.stderr, level=log_level))
+
+        logger.configure(handlers=handlers)
+
         return func(*args, **kwargs)
 
     return wrapper
