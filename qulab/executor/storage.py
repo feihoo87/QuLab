@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from loguru import logger
 
@@ -21,7 +21,7 @@ class Result():
     ttl: timedelta = timedelta(days=3650)
     parameters: dict = field(default_factory=dict)
     other_infomation: dict = field(default_factory=dict)
-    data: tuple = field(default_factory=tuple)
+    data: Any = field(default_factory=tuple)
     index: int = -1
     previous_path: Path | None = None
     base_path: Path | None = None
