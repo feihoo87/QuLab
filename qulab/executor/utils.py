@@ -60,7 +60,15 @@ def calibrate():
     return x, y
 
 
-def analyze(result, history):
+def analyze(result: Result, history: Result | None) -> Result:
+    \"\"\"
+    分析校准结果。
+
+    result: Result
+        本次校准实验的数据。
+    history: Result | None
+        上次校准实验数据和分析结果，如果有的话。
+    \"\"\"
     import random
 
     # 这里添加你的分析过程，运行 calibrate 得到的数据，在 result.data 里
@@ -99,7 +107,15 @@ def check():
     return x, y
 
 
-def check_analyze(result, history):
+def check_analyze(result: Result, history: Result) -> Result:
+    \"\"\"
+    分析检查结果。
+
+    result: Result
+        本次检查实验的数据。
+    history: Result | None
+        上次检查实验数据和分析结果，如果有的话。
+    \"\"\"
     import random
 
     # 这里添加你的分析过程，运行 check 得到的数据，在 result.data 里
