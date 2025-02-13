@@ -1,18 +1,33 @@
 import functools
+import graphlib
 import importlib
 import os
-import sys
 from pathlib import Path
 
 import click
 from loguru import logger
 
-from ..cli.config import ENV_PREFIX, get_config_value, log_options
-from .load import find_unreferenced_workflows, get_entries, load_workflow
+from ..cli.config import get_config_value, log_options
+from .load import (WorkflowType, find_unreferenced_workflows, get_entries,
+                   load_workflow, make_graph)
 from .schedule import maintain as maintain_workflow
 from .schedule import run as run_workflow
 from .transform import set_config_api
 from .utils import workflow_template
+
+
+@logger.catch(reraise=True)
+def check_toplogy(workflow: WorkflowType, code_path: str | Path) -> dict:
+    graph = {}
+    try:
+        graphlib.TopologicalSorter(make_graph(workflow, graph,
+                                              code_path)).static_order()
+    except graphlib.CycleError as e:
+        logger.error(
+            f"Workflow {workflow.__workflow_id__} has a circular dependency: {e}"
+        )
+        raise e
+    return graph
 
 
 def command_option(command_name):
@@ -142,6 +157,7 @@ def run(workflow, code, data, api, plot, no_dependents, update):
     data = Path(os.path.expanduser(data))
 
     wf = load_workflow(workflow, code)
+    check_toplogy(wf, code)
 
     if no_dependents:
         if hasattr(wf, 'entries'):
@@ -152,9 +168,19 @@ def run(workflow, code, data, api, plot, no_dependents, update):
     else:
         if hasattr(wf, 'entries'):
             for entry in get_entries(wf, code):
-                maintain_workflow(entry, code, data, run=True, plot=plot, update=update)
+                maintain_workflow(entry,
+                                  code,
+                                  data,
+                                  run=True,
+                                  plot=plot,
+                                  update=update)
         else:
-            maintain_workflow(wf, code, data, run=True, plot=plot, update=update)
+            maintain_workflow(wf,
+                              code,
+                              data,
+                              run=True,
+                              plot=plot,
+                              update=update)
 
 
 @click.command()
@@ -181,6 +207,8 @@ def maintain(workflow, code, data, api, plot):
     data = Path(os.path.expanduser(data))
 
     wf = load_workflow(workflow, code)
+    check_toplogy(wf, code)
+
     if hasattr(wf, 'entries'):
         for entry in get_entries(wf, code):
             maintain_workflow(entry, code, data, run=False, plot=plot)

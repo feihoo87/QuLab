@@ -1,4 +1,5 @@
 import base64
+import graphlib
 import hashlib
 import inspect
 import lzma
@@ -259,7 +260,7 @@ def load_workflow_from_template(template_path: str,
     with open(base_path / path) as f:
         content = f.read()
 
-    mtime = max(Path(template_path).stat().st_mtime, mtime)
+    mtime = max((base_path / template_path).stat().st_mtime, mtime)
     hash_str, mapping_code = encode_mapping(mapping)
 
     def replace(text):
@@ -360,8 +361,27 @@ def get_dependents(workflow: WorkflowType,
     ]
 
 
-def get_entries(workflow: WorkflowType, code_path: str | Path) -> WorkflowType:
+def get_entries(workflow: WorkflowType,
+                code_path: str | Path) -> list[WorkflowType]:
     return [
         load_workflow(n, code_path, mtime=workflow.__mtime__)
         for n in workflow.entries()
     ]
+
+
+def make_graph(workflow: WorkflowType, graph: dict, code_path: str | Path):
+    if workflow.__workflow_id__ in graph:
+        raise graphlib.CycleError(
+            f"Workflow {workflow.__workflow_id__} has a circular dependency")
+    graph[workflow.__workflow_id__] = []
+
+    if hasattr(workflow, 'entries'):
+        for w in get_entries(workflow, code_path):
+            graph[workflow.__workflow_id__].append(w.__workflow_id__)
+            make_graph(w, graph=graph, code_path=code_path)
+    elif hasattr(workflow, 'depends'):
+        for w in get_dependents(workflow, code_path):
+            graph[workflow.__workflow_id__].append(w.__workflow_id__)
+            make_graph(w, graph=graph, code_path=code_path)
+
+    return graph
