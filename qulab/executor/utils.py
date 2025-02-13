@@ -60,23 +60,27 @@ def calibrate():
     return x, y
 
 
-def analyze(*args, history):
+def analyze(result, history):
     import random
+
+    # 这里添加你的分析过程，运行 calibrate 得到的数据，在 result.data 里
+    # 你可以得到校准的结果，然后根据这个结果进行分析。
+    x, y = result.data
 
     # 完整校准后的状态有两种：OK 和 Bad，分别对应校准成功和校准失败。
     # 校准失败是指出现坏数据，无法简单通过重新运行本次校准解决，需要
     # 检查前置步骤。
-    state = random.choice(['OK', 'Bad'])
+    result.state = random.choice(['OK', 'Bad'])
 
     # 参数是一个字典，包含了本次校准得到的参数，后续会更新到config表中。
-    parameters = {{'gate.R.Q1.params.amp':1}}
+    result.parameters = {{'gate.R.Q1.params.amp':1}}
 
     # 其他信息可以是任何可序列化的内容，你可以将你想要记录的信息放在这里。
     # 下次校准分析时，这些信息也会在 history 参数中一起传入，帮助你在下
     # 次分析时对比参考。
-    other_infomation = {{}}
+    result.other_infomation = {{}}
 
-    return state, parameters, other_infomation
+    return result
 
 
 def check():
@@ -95,14 +99,18 @@ def check():
     return x, y
 
 
-def check_analyze(*args, history):
+def check_analyze(result, history):
     import random
+
+    # 这里添加你的分析过程，运行 check 得到的数据，在 result.data 里
+    # 你可以得到校准的结果，然后根据这个结果进行分析。
+    x, y = result.data
 
     # 状态有三种：Outdated, OK, Bad，分别对应过时、正常、坏数据。
     # Outdated 是指数据过时，即参数漂了，需要重新校准。
     # OK 是指数据正常，参数也没漂，不用重新校准。
     # Bad 是指数据坏了，无法校准，需要检查前置步骤。
-    state = random.choice(['Outdated', 'OK', 'Bad'])
+    result.state = random.choice(['Outdated', 'OK', 'Bad'])
 
-    return state, {{}}, {{}}
+    return result
 """

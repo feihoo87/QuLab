@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Literal
 
 from loguru import logger
 
@@ -18,8 +19,8 @@ class Result():
     calibrated_time: datetime = field(default_factory=datetime.now)
     checked_time: datetime = field(default_factory=datetime.now)
     ttl: timedelta = timedelta(days=3650)
-    params: dict = field(default_factory=dict)
-    info: dict = field(default_factory=dict)
+    parameters: dict = field(default_factory=dict)
+    other_infomation: dict = field(default_factory=dict)
     data: tuple = field(default_factory=tuple)
     index: int = -1
     previous_path: Path | None = None
@@ -31,6 +32,37 @@ class Result():
             return load_result(self.previous_path, self.base_path)
         else:
             return None
+
+    @property
+    def state(self) -> Literal['OK', 'Bad', 'Outdated']:
+        state = 'Bad'
+        match (self.in_spec, self.bad_data):
+            case (True, False):
+                state = 'OK'
+            case (False, True):
+                state = 'Bad'
+            case (False, False):
+                state = 'Outdated'
+        return state
+
+    @state.setter
+    def state(self, state: Literal['OK', 'Bad', 'Outdated', 'In spec',
+                                   'Out of spec', 'Bad data']):
+        if state not in [
+                'OK', 'Bad', 'Outdated', 'In spec', 'Out of spec', 'Bad data'
+        ]:
+            raise ValueError(
+                f'Invalid state: {state}, state must be one of "OK", "Bad" and "Outdated"'
+            )
+        if state in ['In spec', 'OK']:
+            self.in_spec = True
+            self.bad_data = False
+        elif state in ['Bad data', 'Bad']:
+            self.bad_data = True
+            self.in_spec = False
+        else:
+            self.bad_data = False
+            self.in_spec = False
 
 
 def random_path(base: Path) -> Path:
@@ -44,7 +76,7 @@ def random_path(base: Path) -> Path:
 def save_result(workflow: str,
                 result: Result,
                 base_path: str | Path,
-                overwrite: bool = False):
+                overwrite: bool = False) -> int:
     logger.debug(
         f'Saving result for "{workflow}", {result.in_spec=}, {result.bad_data=}, {result.fully_calibrated=}'
     )
@@ -70,6 +102,7 @@ def save_result(workflow: str,
         f.write(result.index.to_bytes(8, 'big'))
         f.write(buf)
     set_head(workflow, path, base_path)
+    return result.index
 
 
 def load_result(path: str | Path, base_path: str | Path) -> Result | None:
@@ -99,7 +132,7 @@ def renew_result(workflow: str, base_path: str | Path):
     result = find_result(workflow, base_path)
     if result is not None:
         result.checked_time = datetime.now()
-        save_result(workflow, result, base_path)
+        return save_result(workflow, result, base_path)
 
 
 def revoke_result(workflow: str, base_path: str | Path):
@@ -110,7 +143,7 @@ def revoke_result(workflow: str, base_path: str | Path):
         with open(base_path / 'objects' / path, "rb") as f:
             result = pickle.load(f)
         result.in_spec = False
-        save_result(workflow, result, base_path)
+        return save_result(workflow, result, base_path)
 
 
 def set_head(workflow: str, path: Path, base_path: str | Path):

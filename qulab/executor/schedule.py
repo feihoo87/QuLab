@@ -5,10 +5,10 @@ from pathlib import Path
 
 from loguru import logger
 
-from . import transform
 from .load import WorkflowType, get_dependents
 from .storage import (Result, find_result, renew_result, revoke_result,
                       save_result)
+from .transform import update_parameters
 
 
 class CalibrationFailedError(Exception):
@@ -66,27 +66,22 @@ def check_state(workflow: WorkflowType, code_path: str | Path,
     return True
 
 
-def call_analyzer(node, data, history, check=False, plot=False):
+def call_analyzer(node, result, history, check=False, plot=False):
     if check:
-        result = transform.params_to_result(
-            node.check_analyze(*data,
-                               history=transform.result_to_params(history)))
+        result = node.check_analyze(result, history=history)
         result.fully_calibrated = False
     else:
-        result = transform.params_to_result(
-            node.analyze(*data, history=transform.result_to_params(history)))
+        result = node.analyze(result, history=history)
         result.fully_calibrated = True
         if plot:
             call_plot(node, result)
-    result.data = data
     return result
 
 
 @logger.catch()
 def call_plot(node, result, check=False):
     if hasattr(node, 'plot') and callable(node.plot):
-        state, params, other = transform.result_to_params(result)
-        node.plot(state, params, other)
+        node.plot(result)
 
 
 @functools.lru_cache(maxsize=128)
@@ -128,7 +123,7 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
         #save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Checked "{workflow.__workflow_id__}" !')
-        result = call_analyzer(workflow, data, history, check=True, plot=plot)
+        result = call_analyzer(workflow, result, history, check=True, plot=plot)
         if result.in_spec:
             logger.debug(
                 f'"{workflow.__workflow_id__}": checked in spec, renewing result'
@@ -149,7 +144,7 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
         save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Calibrated "{workflow}" !')
-        result = call_analyzer(workflow, data, history, check=False, plot=plot)
+        result = call_analyzer(workflow, result, history, check=False, plot=plot)
         save_result(workflow.__workflow_id__,
                     result,
                     state_path,
@@ -169,7 +164,7 @@ def calibrate(workflow: WorkflowType, code_path: str | Path,
     result.data = data
     save_result(workflow.__workflow_id__, result, state_path)
     logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
-    result = call_analyzer(workflow, data, history, check=False, plot=plot)
+    result = call_analyzer(workflow, result, history, check=False, plot=plot)
     save_result(workflow.__workflow_id__, result, state_path, overwrite=True)
     return result
 
@@ -228,7 +223,7 @@ def diagnose(workflow: WorkflowType, code_path: str | Path,
         raise CalibrationFailedError(
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
-    transform.update_parameters(result)
+    update_parameters(result)
     return True
 
 
@@ -284,7 +279,7 @@ def maintain(workflow: WorkflowType,
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
     if update:
-        transform.update_parameters(result)
+        update_parameters(result)
     return
 
 
@@ -306,5 +301,5 @@ def run(workflow: WorkflowType,
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
     if update:
-        transform.update_parameters(result)
+        update_parameters(result)
     return
