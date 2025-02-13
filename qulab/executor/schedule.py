@@ -7,8 +7,8 @@ from loguru import logger
 
 from . import transform
 from .load import WorkflowType, get_dependents
-from .storage import (Result, find_result, get_head, renew_result,
-                      revoke_result, save_result)
+from .storage import (Result, find_result, renew_result, revoke_result,
+                      save_result)
 
 
 class CalibrationFailedError(Exception):
@@ -120,7 +120,8 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
 
     if hasattr(workflow, 'check') and callable(workflow.check) and hasattr(
             workflow, 'check_analyze') and callable(workflow.check_analyze):
-        logger.debug(f'Checking "{workflow.__workflow_id__}" with "check" method ...')
+        logger.debug(
+            f'Checking "{workflow.__workflow_id__}" with "check" method ...')
         data = workflow.check()
         result = Result()
         result.data = data
@@ -149,7 +150,9 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
 
         logger.debug(f'Calibrated "{workflow}" !')
         result = call_analyzer(workflow, data, history, check=False, plot=plot)
-        save_result(workflow.__workflow_id__, result, state_path,
+        save_result(workflow.__workflow_id__,
+                    result,
+                    state_path,
                     overwrite=True)
 
     return result
@@ -167,8 +170,7 @@ def calibrate(workflow: WorkflowType, code_path: str | Path,
     save_result(workflow.__workflow_id__, result, state_path)
     logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
     result = call_analyzer(workflow, data, history, check=False, plot=plot)
-    save_result(workflow.__workflow_id__, result, state_path,
-                overwrite=True)
+    save_result(workflow.__workflow_id__, result, state_path, overwrite=True)
     return result
 
 
