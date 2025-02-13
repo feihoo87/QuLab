@@ -124,7 +124,7 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
         data = workflow.check()
         result = Result()
         result.data = data
-        save_result(workflow.__workflow_id__, result, state_path)
+        #save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Checked "{workflow.__workflow_id__}" !')
         result = call_analyzer(workflow, data, history, check=True, plot=plot)
@@ -150,7 +150,7 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
         logger.debug(f'Calibrated "{workflow}" !')
         result = call_analyzer(workflow, data, history, check=False, plot=plot)
         save_result(workflow.__workflow_id__, result, state_path,
-                    get_head(workflow.__workflow_id__, state_path))
+                    overwrite=True)
 
     return result
 
@@ -168,7 +168,7 @@ def calibrate(workflow: WorkflowType, code_path: str | Path,
     logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
     result = call_analyzer(workflow, data, history, check=False, plot=plot)
     save_result(workflow.__workflow_id__, result, state_path,
-                get_head(workflow.__workflow_id__, state_path))
+                overwrite=True)
     return result
 
 
