@@ -66,7 +66,11 @@ def check_state(workflow: WorkflowType, code_path: str | Path,
     return True
 
 
-def call_analyzer(node, result, history, check=False, plot=False):
+def call_analyzer(node,
+                  result: Result,
+                  history: Result | None,
+                  check=False,
+                  plot=False) -> Result:
     if check:
         result = node.check_analyze(result, history=history)
         result.fully_calibrated = False
@@ -79,7 +83,7 @@ def call_analyzer(node, result, history, check=False, plot=False):
 
 
 @logger.catch()
-def call_plot(node, result, check=False):
+def call_plot(node, result: Result, check=False):
     if hasattr(node, 'plot') and callable(node.plot):
         node.plot(result)
 
@@ -123,7 +127,11 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
         #save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Checked "{workflow.__workflow_id__}" !')
-        result = call_analyzer(workflow, result, history, check=True, plot=plot)
+        result = call_analyzer(workflow,
+                               result,
+                               history,
+                               check=True,
+                               plot=plot)
         if result.in_spec:
             logger.debug(
                 f'"{workflow.__workflow_id__}": checked in spec, renewing result'
@@ -144,7 +152,11 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
         save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Calibrated "{workflow}" !')
-        result = call_analyzer(workflow, result, history, check=False, plot=plot)
+        result = call_analyzer(workflow,
+                               result,
+                               history,
+                               check=False,
+                               plot=plot)
         save_result(workflow.__workflow_id__,
                     result,
                     state_path,

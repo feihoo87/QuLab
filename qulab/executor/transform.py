@@ -30,7 +30,7 @@ def _update_config(updates):
 
 
 def update_parameters(result: Result):
-    update_config(result.params)
+    update_config(result.parameters)
 
 
 query_config = _query_config

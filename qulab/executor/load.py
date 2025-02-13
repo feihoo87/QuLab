@@ -40,17 +40,21 @@ class SetConfigWorkflow():
             value = transform.query_config(self.key)
         except:
             value = eval(input(f'"{self.key}": '))
-        return self.key, value
+        return value
 
-    def analyze(self, key, value, history):
-        return 'OK', {key: value}, {}
+    def analyze(self, result: Result, history: Result):
+        result.state = 'OK'
+        result.parameters = {self.key: result.data}
+        return result
 
     def check(self):
         from .transform import query_config
-        return self.key, query_config(self.key)
+        return query_config(self.key)
 
-    def check_analyze(self, key, value, history):
-        return 'Out of Spec', {key: value}, {}
+    def check_analyze(self, result: Result, history: Result):
+        result.state = 'Outdated'
+        result.parameters = {self.key: result.data}
+        return result
 
     @staticmethod
     def _equal(a, b):
