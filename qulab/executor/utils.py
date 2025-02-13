@@ -31,11 +31,12 @@ def dependent_tree(node: str, code_path: str | Path) -> dict[str, list[str]]:
 
 
 def workflow_template(deps: list[str]) -> str:
-    return f"""from loguru import logger
-
-def VAR(s): pass  # 没有实际作用，只是用来抑制编辑器的警告。
+    return f"""def VAR(s): pass  # 没有实际作用，只是用来抑制编辑器的警告。
 
 import numpy as np
+from loguru import logger
+
+from qulab.typing import Result
 
 
 # 多长时间应该检查一次校准实验，单位是秒。
