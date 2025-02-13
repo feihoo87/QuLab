@@ -140,8 +140,7 @@ def revoke_result(workflow: str, base_path: str | Path):
     base_path = Path(base_path)
     path = get_head(workflow, base_path)
     if path is not None:
-        with open(base_path / 'objects' / path, "rb") as f:
-            result = pickle.load(f)
+        result = load_result(path, base_path)
         result.in_spec = False
         return save_result(workflow, result, base_path)
 
