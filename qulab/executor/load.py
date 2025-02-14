@@ -11,6 +11,7 @@ import warnings
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 from loguru import logger
 
@@ -107,7 +108,8 @@ def verify_calibrate_method(module: WorkflowType):
 def verify_check_method(module: WorkflowType):
     if not hasattr(module, 'check'):
         warnings.warn(
-            f"Workflow {module.__file__} does not have 'check' function")
+            f"Workflow {module.__file__} does not have 'check' function, it will be set to 'calibrate' function"
+        )
     else:
         if not can_call_without_args(module.check):
             raise AttributeError(
@@ -118,6 +120,93 @@ def verify_check_method(module: WorkflowType):
             raise AttributeError(
                 f"Workflow {module.__file__} has 'check' function but does not have 'check_analyze' function"
             )
+
+
+def verify_dependence_key(workflow: str | tuple[str, dict[str, Any]]
+                          | tuple[str, str, dict[str, Any]]):
+    if isinstance(workflow, str):
+        return
+    if not isinstance(workflow, tuple) or len(workflow) not in [2, 3]:
+        raise ValueError(f"Invalid workflow: {workflow}")
+
+    if len(workflow) == 2:
+        file_name, mapping = workflow
+        if not Path(file_name).exists():
+            raise FileNotFoundError(f"File not found: {file_name}")
+    elif len(workflow) == 3:
+        template_path, target_path, mapping = workflow
+        if not Path(template_path).exists():
+            raise FileNotFoundError(f"File not found: {template_path}")
+        if not isinstance(target_path, (Path, str)) or target_path == '':
+            raise ValueError(f"Invalid target_path: {target_path}")
+        if not isinstance(target_path, (Path, str)):
+            raise ValueError(f"Invalid target_path: {target_path}")
+        if Path(target_path).suffix != '.py':
+            raise ValueError(
+                f"Invalid target_path: {target_path}. Only .py file is supported"
+            )
+    else:
+        raise ValueError(f"Invalid workflow: {workflow}")
+
+    if not isinstance(mapping, dict):
+        raise ValueError(f"Invalid mapping: {mapping}")
+
+    for key, value in mapping.items():
+        if not isinstance(key, str):
+            raise ValueError(
+                f"Invalid key: {key}, should be str type and valid identifier")
+        if not key.isidentifier():
+            raise ValueError(f"Invalid key: {key}, should be identifier")
+        try:
+            pickle.dumps(value)
+        except Exception as e:
+            raise ValueError(
+                f"Invalid value: {key}: {value}, should be pickleable") from e
+    return
+
+
+def verify_depends(module: WorkflowType):
+    if not hasattr(module, 'depends'):
+        return
+
+    deps = []
+
+    if callable(module.depends):
+        if not can_call_without_args(module.depends):
+            raise AttributeError(
+                f"Workflow {module.__file__} 'depends' function should not have any parameters"
+            )
+        deps = list(module.depends())
+    elif isinstance(module.depends, (list, tuple)):
+        deps = module.depends
+    else:
+        raise AttributeError(
+            f"Workflow {module.__file__} 'depends' should be a callable or a list"
+        )
+    for workflow in deps:
+        verify_dependence_key(workflow)
+
+
+def verify_entries(module: WorkflowType):
+    if not hasattr(module, 'entries'):
+        return
+
+    deps = []
+
+    if callable(module.entries):
+        if not can_call_without_args(module.entries):
+            raise AttributeError(
+                f"Workflow {module.__file__} 'entries' function should not have any parameters"
+            )
+        deps = list(module.entries())
+    elif isinstance(module.entries, (list, tuple)):
+        deps = module.entries
+    else:
+        raise AttributeError(
+            f"Workflow {module.__file__} 'entries' should be a callable or a list"
+        )
+    for workflow in deps:
+        verify_dependence_key(workflow)
 
 
 def is_workflow(module: ModuleType) -> bool:
@@ -218,14 +307,15 @@ def load_workflow_from_file(file_name: str,
     module.__mtime__ = (base_path / path).stat().st_mtime
 
     if hasattr(module, 'entries'):
+        verify_entries(module)
         return module
 
     if not hasattr(module, '__timeout__'):
         module.__timeout__ = None
 
     if not hasattr(module, 'depends'):
-        module.depends = lambda: [[]]
-
+        module.depends = lambda: []
+    verify_depends(module)
     verify_calibrate_method(module)
     verify_check_method(module)
 
