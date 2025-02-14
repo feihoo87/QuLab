@@ -73,9 +73,17 @@ def call_analyzer(node,
                   plot=False) -> Result:
     if check:
         result = node.check_analyze(result, history=history)
+        if not isinstance(result, Result):
+            raise TypeError(
+                f'"{node.__workflow_id__}" : "check_analyze" must return a Result object'
+            )
         result.fully_calibrated = False
     else:
         result = node.analyze(result, history=history)
+        if not isinstance(result, Result):
+            raise TypeError(
+                f'"{node.__workflow_id__}" : "analyze" must return a Result object'
+            )
         result.fully_calibrated = True
         if plot:
             call_plot(node, result)

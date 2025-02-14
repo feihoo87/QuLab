@@ -355,18 +355,50 @@ def load_workflow(workflow: str | tuple[str, dict],
 
 def get_dependents(workflow: WorkflowType,
                    code_path: str | Path) -> list[WorkflowType]:
-    return [
-        load_workflow(n, code_path, mtime=workflow.__mtime__)
-        for n in workflow.depends()
-    ]
+    if callable(getattr(workflow, 'depends', None)):
+        if not can_call_without_args(workflow.depends):
+            raise AttributeError(
+                f'Workflow {workflow.__workflow_id__} "depends" function should not have any parameters'
+            )
+        return [
+            load_workflow(n, code_path, mtime=workflow.__mtime__)
+            for n in workflow.depends()
+        ]
+    elif isinstance(getattr(workflow, 'depends', None), (list, tuple)):
+        return [
+            load_workflow(n, code_path, mtime=workflow.__mtime__)
+            for n in workflow.depends
+        ]
+    elif getattr(workflow, 'entries', None) is None:
+        return []
+    else:
+        raise AttributeError(
+            f'Workflow {workflow.__workflow_id__} "depends" should be a callable or a list'
+        )
 
 
 def get_entries(workflow: WorkflowType,
                 code_path: str | Path) -> list[WorkflowType]:
-    return [
-        load_workflow(n, code_path, mtime=workflow.__mtime__)
-        for n in workflow.entries()
-    ]
+    if callable(getattr(workflow, 'entries', None)):
+        if not can_call_without_args(workflow.entries):
+            raise AttributeError(
+                f'Workflow {workflow.__workflow_id__} "entries" function should not have any parameters'
+            )
+        return [
+            load_workflow(n, code_path, mtime=workflow.__mtime__)
+            for n in workflow.entries()
+        ]
+    elif isinstance(getattr(workflow, 'entries', None), (list, tuple)):
+        return [
+            load_workflow(n, code_path, mtime=workflow.__mtime__)
+            for n in workflow.entries
+        ]
+    elif getattr(workflow, 'entries', None) is None:
+        return []
+    else:
+        raise AttributeError(
+            f'Workflow {workflow.__workflow_id__} "entries" should be a callable or a list'
+        )
 
 
 def make_graph(workflow: WorkflowType, graph: dict, code_path: str | Path):

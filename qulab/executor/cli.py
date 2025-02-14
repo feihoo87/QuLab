@@ -83,7 +83,7 @@ def create(workflow, code):
     deps = find_unreferenced_workflows(code)
 
     with open(fname, 'w') as f:
-        f.write(workflow_template(list(deps)))
+        f.write(workflow_template(workflow, list(deps)))
     click.echo(f'{workflow} created')
 
 

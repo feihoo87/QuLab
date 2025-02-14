@@ -30,7 +30,7 @@ def dependent_tree(node: str, code_path: str | Path) -> dict[str, list[str]]:
     return tree
 
 
-def workflow_template(deps: list[str]) -> str:
+def workflow_template(workflow: str, deps: list[str]) -> str:
     return f"""def VAR(s): pass  # 没有实际作用，只是用来抑制编辑器的警告。
 
 import numpy as np
@@ -47,7 +47,7 @@ def depends():
 
 
 def calibrate():
-    logger.info(f"run {{__name__}}")
+    logger.info(f"running {workflow} ...")
 
     # calibrate 是一个完整的校准实验，如power Rabi，Ramsey等。
     # 你需要足够的扫描点，以使得后续的 analyze 可以拟合出合适的参数。
@@ -58,10 +58,11 @@ def calibrate():
     for i in x:
         y.append(np.sin(i))
 
+    logger.info(f"running {workflow} ... finished!")
     return x, y
 
 
-def analyze(result: Result, history: Result | None) -> Result:
+def analyze(result: Result, history: Result | None = None) -> Result:
     \"\"\"
     分析校准结果。
 
@@ -93,7 +94,7 @@ def analyze(result: Result, history: Result | None) -> Result:
 
 
 def check():
-    logger.info(f"check {{__name__}}")
+    logger.info(f"checking {workflow} ...")
 
     # check 是一个快速检查实验，用于检查校准是否过时。
     # 你只需要少数扫描点，让后续的 check_analyze 知道参数是否漂移，数据
@@ -105,10 +106,11 @@ def check():
     for i in x:
         y.append(np.sin(i))
 
+    logger.info(f"checking {workflow} ... finished!")
     return x, y
 
 
-def check_analyze(result: Result, history: Result) -> Result:
+def check_analyze(result: Result, history: Result | None = None) -> Result:
     \"\"\"
     分析检查结果。
 
