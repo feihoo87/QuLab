@@ -1,4 +1,5 @@
 import functools
+import pickle
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -13,6 +14,27 @@ from .transform import update_parameters
 
 class CalibrationFailedError(Exception):
     pass
+
+
+def is_pickleable(obj) -> bool:
+    try:
+        pickle.dumps(obj)
+        return True
+    except:
+        return False
+
+
+def veryfy_analyzed_result(result: Result, script: str, method: str):
+    if not isinstance(result, Result):
+        raise TypeError(f'"{script}" : "{method}" must return a Result object')
+    if not is_pickleable(result.parameters):
+        raise TypeError(
+            f'"{script}" : "{method}" return not pickleable data in .parameters'
+        )
+    if not is_pickleable(result.other_infomation):
+        raise TypeError(
+            f'"{script}" : "{method}" return not pickleable data in .other_infomation'
+        )
 
 
 def check_state(workflow: WorkflowType, code_path: str | Path,
@@ -73,17 +95,11 @@ def call_analyzer(node,
                   plot=False) -> Result:
     if check:
         result = node.check_analyze(result, history=history)
-        if not isinstance(result, Result):
-            raise TypeError(
-                f'"{node.__workflow_id__}" : "check_analyze" must return a Result object'
-            )
+        veryfy_analyzed_result(result, node.__workflow_id__, "check_analyze")
         result.fully_calibrated = False
     else:
         result = node.analyze(result, history=history)
-        if not isinstance(result, Result):
-            raise TypeError(
-                f'"{node.__workflow_id__}" : "analyze" must return a Result object'
-            )
+        veryfy_analyzed_result(result, node.__workflow_id__, "analyze")
         result.fully_calibrated = True
         if plot:
             call_plot(node, result)
@@ -130,6 +146,10 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
         logger.debug(
             f'Checking "{workflow.__workflow_id__}" with "check" method ...')
         data = workflow.check()
+        if not is_pickleable(data):
+            raise TypeError(
+                f'"{workflow.__workflow_id__}" : "check" return not pickleable data'
+            )
         result = Result()
         result.data = data
         #save_result(workflow.__workflow_id__, result, state_path)
@@ -155,6 +175,10 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
             f'Checking "{workflow.__workflow_id__}" with "calibrate" method ...'
         )
         data = workflow.calibrate()
+        if not is_pickleable(data):
+            raise TypeError(
+                f'"{workflow.__workflow_id__}" : "calibrate" return not pickleable data'
+            )
         result = Result()
         result.data = data
         save_result(workflow.__workflow_id__, result, state_path)
@@ -180,6 +204,10 @@ def calibrate(workflow: WorkflowType, code_path: str | Path,
 
     logger.debug(f'Calibrating "{workflow.__workflow_id__}" ...')
     data = workflow.calibrate()
+    if not is_pickleable(data):
+        raise TypeError(
+            f'"{workflow.__workflow_id__}" : "calibrate" return not pickleable data'
+        )
     result = Result()
     result.data = data
     save_result(workflow.__workflow_id__, result, state_path)

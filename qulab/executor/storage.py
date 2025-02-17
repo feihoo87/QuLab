@@ -3,6 +3,7 @@ import pickle
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
@@ -181,36 +182,42 @@ def get_heads(base_path: str | Path) -> Path | None:
 def create_index(name: str,
                  base_path: str | Path,
                  context: str,
-                 width: int,
+                 width: int = -1,
                  start: int = 0):
-    path = Path(base_path) / "index" / f"{name}.seq"
-    if path.exists():
-        with open(path, "r") as f:
-            index = int(f.read())
+
+    path = Path(base_path) / "index" / name
+    if width == -1:
+        width = len(context)
+    else:
+        width = max(width, len(context))
+
+    if path.with_suffix('.width').exists():
+        width = int(path.with_suffix('.width').read_text())
+        index = int(path.with_suffix('.seq').read_text())
     else:
         index = start
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        f.write(str(index + 1))
+    if width < len(context):
+        raise ValueError(
+            f"Context '{context}' is too long, existing width of '{name}' is {width}."
+        )
+    if not path.with_suffix('.width').exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.with_suffix('.width').write_text(str(width))
 
-    path = Path(base_path) / "index" / f"{name}.width"
-    with open(path, "w") as f:
-        f.write(str(width))
+    path.with_suffix('.seq').write_text(str(index + 1))
 
-    path = Path(base_path) / "index" / f"{name}.idx"
-    with open(path, "a") as f:
-
+    with path.with_suffix('.idx').open("a") as f:
         f.write(f"{context.ljust(width)}\n")
 
     return index
 
 
+@lru_cache(maxsize=4096)
 def query_index(name: str, base_path: str | Path, index: int):
-    path = Path(base_path) / "index" / f"{name}.width"
-    with open(path, "r") as f:
-        width = int(f.read())
-    path = Path(base_path) / "index" / f"{name}.idx"
-    with open(path, "r") as f:
+    path = Path(base_path) / "index" / name
+    width = int(path.with_suffix('.width').read_text())
+
+    with path.with_suffix('.idx').open("r") as f:
         f.seek(index * (width + 1))
         context = f.read(width)
     return context.rstrip()
@@ -219,5 +226,8 @@ def query_index(name: str, base_path: str | Path, index: int):
 def get_result_by_index(
     index: int, base_path: str | Path = get_config_value("data", Path)
 ) -> Result | None:
-    path = query_index("result", base_path, index)
-    return load_result(path, base_path)
+    try:
+        path = query_index("result", base_path, index)
+        return load_result(path, base_path)
+    except:
+        return None
