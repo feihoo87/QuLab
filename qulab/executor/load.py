@@ -505,5 +505,7 @@ def make_graph(workflow: WorkflowType, graph: dict, code_path: str | Path):
         for w in get_dependents(workflow, code_path):
             graph[workflow.__workflow_id__].append(w.__workflow_id__)
             make_graph(w, graph=graph, code_path=code_path)
+    if graph[workflow.__workflow_id__] == []:
+        del graph[workflow.__workflow_id__]
 
     return graph
