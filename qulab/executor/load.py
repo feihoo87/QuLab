@@ -123,7 +123,7 @@ def verify_check_method(module: WorkflowType):
 
 
 def verify_dependence_key(workflow: str | tuple[str, dict[str, Any]]
-                          | tuple[str, str, dict[str, Any]]):
+                          | tuple[str, str, dict[str, Any]], base_path: Path):
     if isinstance(workflow, str):
         return
     if not isinstance(workflow, tuple) or len(workflow) not in [2, 3]:
@@ -135,7 +135,7 @@ def verify_dependence_key(workflow: str | tuple[str, dict[str, Any]]
             raise FileNotFoundError(f"File not found: {file_name}")
     elif len(workflow) == 3:
         template_path, target_path, mapping = workflow
-        if not Path(template_path).exists():
+        if not (Path(base_path) / template_path).exists():
             raise FileNotFoundError(f"File not found: {template_path}")
         if not isinstance(target_path, (Path, str)) or target_path == '':
             raise ValueError(f"Invalid target_path: {target_path}")
@@ -165,7 +165,7 @@ def verify_dependence_key(workflow: str | tuple[str, dict[str, Any]]
     return
 
 
-def verify_depends(module: WorkflowType):
+def verify_depends(module: WorkflowType, base_path):
     if not hasattr(module, 'depends'):
         return
 
@@ -184,10 +184,10 @@ def verify_depends(module: WorkflowType):
             f"Workflow {module.__file__} 'depends' should be a callable or a list"
         )
     for workflow in deps:
-        verify_dependence_key(workflow)
+        verify_dependence_key(workflow, base_path)
 
 
-def verify_entries(module: WorkflowType):
+def verify_entries(module: WorkflowType, base_path):
     if not hasattr(module, 'entries'):
         return
 
@@ -206,7 +206,7 @@ def verify_entries(module: WorkflowType):
             f"Workflow {module.__file__} 'entries' should be a callable or a list"
         )
     for workflow in deps:
-        verify_dependence_key(workflow)
+        verify_dependence_key(workflow, base_path)
 
 
 def is_workflow(module: ModuleType) -> bool:
@@ -307,7 +307,7 @@ def load_workflow_from_file(file_name: str,
     module.__mtime__ = (base_path / path).stat().st_mtime
 
     if hasattr(module, 'entries'):
-        verify_entries(module)
+        verify_entries(module, base_path)
         return module
 
     if not hasattr(module, '__timeout__'):
@@ -315,7 +315,7 @@ def load_workflow_from_file(file_name: str,
 
     if not hasattr(module, 'depends'):
         module.depends = lambda: []
-    verify_depends(module)
+    verify_depends(module, base_path)
     verify_calibrate_method(module)
     verify_check_method(module)
 

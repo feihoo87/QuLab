@@ -138,8 +138,8 @@ def check_analyze(result: Result, history: Result | None = None) -> Result:
 
 def debug_analyze(
         result_index: int,
-        code_path: str | Path = get_config_value('code_path', Path),
-        data_path: str | Path = get_config_value('data_path', Path),
+        code_path: str | Path = get_config_value('code', Path),
+        data_path: str | Path = get_config_value('data', Path),
 ) -> None:
     from .storage import get_result_by_index
 
@@ -150,7 +150,7 @@ def debug_analyze(
     wf = load_workflow(workflow, code_path)
     if wf is None:
         raise ValueError(f'Invalid workflow: {workflow}')
-    result = wf.analyze(result)
+    result = wf.analyze(result, result.previous)
     if hasattr(wf, 'plot'):
         wf.plot(result)
     return result
