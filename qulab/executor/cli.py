@@ -12,6 +12,7 @@ from .load import (WorkflowType, find_unreferenced_workflows, get_entries,
                    load_workflow, make_graph)
 from .schedule import maintain as maintain_workflow
 from .schedule import run as run_workflow
+from .schedule import CalibrationFailedError
 from .transform import set_config_api
 from .utils import workflow_template
 
@@ -135,16 +136,20 @@ def get(key, api):
               '-n',
               is_flag=True,
               help='Do not run dependents.')
+@click.option('--retry', '-r', default=1, type=int, help='Retry times.')
 @click.option('--update', '-u', is_flag=True)
 @log_options
 @command_option('run')
-def run(workflow, code, data, api, plot, no_dependents, update):
+def run(workflow, code, data, api, plot, no_dependents, retry, update):
     """
     Run a workflow.
     """
     logger.info(
-        f'[CMD]: run {workflow} --code {code} --data {data} --api {api}{" --plot" if plot else ""}{" --no-dependents" if no_dependents else ""}{" --update " if update else ""}'
-    )
+        f'[CMD]: run {workflow} --code {code} --data {data} --api {api}'
+        f'{" --plot" if plot else ""}'
+        f'{" --no-dependents" if no_dependents else ""}'
+        f' --retry {retry}'
+        f'{" --update " if update else ""}')
     if api is not None:
         api = importlib.import_module(api)
         set_config_api(api.query_config, api.update_config, api.export_config)
@@ -159,42 +164,56 @@ def run(workflow, code, data, api, plot, no_dependents, update):
     wf = load_workflow(workflow, code)
     check_toplogy(wf, code)
 
-    if no_dependents:
-        if hasattr(wf, 'entries'):
-            for entry in get_entries(wf, code):
-                run_workflow(entry, code, data, plot=plot, update=update)
-        else:
-            run_workflow(wf, code, data, plot=plot, update=update)
-    else:
-        if hasattr(wf, 'entries'):
-            for entry in get_entries(wf, code):
-                maintain_workflow(entry,
-                                  code,
-                                  data,
-                                  run=True,
-                                  plot=plot,
-                                  update=update)
-        else:
-            maintain_workflow(wf,
-                              code,
-                              data,
-                              run=True,
-                              plot=plot,
-                              update=update)
+    for i in range(retry):
+        try:
+            if no_dependents:
+                if hasattr(wf, 'entries'):
+                    for entry in get_entries(wf, code):
+                        run_workflow(entry,
+                                     code,
+                                     data,
+                                     plot=plot,
+                                     update=update)
+                else:
+                    run_workflow(wf, code, data, plot=plot, update=update)
+            else:
+                if hasattr(wf, 'entries'):
+                    for entry in get_entries(wf, code):
+                        maintain_workflow(entry,
+                                          code,
+                                          data,
+                                          run=True,
+                                          plot=plot,
+                                          update=update)
+                else:
+                    maintain_workflow(wf,
+                                      code,
+                                      data,
+                                      run=True,
+                                      plot=plot,
+                                      update=update)
+            break
+        except CalibrationFailedError as e:
+            if i == retry - 1:
+                raise e
+            logger.warning(f'Calibration failed, retrying ({i + 1}/{retry})')
+            continue
 
 
 @click.command()
 @click.argument('workflow')
+@click.option('--retry', '-r', default=1, type=int, help='Retry times.')
 @click.option('--plot', '-p', is_flag=True, help='Plot the result.')
 @log_options
 @command_option('maintain')
-def maintain(workflow, code, data, api, plot):
+def maintain(workflow, code, data, api, retry, plot):
     """
     Maintain a workflow.
     """
     logger.info(
-        f'[CMD]: maintain {workflow} --code {code} --data {data} --api {api}{" --plot" if plot else ""}'
-    )
+        f'[CMD]: maintain {workflow} --code {code} --data {data} --api {api}'
+        f' --retry {retry}'
+        f'{" --plot" if plot else ""}')
     if api is not None:
         api = importlib.import_module(api)
         set_config_api(api.query_config, api.update_config, api.export_config)
@@ -209,8 +228,15 @@ def maintain(workflow, code, data, api, plot):
     wf = load_workflow(workflow, code)
     check_toplogy(wf, code)
 
-    if hasattr(wf, 'entries'):
-        for entry in get_entries(wf, code):
-            maintain_workflow(entry, code, data, run=False, plot=plot)
-    else:
-        maintain_workflow(wf, code, data, run=False, plot=plot)
+    for i in range(retry):
+        try:
+            if hasattr(wf, 'entries'):
+                for entry in get_entries(wf, code):
+                    maintain_workflow(entry, code, data, run=False, plot=plot)
+            else:
+                maintain_workflow(wf, code, data, run=False, plot=plot)
+        except CalibrationFailedError as e:
+            if i == retry - 1:
+                raise e
+            logger.warning(f'Calibration failed, retrying ({i + 1}/{retry})')
+            continue
