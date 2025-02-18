@@ -1,3 +1,4 @@
+import hashlib
 import lzma
 import pickle
 import uuid
@@ -50,9 +51,8 @@ class Result():
 
     @property
     def config(self):
-        from . import transform
         if self.config_path is not None and self.base_path is not None:
-            return transform._load_config(self.config_path, self.base_path)
+            return load_config(self.config_path, self.base_path)
         else:
             return None
 
@@ -241,3 +241,35 @@ def get_result_by_index(
         return load_result(path, base_path)
     except:
         return None
+
+
+def save_config(cfg, data_path):
+    i = 0
+    buf = pickle.dumps(cfg)
+    buf = lzma.compress(buf)
+    h = hashlib.md5(buf)
+
+    while True:
+        salt = f"{i}".encode()
+        h.update(salt)
+        hashstr = h.hexdigest()
+        cfg_id = Path(hashstr[:2]) / hashstr[2:4] / hashstr[4:]
+        path = Path(data_path) / 'config' / cfg_id
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, 'wb') as f:
+                f.write(buf)
+            break
+        elif path.read_bytes() == buf:
+            break
+        i += 1
+    return str(cfg_id)
+
+
+@lru_cache(maxsize=1024)
+def load_config(id, data_path):
+    path = Path(data_path) / 'config' / id
+    with open(path, 'rb') as f:
+        buf = f.read()
+    cfg = pickle.loads(lzma.decompress(buf))
+    return cfg

@@ -1,12 +1,6 @@
-import functools
-import hashlib
-import lzma
-import pickle
-from pathlib import Path
+from .storage import Result, save_config
 
-from .storage import Result
-
-__config_id = None
+__current_config_id = None
 
 
 def _query_config(name: str, default=None):
@@ -50,52 +44,18 @@ def _export_config() -> dict:
 
 
 def update_parameters(result: Result, data_path):
-    global __config_id
+    global __current_config_id
     update_config(result.parameters)
     cfg = export_config()
-    __config_id = _save_config(cfg, data_path)
+    __current_config_id = save_config(cfg, data_path)
 
 
 def current_config(data_path):
-    global __config_id
-    if __config_id is None:
+    global __current_config_id
+    if __current_config_id is None:
         cfg = export_config()
-        __config_id = _save_config(cfg, data_path)
-    return __config_id
-
-
-def _save_config(cfg, data_path):
-    global __config_id
-    i = 0
-    buf = pickle.dumps(cfg)
-    buf = lzma.compress(buf)
-    h = hashlib.md5(buf)
-
-    while True:
-        salt = f"{i:08d}".encode()
-        h.update(salt)
-        hashstr = h.hexdigest()
-        cfg_id = Path(hashstr[:2]) / hashstr[2:4] / hashstr[4:]
-        path = Path(data_path) / 'config' / cfg_id
-        if not path.exists():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with open(path, 'wb') as f:
-                f.write(buf)
-            break
-        elif path.read_bytes() == buf:
-            break
-        i += 1
-    __config_id = str(cfg_id)
-    return __config_id
-
-
-@functools.lru_cache(maxsize=1024)
-def _load_config(id, data_path):
-    path = Path(data_path) / 'config' / id
-    with open(path, 'rb') as f:
-        buf = f.read()
-    cfg = pickle.loads(lzma.decompress(buf))
-    return cfg
+        __current_config_id = save_config(cfg, data_path)
+    return __current_config_id
 
 
 query_config = _query_config

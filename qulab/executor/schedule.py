@@ -125,7 +125,8 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
     if history is None:
         logger.debug(f'No history found for "{workflow.__workflow_id__}"')
         result = Result(workflow=workflow.__workflow_id__,
-                        config_path=current_config(state_path))
+                        config_path=current_config(state_path),
+                        base_path=state_path)
         result.in_spec = False
         result.bad_data = False
         return result
@@ -153,7 +154,8 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
             )
         result = Result(workflow=workflow.__workflow_id__,
                         data=data,
-                        config_path=current_config(state_path))
+                        config_path=current_config(state_path),
+                        base_path=state_path)
         #save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Checked "{workflow.__workflow_id__}" !')
@@ -183,7 +185,8 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
             )
         result = Result(workflow=workflow.__workflow_id__,
                         data=data,
-                        config_path=current_config(state_path))
+                        config_path=current_config(state_path),
+                        base_path=state_path)
         save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Calibrated "{workflow}" !')
@@ -213,7 +216,8 @@ def calibrate(workflow: WorkflowType, code_path: str | Path,
         )
     result = Result(workflow=workflow.__workflow_id__,
                     data=data,
-                    config_path=current_config(state_path))
+                    config_path=current_config(state_path),
+                    base_path=state_path)
     save_result(workflow.__workflow_id__, result, state_path)
     logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
     result = call_analyzer(workflow, result, history, check=False, plot=plot)
