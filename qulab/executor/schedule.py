@@ -9,7 +9,7 @@ from loguru import logger
 from .load import WorkflowType, get_dependents
 from .storage import (Result, find_result, renew_result, revoke_result,
                       save_result)
-from .transform import update_parameters
+from .transform import current_config, update_parameters
 
 
 class CalibrationFailedError(Exception):
@@ -124,7 +124,8 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
 
     if history is None:
         logger.debug(f'No history found for "{workflow.__workflow_id__}"')
-        result = Result()
+        result = Result(workflow=workflow.__workflow_id__,
+                        config_path=current_config(state_path))
         result.in_spec = False
         result.bad_data = False
         return result
@@ -150,8 +151,9 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
             raise TypeError(
                 f'"{workflow.__workflow_id__}" : "check" return not pickleable data'
             )
-        result = Result()
-        result.data = data
+        result = Result(workflow=workflow.__workflow_id__,
+                        data=data,
+                        config_path=current_config(state_path))
         #save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Checked "{workflow.__workflow_id__}" !')
@@ -179,8 +181,9 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
             raise TypeError(
                 f'"{workflow.__workflow_id__}" : "calibrate" return not pickleable data'
             )
-        result = Result()
-        result.data = data
+        result = Result(workflow=workflow.__workflow_id__,
+                        data=data,
+                        config_path=current_config(state_path))
         save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Calibrated "{workflow}" !')
@@ -208,8 +211,9 @@ def calibrate(workflow: WorkflowType, code_path: str | Path,
         raise TypeError(
             f'"{workflow.__workflow_id__}" : "calibrate" return not pickleable data'
         )
-    result = Result()
-    result.data = data
+    result = Result(workflow=workflow.__workflow_id__,
+                    data=data,
+                    config_path=current_config(state_path))
     save_result(workflow.__workflow_id__, result, state_path)
     logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
     result = call_analyzer(workflow, result, history, check=False, plot=plot)
@@ -271,7 +275,7 @@ def diagnose(workflow: WorkflowType, code_path: str | Path,
         raise CalibrationFailedError(
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
-    update_parameters(result)
+    update_parameters(result, state_path)
     return True
 
 
@@ -327,7 +331,7 @@ def maintain(workflow: WorkflowType,
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
     if update:
-        update_parameters(result)
+        update_parameters(result, state_path)
     return
 
 
@@ -349,5 +353,5 @@ def run(workflow: WorkflowType,
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
     if update:
-        update_parameters(result)
+        update_parameters(result, state_path)
     return

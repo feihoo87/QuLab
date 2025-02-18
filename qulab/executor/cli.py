@@ -102,7 +102,7 @@ def set(key, value, api):
     from . import transform
     if api is not None:
         api = importlib.import_module(api)
-        set_config_api(api.query_config, api.update_config)
+        set_config_api(api.query_config, api.update_config, api.export_config)
     try:
         value = eval(value)
     except:
@@ -124,7 +124,7 @@ def get(key, api):
     from . import transform
     if api is not None:
         api = importlib.import_module(api)
-        set_config_api(api.query_config, api.update_config)
+        set_config_api(api.query_config, api.update_config, api.export_config)
     click.echo(transform.query_config(key))
 
 
@@ -147,7 +147,7 @@ def run(workflow, code, data, api, plot, no_dependents, update):
     )
     if api is not None:
         api = importlib.import_module(api)
-        set_config_api(api.query_config, api.update_config)
+        set_config_api(api.query_config, api.update_config, api.export_config)
     if code is None:
         code = Path.cwd()
     if data is None:
@@ -197,7 +197,7 @@ def maintain(workflow, code, data, api, plot):
     )
     if api is not None:
         api = importlib.import_module(api)
-        set_config_api(api.query_config, api.update_config)
+        set_config_api(api.query_config, api.update_config, api.export_config)
     if code is None:
         code = Path.cwd()
     if data is None:

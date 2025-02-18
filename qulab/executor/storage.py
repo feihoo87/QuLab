@@ -14,6 +14,7 @@ from ..cli.config import get_config_value
 
 @dataclass
 class Result():
+    workflow: str = ''
     in_spec: bool = False
     bad_data: bool = False
     fully_calibrated: bool = False
@@ -26,6 +27,7 @@ class Result():
     index: int = -1
     previous_path: Path | None = None
     base_path: Path | None = None
+    config_path: Path | None = None
 
     @property
     def previous(self):
@@ -45,6 +47,14 @@ class Result():
             case (False, False):
                 state = 'Outdated'
         return state
+
+    @property
+    def config(self):
+        from . import transform
+        if self.config_path is not None and self.base_path is not None:
+            return transform._load_config(self.config_path, self.base_path)
+        else:
+            return None
 
     @state.setter
     def state(self, state: Literal['OK', 'Bad', 'Outdated', 'In spec',

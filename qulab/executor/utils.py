@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from ..cli.config import get_config_value
 from .load import load_workflow
 
 
@@ -133,3 +134,23 @@ def check_analyze(result: Result, history: Result | None = None) -> Result:
 
     return result
 """
+
+
+def debug_analyze(
+        result_index: int,
+        code_path: str | Path = get_config_value('code_path', Path),
+        data_path: str | Path = get_config_value('data_path', Path),
+) -> None:
+    from .storage import get_result_by_index
+
+    result = get_result_by_index(result_index, data_path)
+    if result is None:
+        raise ValueError(f'Invalid result index: {result_index}')
+    workflow = result.workflow
+    wf = load_workflow(workflow, code_path)
+    if wf is None:
+        raise ValueError(f'Invalid workflow: {workflow}')
+    result = wf.analyze(result)
+    if hasattr(wf, 'plot'):
+        wf.plot(result)
+    return result
