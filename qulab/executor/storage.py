@@ -30,6 +30,7 @@ class Result():
     data: Any = field(default_factory=tuple)
     index: int = -1
     previous_path: Path | None = None
+    heads: dict[str, Path] | None = None
     base_path: Path | None = None
     config_path: Path | None = None
 
@@ -100,7 +101,7 @@ def save_config_key_history(key: str, result: Result,
         else:
             __current_config_cache = {}
 
-    __current_config_cache[key] = result.data
+    __current_config_cache[key] = result.data, datetime.now()
 
     with open(base_path / 'parameters.pkl', 'wb') as f:
         pickle.dump(__current_config_cache, f)
@@ -118,13 +119,17 @@ def find_config_key_history(key: str, base_path: str | Path) -> Result | None:
             __current_config_cache = {}
 
     if key in __current_config_cache:
-        value = __current_config_cache.get(key, None)
-        result = Result(workflow=f'cfg:{key}',
-                        bad_data=False,
-                        in_spec=True,
-                        fully_calibrated=True,
-                        parameters={key: value},
-                        data=value)
+        value, checked_time = __current_config_cache.get(key, None)
+        result = Result(
+            workflow=f'cfg:{key}',
+            bad_data=False,
+            in_spec=True,
+            fully_calibrated=True,
+            parameters={key: value},
+            data=value,
+            calibrated_time=checked_time,
+            checked_time=checked_time,
+        )
         result.bad_data = False
         return result
     return None
