@@ -263,6 +263,7 @@ def maintain(workflow, code, data, api, retry, plot):
                                   run=False,
                                   plot=plot,
                                   freeze=False)
+            break
         except CalibrationFailedError as e:
             if i == retry - 1:
                 raise e
