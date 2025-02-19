@@ -108,9 +108,13 @@ def call_analyzer(node,
             except Exception as e:
                 logger.exception(e)
                 result.oracle = {}
+            if not isinstance(result, Result):
+                raise TypeError(
+                    f'"{node.__workflow_id__}" : function "oracle" must return a Result object'
+                )
             if not is_pickleable(result.oracle):
                 raise TypeError(
-                    f'"{node.__workflow_id__}" : "oracle" return not pickleable data'
+                    f'"{node.__workflow_id__}" : function "oracle" return not pickleable data'
                 )
         result.fully_calibrated = True
         if plot:
