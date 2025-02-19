@@ -145,7 +145,6 @@ def oracle(result: Result, history: Result | None = None):
 
     该函数代入的参数 result 是 analyze 函数的返回值。
     \"\"\"
-    result.oracle = {{}}
 
     # result.oracle['Q0.bias'] = 0.1
     # result.oracle['Q1.bias'] = -0.03
