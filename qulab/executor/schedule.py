@@ -47,7 +47,7 @@ def check_state(workflow: WorkflowType, code_path: str | Path,
     3. No dependencies have been recalibrated since the last time check data or calibrate was run on this cal.
     4. All dependencies pass check state.
     """
-    logger.debug(f'check_state: "{workflow}"')
+    logger.debug(f'check_state: "{workflow.__workflow_id__}"')
     result = find_result(workflow.__workflow_id__, state_path)
     if not result:
         logger.debug(
@@ -207,7 +207,7 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
                         base_path=state_path)
         save_result(workflow.__workflow_id__, result, state_path)
 
-        logger.debug(f'Calibrated "{workflow}" !')
+        logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
         result = call_analyzer(workflow,
                                result,
                                history,
