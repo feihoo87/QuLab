@@ -18,6 +18,16 @@ from .utils import workflow_template
 
 
 @logger.catch(reraise=True)
+def boot(script_path):
+    """Run a script in a new terminal."""
+    import sys
+
+    from qulab.utils import run_detached_with_terminal
+
+    run_detached_with_terminal(sys.executable + ' ' + script_path)
+
+
+@logger.catch(reraise=True)
 def check_toplogy(workflow: WorkflowType, code_path: str | Path) -> dict:
     graph = {}
     try:
@@ -51,8 +61,16 @@ def command_option(command_name):
             '-a',
             default=lambda: get_config_value("api", str, command_name),
             help='The modlule name of the api.')
+        @click.option(
+            '--bootstrap',
+            '-b',
+            default=lambda: get_config_value("bootstrap", Path, command_name),
+            help='The path of the bootstrap.')
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            bootstrap = kwargs.pop('bootstrap')
+            if bootstrap is not None:
+                boot(bootstrap)
             return func(*args, **kwargs)
 
         return wrapper
