@@ -20,11 +20,11 @@ from .utils import workflow_template
 @logger.catch(reraise=True)
 def boot(script_path):
     """Run a script in a new terminal."""
+    import subprocess
     import sys
 
-    from qulab.utils import run_detached_with_terminal
-
-    run_detached_with_terminal(sys.executable + ' ' + script_path)
+    proc = subprocess.Popen([sys.executable, script_path])
+    proc.communicate()
 
 
 @logger.catch(reraise=True)
