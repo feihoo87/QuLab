@@ -9,7 +9,7 @@ from loguru import logger
 from .load import WorkflowType, get_dependents
 from .storage import (Result, find_result, renew_result, revoke_result,
                       save_result)
-from .transform import current_config, update_parameters
+from .transform import current_config, obey_the_oracle, update_parameters
 
 
 class CalibrationFailedError(Exception):
@@ -100,6 +100,18 @@ def call_analyzer(node,
     else:
         result = node.analyze(result, history=history)
         veryfy_analyzed_result(result, node.__workflow_id__, "analyze")
+        if hasattr(node, 'oracle') and callable(node.oracle):
+            logger.debug(
+                f'"{node.__workflow_id__}" has oracle method, calling ...')
+            try:
+                result = node.oracle(result, history=history)
+            except Exception as e:
+                logger.exception(e)
+                result.oracle = {}
+            if not is_pickleable(result.oracle):
+                raise TypeError(
+                    f'"{node.__workflow_id__}" : "oracle" return not pickleable data'
+                )
         result.fully_calibrated = True
         if plot:
             call_plot(node, result)
@@ -276,6 +288,7 @@ def diagnose(workflow: WorkflowType, code_path: str | Path,
 
     result = calibrate(workflow, code_path, state_path, plot, session_id)
     if result.bad_data or not result.in_spec:
+        obey_the_oracle(result, state_path)
         raise CalibrationFailedError(
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
@@ -290,7 +303,7 @@ def maintain(workflow: WorkflowType,
              session_id: str | None = None,
              run: bool = False,
              plot: bool = False,
-             update: bool = True):
+             freeze: bool = False):
     if session_id is None:
         session_id = uuid.uuid4().hex
     logger.debug(f'run "{workflow.__workflow_id__}"'
@@ -300,7 +313,13 @@ def maintain(workflow: WorkflowType,
         logger.debug(
             f'maintain "{n.__workflow_id__}" because it is depended by "{workflow.__workflow_id__}"'
         )
-        maintain(n, code_path, state_path, session_id, run=False, plot=plot)
+        maintain(n,
+                 code_path,
+                 state_path,
+                 session_id,
+                 run=False,
+                 plot=plot,
+                 freeze=freeze)
     else:
         logger.debug(
             f'"{workflow.__workflow_id__}": All dependents maintained')
@@ -331,10 +350,12 @@ def maintain(workflow: WorkflowType,
     logger.debug(f'recalibrate "{workflow.__workflow_id__}"')
     result = calibrate(workflow, code_path, state_path, plot, session_id)
     if result.bad_data or not result.in_spec:
+        if not freeze:
+            obey_the_oracle(result, state_path)
         raise CalibrationFailedError(
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
-    if update:
+    if not freeze:
         update_parameters(result, state_path)
     return
 
@@ -344,7 +365,7 @@ def run(workflow: WorkflowType,
         code_path: str | Path,
         state_path: str | Path,
         plot: bool = False,
-        update: bool = True):
+        freeze: bool = False):
     session_id = uuid.uuid4().hex
     logger.debug(f'run "{workflow.__workflow_id__}" without dependences.')
     result = calibrate(workflow,
@@ -353,9 +374,11 @@ def run(workflow: WorkflowType,
                        plot,
                        session_id=session_id)
     if result.bad_data or not result.in_spec:
+        if not freeze:
+            obey_the_oracle(result, state_path)
         raise CalibrationFailedError(
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
-    if update:
+    if not freeze:
         update_parameters(result, state_path)
     return

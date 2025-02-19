@@ -10,9 +10,9 @@ from loguru import logger
 from ..cli.config import get_config_value, log_options
 from .load import (WorkflowType, find_unreferenced_workflows, get_entries,
                    load_workflow, make_graph)
+from .schedule import CalibrationFailedError
 from .schedule import maintain as maintain_workflow
 from .schedule import run as run_workflow
-from .schedule import CalibrationFailedError
 from .transform import set_config_api
 from .utils import workflow_template
 
@@ -137,10 +137,10 @@ def get(key, api):
               is_flag=True,
               help='Do not run dependents.')
 @click.option('--retry', '-r', default=1, type=int, help='Retry times.')
-@click.option('--update', '-u', is_flag=True)
+@click.option('--freeze', is_flag=True, help='Freeze the config table.')
 @log_options
 @command_option('run')
-def run(workflow, code, data, api, plot, no_dependents, retry, update):
+def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
     """
     Run a workflow.
     """
@@ -149,7 +149,7 @@ def run(workflow, code, data, api, plot, no_dependents, retry, update):
         f'{" --plot" if plot else ""}'
         f'{" --no-dependents" if no_dependents else ""}'
         f' --retry {retry}'
-        f'{" --update " if update else ""}')
+        f'{" --freeze " if freeze else ""}')
     if api is not None:
         api = importlib.import_module(api)
         set_config_api(api.query_config, api.update_config, api.export_config)
@@ -173,9 +173,9 @@ def run(workflow, code, data, api, plot, no_dependents, retry, update):
                                      code,
                                      data,
                                      plot=plot,
-                                     update=update)
+                                     freeze=freeze)
                 else:
-                    run_workflow(wf, code, data, plot=plot, update=update)
+                    run_workflow(wf, code, data, plot=plot, freeze=freeze)
             else:
                 if hasattr(wf, 'entries'):
                     for entry in get_entries(wf, code):
@@ -184,14 +184,14 @@ def run(workflow, code, data, api, plot, no_dependents, retry, update):
                                           data,
                                           run=True,
                                           plot=plot,
-                                          update=update)
+                                          freeze=freeze)
                 else:
                     maintain_workflow(wf,
                                       code,
                                       data,
                                       run=True,
                                       plot=plot,
-                                      update=update)
+                                      freeze=freeze)
             break
         except CalibrationFailedError as e:
             if i == retry - 1:
@@ -232,9 +232,19 @@ def maintain(workflow, code, data, api, retry, plot):
         try:
             if hasattr(wf, 'entries'):
                 for entry in get_entries(wf, code):
-                    maintain_workflow(entry, code, data, run=False, plot=plot)
+                    maintain_workflow(entry,
+                                      code,
+                                      data,
+                                      run=False,
+                                      plot=plot,
+                                      freeze=False)
             else:
-                maintain_workflow(wf, code, data, run=False, plot=plot)
+                maintain_workflow(wf,
+                                  code,
+                                  data,
+                                  run=False,
+                                  plot=plot,
+                                  freeze=False)
         except CalibrationFailedError as e:
             if i == retry - 1:
                 raise e

@@ -23,6 +23,7 @@ class Result():
     checked_time: datetime = field(default_factory=datetime.now)
     ttl: timedelta = timedelta(days=3650)
     parameters: dict = field(default_factory=dict)
+    oracle: dict = field(default_factory=dict)
     other_infomation: dict = field(default_factory=dict)
     data: Any = field(default_factory=tuple)
     index: int = -1

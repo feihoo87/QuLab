@@ -43,6 +43,13 @@ def _export_config() -> dict:
     return parameters
 
 
+def obey_the_oracle(result: Result, data_path):
+    global __current_config_id
+    update_config(result.oracle)
+    cfg = export_config()
+    __current_config_id = save_config(cfg, data_path)
+
+
 def update_parameters(result: Result, data_path):
     global __current_config_id
     update_config(result.parameters)

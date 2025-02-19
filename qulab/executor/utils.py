@@ -133,6 +133,24 @@ def check_analyze(result: Result, history: Result | None = None) -> Result:
     result.state = random.choice(['Outdated', 'OK', 'Bad'])
 
     return result
+
+
+def oracle(result: Result, history: Result | None = None):
+    \"\"\"
+    谕示：指凭直觉或经验判断，改动某些配置，以期望下次校准成功。
+    
+    当校准失败时，根据 analyze 的结果，尝试改变某些配置再重新校准整个系统。
+    比如通常我们在死活测不到 rabi 或能谱时，会换一个 idle bias 再试试。这
+    里我们凭直觉设的那个 bias 值，就是一个谕示，可以通过 oracle 来设定。
+
+    该函数代入的参数 result 是 analyze 函数的返回值。
+    \"\"\"
+    result.oracle = {{}}
+
+    # result.oracle['Q0.bias'] = 0.1
+    # result.oracle['Q1.bias'] = -0.03
+
+    return result
 """
 
 
