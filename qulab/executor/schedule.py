@@ -7,8 +7,8 @@ from pathlib import Path
 from loguru import logger
 
 from .load import WorkflowType, get_dependents
-from .storage import (Result, find_result, renew_result, revoke_result,
-                      save_result)
+from .storage import (Result, find_result, get_heads, renew_result,
+                      revoke_result, save_result)
 from .transform import current_config, obey_the_oracle, update_parameters
 
 
@@ -104,7 +104,9 @@ def call_analyzer(node,
             logger.debug(
                 f'"{node.__workflow_id__}" has oracle method, calling ...')
             try:
-                result = node.oracle(result, history=history)
+                result = node.oracle(result,
+                                     history=history,
+                                     system_state=get_heads(result.base_path))
             except Exception as e:
                 logger.exception(e)
                 result.oracle = {}

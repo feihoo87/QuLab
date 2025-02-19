@@ -24,6 +24,7 @@ class SetConfigWorkflow():
 
     def __init__(self, key):
         self.key = key
+        self.__workflow_id__ = f"cfg:{self.key}"
 
     def depends(self):
         return []
@@ -31,7 +32,7 @@ class SetConfigWorkflow():
     def check_state(self, history: Result) -> bool:
         from . import transform
         try:
-            return self._equal(history.params[self.key],
+            return self._equal(history.parameters[self.key],
                                transform.query_config(self.key))
         except:
             return False
@@ -50,18 +51,22 @@ class SetConfigWorkflow():
         return result
 
     def check(self):
-        from .transform import query_config
-        return query_config(self.key)
+        return self.calibrate()
 
-    def check_analyze(self, result: Result, history: Result):
-        result.state = 'Outdated'
-        result.parameters = {self.key: result.data}
+    def check_analyze(self, result: Result, history: Result | None):
+        if self.check_state(history):
+            result.state = 'OK'
+            result.parameters = {self.key: history.data}
+        else:
+            result.state = 'Outdated'
         return result
 
     @staticmethod
     def _equal(a, b):
         import numpy as np
 
+        if a is b:
+            return True
         try:
             return a == b
         except:

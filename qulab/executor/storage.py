@@ -12,6 +12,8 @@ from loguru import logger
 
 from ..cli.config import get_config_value
 
+__current_config_cache = None
+
 
 @dataclass
 class Result():
@@ -85,10 +87,56 @@ def random_path(base: Path) -> Path:
             return path
 
 
+def save_config_key_history(key: str, result: Result,
+                            base_path: str | Path) -> int:
+    global __current_config_cache
+    base_path = Path(base_path) / 'state'
+    base_path.mkdir(parents=True, exist_ok=True)
+
+    if __current_config_cache is None:
+        if (base_path / 'parameters.pkl').exists():
+            with open(base_path / 'parameters.pkl', 'rb') as f:
+                __current_config_cache = pickle.load(f)
+        else:
+            __current_config_cache = {}
+
+    __current_config_cache[key] = result.data
+
+    with open(base_path / 'parameters.pkl', 'wb') as f:
+        pickle.dump(__current_config_cache, f)
+    return 0
+
+
+def find_config_key_history(key: str, base_path: str | Path) -> Result | None:
+    global __current_config_cache
+    base_path = Path(base_path) / 'state'
+    if __current_config_cache is None:
+        if (base_path / 'parameters.pkl').exists():
+            with open(base_path / 'parameters.pkl', 'rb') as f:
+                __current_config_cache = pickle.load(f)
+        else:
+            __current_config_cache = {}
+
+    if key in __current_config_cache:
+        value = __current_config_cache.get(key, None)
+        result = Result(workflow=f'cfg:{key}',
+                        bad_data=False,
+                        in_spec=True,
+                        fully_calibrated=True,
+                        parameters={key: value},
+                        data=value)
+        result.bad_data = False
+        return result
+    return None
+
+
 def save_result(workflow: str,
                 result: Result,
                 base_path: str | Path,
                 overwrite: bool = False) -> int:
+    if workflow.startswith("cfg:"):
+        return save_config_key_history(workflow[4:], result, base_path)
+
     logger.debug(
         f'Saving result for "{workflow}", {result.in_spec=}, {result.bad_data=}, {result.fully_calibrated=}'
     )
@@ -132,6 +180,9 @@ def load_result(path: str | Path, base_path: str | Path) -> Result | None:
 def find_result(
     workflow: str, base_path: str | Path = get_config_value("data", Path)
 ) -> Result | None:
+    if workflow.startswith("cfg:"):
+        return find_config_key_history(workflow[4:], base_path)
+
     base_path = Path(base_path)
     path = get_head(workflow, base_path)
     if path is None:

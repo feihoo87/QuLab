@@ -135,7 +135,9 @@ def check_analyze(result: Result, history: Result | None = None) -> Result:
     return result
 
 
-def oracle(result: Result, history: Result | None = None):
+def oracle(result: Result,
+           history: Result | None = None,
+           system_state: dict[str:str] | None = None) -> Result:
     \"\"\"
     谕示：指凭直觉或经验判断，改动某些配置，以期望下次校准成功。
     
