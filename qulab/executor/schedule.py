@@ -7,7 +7,7 @@ from pathlib import Path
 from loguru import logger
 
 from .load import WorkflowType, get_dependents
-from .storage import (Report, find_report, get_heads, renew_report,
+from .storage import (Report, find_report, get_head, get_heads, renew_report,
                       revoke_report, save_report)
 from .transform import current_config, obey_the_oracle, update_parameters
 
@@ -141,7 +141,9 @@ def call_check(workflow: WorkflowType, session_id: str, state_path: Path):
                     data=data,
                     config_path=current_config(state_path),
                     base_path=state_path,
-                    heads=get_heads(state_path))
+                    heads=get_heads(state_path),
+                    previous_path=get_head(workflow.__workflow_id__,
+                                           state_path))
 
     save_report(workflow.__workflow_id__, report, state_path)
 
@@ -164,7 +166,9 @@ def call_calibrate(workflow: WorkflowType, session_id: str, state_path: Path):
                     data=data,
                     config_path=current_config(state_path),
                     base_path=state_path,
-                    heads=get_heads(state_path))
+                    heads=get_heads(state_path),
+                    previous_path=get_head(workflow.__workflow_id__,
+                                           state_path))
 
     save_report(workflow.__workflow_id__, report, state_path)
 
@@ -183,11 +187,11 @@ def call_check_analyzer(node: WorkflowType,
     if report.in_spec:
         logger.debug(
             f'"{node.__workflow_id__}": checked in spec, renewing report')
-        renew_report(node.__workflow_id__, report, state_path)
+        renew_report(node.__workflow_id__, report.previous, state_path)
     else:
         logger.debug(
             f'"{node.__workflow_id__}": checked out of spec, revoking report')
-        revoke_report(node.__workflow_id__, report, state_path)
+        revoke_report(node.__workflow_id__, report.previous, state_path)
     return report
 
 
@@ -238,7 +242,9 @@ def check_data(workflow: WorkflowType, state_path: str | Path, plot: bool,
         report = Report(workflow=workflow.__workflow_id__,
                         config_path=current_config(state_path),
                         base_path=state_path,
-                        heads=get_heads(state_path))
+                        heads=get_heads(state_path),
+                        previous_path=get_head(workflow.__workflow_id__,
+                                               state_path))
         report.in_spec = False
         report.bad_data = False
         return report

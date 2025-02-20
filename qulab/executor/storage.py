@@ -149,8 +149,11 @@ def save_report(workflow: str,
         f'Saving report for "{workflow}", {report.in_spec=}, {report.bad_data=}, {report.fully_calibrated=}'
     )
     base_path = Path(base_path)
-    if overwrite:
+    try:
         buf = lzma.compress(pickle.dumps(report))
+    except:
+        raise ValueError(f"Can't pickle report for {workflow}")
+    if overwrite:
         path = report.path
         if path is None:
             raise ValueError("Report path is None, can't overwrite.")
@@ -158,8 +161,6 @@ def save_report(workflow: str,
             index = int.from_bytes(f.read(8), 'big')
         report.index = index
     else:
-        report.previous_path = get_head(workflow, base_path)
-        buf = lzma.compress(pickle.dumps(report))
         path = random_path(base_path / 'objects')
         (base_path / 'objects' / path).parent.mkdir(parents=True,
                                                     exist_ok=True)
@@ -168,7 +169,6 @@ def save_report(workflow: str,
                                     base_path,
                                     context=str(path),
                                     width=35)
-
     with open(base_path / 'objects' / path, "wb") as f:
         f.write(report.index.to_bytes(8, 'big'))
         f.write(buf)
@@ -202,22 +202,30 @@ def find_report(
     return load_report(path, base_path)
 
 
-def renew_report(workflow: str, report, base_path: str | Path):
+def renew_report(workflow: str, report: Report | None, base_path: str | Path):
     logger.debug(f'Renewing report for "{workflow}"')
-    report = find_report(workflow, base_path)
     if report is not None:
         report.checked_time = datetime.now()
-        return save_report(workflow, report, base_path)
+        return save_report(workflow,
+                           report,
+                           base_path,
+                           overwrite=True,
+                           refresh_heads=True)
+    else:
+        raise ValueError(f"Can't renew report for {workflow}")
 
 
-def revoke_report(workflow: str, report, base_path: str | Path):
+def revoke_report(workflow: str, report: Report | None, base_path: str | Path):
     logger.debug(f'Revoking report for "{workflow}"')
     base_path = Path(base_path)
-    path = get_head(workflow, base_path)
-    if path is not None:
-        report = load_report(path, base_path)
+    if report is not None:
         report.in_spec = False
-        return save_report(workflow, report, base_path)
+        report.previous_path = report.path
+        return save_report(workflow,
+                           report,
+                           base_path,
+                           overwrite=False,
+                           refresh_heads=True)
 
 
 def set_head(workflow: str, path: Path, base_path: str | Path):
