@@ -77,6 +77,9 @@ class SetConfigWorkflow():
 
         return False
 
+    def __hash__(self):
+        return hash(self.__workflow_id__)
+
 
 WorkflowType = ModuleType | SetConfigWorkflow
 

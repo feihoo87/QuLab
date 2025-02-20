@@ -27,12 +27,13 @@ class Result():
     parameters: dict = field(default_factory=dict)
     oracle: dict = field(default_factory=dict)
     other_infomation: dict = field(default_factory=dict)
-    data: Any = field(default_factory=tuple)
+    data: Any = field(default_factory=tuple, repr=False)
     index: int = -1
-    previous_path: Path | None = None
-    heads: dict[str, Path] | None = None
-    base_path: Path | None = None
-    config_path: Path | None = None
+    previous_path: Path | None = field(default=None, repr=False)
+    heads: dict[str, Path] = field(default_factory=dict, repr=False)
+    base_path: Path | None = field(default=None, repr=False)
+    path: Path | None = field(default=None, repr=False)
+    config_path: Path | None = field(default=None, repr=False)
 
     @property
     def previous(self):
@@ -101,7 +102,8 @@ def save_config_key_history(key: str, result: Result,
         else:
             __current_config_cache = {}
 
-    __current_config_cache[key] = result.data, datetime.now()
+    __current_config_cache[
+        key] = result.data, result.calibrated_time, result.checked_time
 
     with open(base_path / 'parameters.pkl', 'wb') as f:
         pickle.dump(__current_config_cache, f)
@@ -119,7 +121,8 @@ def find_config_key_history(key: str, base_path: str | Path) -> Result | None:
             __current_config_cache = {}
 
     if key in __current_config_cache:
-        value, checked_time = __current_config_cache.get(key, None)
+        value, calibrated_time, checked_time = __current_config_cache.get(
+            key, None)
         result = Result(
             workflow=f'cfg:{key}',
             bad_data=False,
@@ -127,10 +130,9 @@ def find_config_key_history(key: str, base_path: str | Path) -> Result | None:
             fully_calibrated=True,
             parameters={key: value},
             data=value,
-            calibrated_time=checked_time,
+            calibrated_time=calibrated_time,
             checked_time=checked_time,
         )
-        result.bad_data = False
         return result
     return None
 
@@ -148,7 +150,10 @@ def save_result(workflow: str,
     base_path = Path(base_path)
     if overwrite:
         buf = lzma.compress(pickle.dumps(result))
-        path = get_head(workflow, base_path)
+        path = result.path
+        if path is None:
+            path = get_head(workflow, base_path)
+            result.path = path
         with open(base_path / 'objects' / path, "rb") as f:
             index = int.from_bytes(f.read(8), 'big')
         result.index = index
@@ -158,6 +163,7 @@ def save_result(workflow: str,
         path = random_path(base_path / 'objects')
         (base_path / 'objects' / path).parent.mkdir(parents=True,
                                                     exist_ok=True)
+        result.path = path
         result.index = create_index("result",
                                     base_path,
                                     context=str(path),

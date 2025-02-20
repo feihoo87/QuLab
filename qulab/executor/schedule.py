@@ -11,6 +11,38 @@ from .storage import (Result, find_result, get_heads, renew_result,
                       revoke_result, save_result)
 from .transform import current_config, obey_the_oracle, update_parameters
 
+__session_id = None
+__session_cache = {}
+
+
+def set_cache(session_id, key, result: Result):
+    global __session_id
+    if __session_id is None:
+        __session_id = session_id
+    if __session_id != session_id:
+        __session_cache.clear()
+    if result.workflow.startswith('cfg:'):
+        __session_cache[key] = result
+    else:
+        __session_cache[key] = result.base_path, result.path
+
+
+def get_cache(session_id, key) -> Result:
+    from .storage import load_result
+    global __session_id
+    if __session_id is None or __session_id != session_id:
+        return None
+    index = __session_cache.get(key, None)
+    if index is None:
+        return None
+    if isinstance(index, tuple):
+        base_path, path = index
+        return load_result(base_path, path)
+    elif isinstance(index, Result):
+        return index
+    else:
+        return None
+
 
 class CalibrationFailedError(Exception):
     pass
@@ -130,7 +162,6 @@ def call_plot(node, result: Result, check=False):
         node.plot(result)
 
 
-@functools.lru_cache(maxsize=128)
 def check_data(workflow: WorkflowType, code_path: str | Path,
                state_path: str | Path, plot: bool, session_id: str) -> Result:
     """
@@ -138,13 +169,19 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
     Is the parameter associated with this cal in spec,
     and is the cal scan working as expected?
     """
+    result = get_cache(session_id, (workflow, 'check_data'))
+    if result is not None:
+        logger.debug(f'Cache hit for "{workflow.__workflow_id__}:check_data"')
+        return result
+
     history = find_result(workflow.__workflow_id__, state_path)
 
     if history is None:
         logger.debug(f'No history found for "{workflow.__workflow_id__}"')
         result = Result(workflow=workflow.__workflow_id__,
                         config_path=current_config(state_path),
-                        base_path=state_path)
+                        base_path=state_path,
+                        heads=get_heads(state_path))
         result.in_spec = False
         result.bad_data = False
         return result
@@ -173,7 +210,8 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
         result = Result(workflow=workflow.__workflow_id__,
                         data=data,
                         config_path=current_config(state_path),
-                        base_path=state_path)
+                        base_path=state_path,
+                        heads=get_heads(state_path))
         #save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Checked "{workflow.__workflow_id__}" !')
@@ -204,7 +242,8 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
         result = Result(workflow=workflow.__workflow_id__,
                         data=data,
                         config_path=current_config(state_path),
-                        base_path=state_path)
+                        base_path=state_path,
+                        heads=get_heads(state_path))
         save_result(workflow.__workflow_id__, result, state_path)
 
         logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
@@ -218,12 +257,17 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
                     state_path,
                     overwrite=True)
 
+    set_cache(session_id, (workflow, 'check_data'), result)
     return result
 
 
-@functools.lru_cache(maxsize=128)
 def calibrate(workflow: WorkflowType, code_path: str | Path,
               state_path: str | Path, plot: bool, session_id: str) -> Result:
+    result = get_cache(session_id, (workflow, 'calibrate'))
+    if result is not None:
+        logger.debug(f'Cache hit for "{workflow.__workflow_id__}:calibrate"')
+        return result
+
     history = find_result(workflow.__workflow_id__, state_path)
 
     logger.debug(f'Calibrating "{workflow.__workflow_id__}" ...')
@@ -235,11 +279,14 @@ def calibrate(workflow: WorkflowType, code_path: str | Path,
     result = Result(workflow=workflow.__workflow_id__,
                     data=data,
                     config_path=current_config(state_path),
-                    base_path=state_path)
+                    base_path=state_path,
+                    heads=get_heads(state_path))
     save_result(workflow.__workflow_id__, result, state_path)
     logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
     result = call_analyzer(workflow, result, history, check=False, plot=plot)
     save_result(workflow.__workflow_id__, result, state_path, overwrite=True)
+
+    set_cache(session_id, (workflow, 'calibrate'), result)
     return result
 
 
