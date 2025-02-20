@@ -140,7 +140,8 @@ def find_config_key_history(key: str, base_path: str | Path) -> Result | None:
 def save_result(workflow: str,
                 result: Result,
                 base_path: str | Path,
-                overwrite: bool = False) -> int:
+                overwrite: bool = False,
+                refresh_heads: bool = True) -> int:
     if workflow.startswith("cfg:"):
         return save_config_key_history(workflow[4:], result, base_path)
 
@@ -152,8 +153,7 @@ def save_result(workflow: str,
         buf = lzma.compress(pickle.dumps(result))
         path = result.path
         if path is None:
-            path = get_head(workflow, base_path)
-            result.path = path
+            raise ValueError("Result path is None, can't overwrite.")
         with open(base_path / 'objects' / path, "rb") as f:
             index = int.from_bytes(f.read(8), 'big')
         result.index = index
@@ -172,7 +172,8 @@ def save_result(workflow: str,
     with open(base_path / 'objects' / path, "wb") as f:
         f.write(result.index.to_bytes(8, 'big'))
         f.write(buf)
-    set_head(workflow, path, base_path)
+    if refresh_heads:
+        set_head(workflow, path, base_path)
     return result.index
 
 

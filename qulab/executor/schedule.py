@@ -162,6 +162,55 @@ def call_plot(node, result: Result, check=False):
         node.plot(result)
 
 
+def call_check(workflow: WorkflowType, session_id: str, state_path: Path):
+    result = get_cache(session_id, (workflow, 'check'))
+    if result is not None:
+        logger.debug(f'Cache hit for "{workflow.__workflow_id__}:check"')
+        return result
+
+    data = workflow.check()
+    if not is_pickleable(data):
+        raise TypeError(
+            f'"{workflow.__workflow_id__}" : "check" return not pickleable data'
+        )
+    result = Result(workflow=workflow.__workflow_id__,
+                    data=data,
+                    config_path=current_config(state_path),
+                    base_path=state_path,
+                    heads=get_heads(state_path))
+
+    save_result(workflow.__workflow_id__,
+                result,
+                state_path,
+                refresh_heads=False)
+
+    set_cache(session_id, (workflow, 'check'), result)
+    return result
+
+
+def call_calibrate(workflow: WorkflowType, session_id: str, state_path: Path):
+    result = get_cache(session_id, (workflow, 'calibrate'))
+    if result is not None:
+        logger.debug(f'Cache hit for "{workflow.__workflow_id__}:calibrate"')
+        return result
+
+    data = workflow.calibrate()
+    if not is_pickleable(data):
+        raise TypeError(
+            f'"{workflow.__workflow_id__}" : "calibrate" return not pickleable data'
+        )
+    result = Result(workflow=workflow.__workflow_id__,
+                    data=data,
+                    config_path=current_config(state_path),
+                    base_path=state_path,
+                    heads=get_heads(state_path))
+
+    save_result(workflow.__workflow_id__, result, state_path)
+
+    set_cache(session_id, (workflow, 'calibrate'), result)
+    return result
+
+
 def check_data(workflow: WorkflowType, code_path: str | Path,
                state_path: str | Path, plot: bool, session_id: str) -> Result:
     """
@@ -169,11 +218,6 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
     Is the parameter associated with this cal in spec,
     and is the cal scan working as expected?
     """
-    result = get_cache(session_id, (workflow, 'check_data'))
-    if result is not None:
-        logger.debug(f'Cache hit for "{workflow.__workflow_id__}:check_data"')
-        return result
-
     history = find_result(workflow.__workflow_id__, state_path)
 
     if history is None:
@@ -202,17 +246,8 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
             workflow, 'check_analyze') and callable(workflow.check_analyze):
         logger.debug(
             f'Checking "{workflow.__workflow_id__}" with "check" method ...')
-        data = workflow.check()
-        if not is_pickleable(data):
-            raise TypeError(
-                f'"{workflow.__workflow_id__}" : "check" return not pickleable data'
-            )
-        result = Result(workflow=workflow.__workflow_id__,
-                        data=data,
-                        config_path=current_config(state_path),
-                        base_path=state_path,
-                        heads=get_heads(state_path))
-        #save_result(workflow.__workflow_id__, result, state_path)
+
+        result = call_check(workflow, session_id, state_path)
 
         logger.debug(f'Checked "{workflow.__workflow_id__}" !')
         result = call_analyzer(workflow,
@@ -234,17 +269,8 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
         logger.debug(
             f'Checking "{workflow.__workflow_id__}" with "calibrate" method ...'
         )
-        data = workflow.calibrate()
-        if not is_pickleable(data):
-            raise TypeError(
-                f'"{workflow.__workflow_id__}" : "calibrate" return not pickleable data'
-            )
-        result = Result(workflow=workflow.__workflow_id__,
-                        data=data,
-                        config_path=current_config(state_path),
-                        base_path=state_path,
-                        heads=get_heads(state_path))
-        save_result(workflow.__workflow_id__, result, state_path)
+
+        result = call_calibrate(workflow, session_id, state_path)
 
         logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
         result = call_analyzer(workflow,
@@ -256,37 +282,22 @@ def check_data(workflow: WorkflowType, code_path: str | Path,
                     result,
                     state_path,
                     overwrite=True)
-
-    set_cache(session_id, (workflow, 'check_data'), result)
     return result
 
 
 def calibrate(workflow: WorkflowType, code_path: str | Path,
               state_path: str | Path, plot: bool, session_id: str) -> Result:
-    result = get_cache(session_id, (workflow, 'calibrate'))
-    if result is not None:
-        logger.debug(f'Cache hit for "{workflow.__workflow_id__}:calibrate"')
-        return result
-
     history = find_result(workflow.__workflow_id__, state_path)
 
     logger.debug(f'Calibrating "{workflow.__workflow_id__}" ...')
-    data = workflow.calibrate()
-    if not is_pickleable(data):
-        raise TypeError(
-            f'"{workflow.__workflow_id__}" : "calibrate" return not pickleable data'
-        )
-    result = Result(workflow=workflow.__workflow_id__,
-                    data=data,
-                    config_path=current_config(state_path),
-                    base_path=state_path,
-                    heads=get_heads(state_path))
-    save_result(workflow.__workflow_id__, result, state_path)
-    logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
-    result = call_analyzer(workflow, result, history, check=False, plot=plot)
-    save_result(workflow.__workflow_id__, result, state_path, overwrite=True)
 
-    set_cache(session_id, (workflow, 'calibrate'), result)
+    result = call_calibrate(workflow, session_id, state_path)
+
+    logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
+
+    result = call_analyzer(workflow, result, history, check=False, plot=plot)
+
+    save_result(workflow.__workflow_id__, result, state_path, overwrite=True)
     return result
 
 
