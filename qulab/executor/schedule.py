@@ -8,7 +8,7 @@ from loguru import logger
 
 from .load import WorkflowType, get_dependents
 from .storage import (Report, find_report, get_head, get_heads, renew_report,
-                      revoke_report, save_report)
+                      revoke_report, save_item, save_report)
 from .transform import current_config, obey_the_oracle, update_parameters
 
 __session_id = None
@@ -69,6 +69,16 @@ def veryfy_analyzed_report(report: Report, script: str, method: str):
         )
 
 
+def get_source(workflow: WorkflowType, code_path: str | Path) -> str:
+    if isinstance(code_path, str):
+        code_path = Path(code_path)
+    try:
+        with open(code_path / workflow.__workflow_id__, 'r') as f:
+            return f.read()
+    except:
+        return ''
+
+
 def check_state(workflow: WorkflowType, code_path: str | Path,
                 state_path: str | Path) -> bool:
     """
@@ -91,6 +101,11 @@ def check_state(workflow: WorkflowType, code_path: str | Path,
             f'check_state: "{workflow.__workflow_id__}" has custom check_state method'
         )
         return workflow.check_state(report)
+    if datetime.fromtimestamp(workflow.__mtime__) > report.checked_time:
+        logger.debug(
+            f'check_state failed: "{workflow.__workflow_id__}" has been modified after last calibration'
+        )
+        return False
     if workflow.__timeout__ is not None and datetime.now(
     ) > report.checked_time + timedelta(seconds=workflow.__timeout__):
         logger.debug(
@@ -143,7 +158,9 @@ def call_check(workflow: WorkflowType, session_id: str, state_path: Path):
                     base_path=state_path,
                     heads=get_heads(state_path),
                     previous_path=get_head(workflow.__workflow_id__,
-                                           state_path))
+                                           state_path),
+                    script_path=save_item(get_source(workflow, state_path),
+                                          state_path))
 
     save_report(workflow.__workflow_id__, report, state_path)
 
@@ -168,7 +185,9 @@ def call_calibrate(workflow: WorkflowType, session_id: str, state_path: Path):
                     base_path=state_path,
                     heads=get_heads(state_path),
                     previous_path=get_head(workflow.__workflow_id__,
-                                           state_path))
+                                           state_path),
+                    script_path=save_item(get_source(workflow, state_path),
+                                          state_path))
 
     save_report(workflow.__workflow_id__, report, state_path)
 
@@ -187,11 +206,17 @@ def call_check_analyzer(node: WorkflowType,
     if report.in_spec:
         logger.debug(
             f'"{node.__workflow_id__}": checked in spec, renewing report')
-        renew_report(node.__workflow_id__, report.previous, state_path)
+        if report.previous is not None:
+            renew_report(node.__workflow_id__, report.previous, state_path)
+        else:
+            renew_report(node.__workflow_id__, report, state_path)
     else:
         logger.debug(
             f'"{node.__workflow_id__}": checked out of spec, revoking report')
-        revoke_report(node.__workflow_id__, report.previous, state_path)
+        if report.previous is not None:
+            revoke_report(node.__workflow_id__, report.previous, state_path)
+        else:
+            revoke_report(node.__workflow_id__, report, state_path)
     return report
 
 
@@ -244,7 +269,9 @@ def check_data(workflow: WorkflowType, state_path: str | Path, plot: bool,
                         base_path=state_path,
                         heads=get_heads(state_path),
                         previous_path=get_head(workflow.__workflow_id__,
-                                               state_path))
+                                               state_path),
+                        script_path=save_item(get_source(workflow, state_path),
+                                              state_path))
         report.in_spec = False
         report.bad_data = False
         return report
@@ -300,11 +327,7 @@ def calibrate(workflow: WorkflowType, state_path: str | Path, plot: bool,
 
     logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
 
-    report = call_analyzer(workflow,
-                           report,
-                           history,
-                           state_path,
-                           plot=plot)
+    report = call_analyzer(workflow, report, history, state_path, plot=plot)
     return report
 
 

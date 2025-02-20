@@ -34,6 +34,7 @@ class Report():
     base_path: Path | None = field(default=None, repr=False)
     path: Path | None = field(default=None, repr=False)
     config_path: Path | None = field(default=None, repr=False)
+    script_path: Path | None = field(default=None, repr=False)
 
     @property
     def previous(self):
@@ -54,13 +55,6 @@ class Report():
                 state = 'Outdated'
         return state
 
-    @property
-    def config(self):
-        if self.config_path is not None and self.base_path is not None:
-            return load_config(self.config_path, self.base_path)
-        else:
-            return None
-
     @state.setter
     def state(self, state: Literal['OK', 'Bad', 'Outdated', 'In spec',
                                    'Out of spec', 'Bad data']):
@@ -79,6 +73,20 @@ class Report():
         else:
             self.bad_data = False
             self.in_spec = False
+
+    @property
+    def config(self):
+        if self.config_path is not None and self.base_path is not None:
+            return load_item(self.config_path, self.base_path)
+        else:
+            return None
+
+    @property
+    def script(self):
+        if self.script_path is not None and self.base_path is not None:
+            return load_item(self.script_path, self.base_path)
+        else:
+            return None
 
 
 def random_path(base: Path) -> Path:
@@ -157,19 +165,19 @@ def save_report(workflow: str,
         path = report.path
         if path is None:
             raise ValueError("Report path is None, can't overwrite.")
-        with open(base_path / 'objects' / path, "rb") as f:
+        with open(base_path / 'reports' / path, "rb") as f:
             index = int.from_bytes(f.read(8), 'big')
         report.index = index
     else:
-        path = random_path(base_path / 'objects')
-        (base_path / 'objects' / path).parent.mkdir(parents=True,
+        path = random_path(base_path / 'reports')
+        (base_path / 'reports' / path).parent.mkdir(parents=True,
                                                     exist_ok=True)
         report.path = path
         report.index = create_index("report",
                                     base_path,
                                     context=str(path),
                                     width=35)
-    with open(base_path / 'objects' / path, "wb") as f:
+    with open(base_path / 'reports' / path, "wb") as f:
         f.write(report.index.to_bytes(8, 'big'))
         f.write(buf)
     if refresh_heads:
@@ -179,9 +187,9 @@ def save_report(workflow: str,
 
 def load_report(path: str | Path, base_path: str | Path) -> Report | None:
     base_path = Path(base_path)
-    path = base_path / 'objects' / path
+    path = base_path / 'reports' / path
 
-    with open(base_path / 'objects' / path, "rb") as f:
+    with open(base_path / 'reports' / path, "rb") as f:
         index = int.from_bytes(f.read(8), 'big')
         report = pickle.loads(lzma.decompress(f.read()))
         report.base_path = base_path
@@ -315,18 +323,17 @@ def get_report_by_index(
         return None
 
 
-def save_config(cfg, data_path):
-    i = 0
-    buf = pickle.dumps(cfg)
+def save_item(item, data_path):
+    salt = 0
+    buf = pickle.dumps(item)
     buf = lzma.compress(buf)
     h = hashlib.md5(buf)
 
     while True:
-        salt = f"{i}".encode()
-        h.update(salt)
+        h.update(f"{salt}".encode())
         hashstr = h.hexdigest()
-        cfg_id = Path(hashstr[:2]) / hashstr[2:4] / hashstr[4:]
-        path = Path(data_path) / 'config' / cfg_id
+        item_id = Path(hashstr[:2]) / hashstr[2:4] / hashstr[4:]
+        path = Path(data_path) / 'items' / item_id
         if not path.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
             with open(path, 'wb') as f:
@@ -334,13 +341,13 @@ def save_config(cfg, data_path):
             break
         elif path.read_bytes() == buf:
             break
-        i += 1
-    return str(cfg_id)
+        salt += 1
+    return str(item_id)
 
 
-@lru_cache(maxsize=1024)
-def load_config(id, data_path):
-    path = Path(data_path) / 'config' / id
+@lru_cache(maxsize=4096)
+def load_item(id, data_path):
+    path = Path(data_path) / 'items' / id
     with open(path, 'rb') as f:
         buf = f.read()
     cfg = pickle.loads(lzma.decompress(buf))
