@@ -304,7 +304,6 @@ def calibrate(workflow: WorkflowType, state_path: str | Path, plot: bool,
                            report,
                            history,
                            state_path,
-                           check=False,
                            plot=plot)
     return report
 
