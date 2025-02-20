@@ -16,7 +16,7 @@ __current_config_cache = None
 
 
 @dataclass
-class Result():
+class Report():
     workflow: str = ''
     in_spec: bool = False
     bad_data: bool = False
@@ -38,7 +38,7 @@ class Result():
     @property
     def previous(self):
         if self.previous_path is not None and self.base_path is not None:
-            return load_result(self.previous_path, self.base_path)
+            return load_report(self.previous_path, self.base_path)
         else:
             return None
 
@@ -89,7 +89,7 @@ def random_path(base: Path) -> Path:
             return path
 
 
-def save_config_key_history(key: str, result: Result,
+def save_config_key_history(key: str, report: Report,
                             base_path: str | Path) -> int:
     global __current_config_cache
     base_path = Path(base_path) / 'state'
@@ -103,14 +103,14 @@ def save_config_key_history(key: str, result: Result,
             __current_config_cache = {}
 
     __current_config_cache[
-        key] = result.data, result.calibrated_time, result.checked_time
+        key] = report.data, report.calibrated_time, report.checked_time
 
     with open(base_path / 'parameters.pkl', 'wb') as f:
         pickle.dump(__current_config_cache, f)
     return 0
 
 
-def find_config_key_history(key: str, base_path: str | Path) -> Result | None:
+def find_config_key_history(key: str, base_path: str | Path) -> Report | None:
     global __current_config_cache
     base_path = Path(base_path) / 'state'
     if __current_config_cache is None:
@@ -123,7 +123,7 @@ def find_config_key_history(key: str, base_path: str | Path) -> Result | None:
     if key in __current_config_cache:
         value, calibrated_time, checked_time = __current_config_cache.get(
             key, None)
-        result = Result(
+        report = Report(
             workflow=f'cfg:{key}',
             bad_data=False,
             in_spec=True,
@@ -133,65 +133,65 @@ def find_config_key_history(key: str, base_path: str | Path) -> Result | None:
             calibrated_time=calibrated_time,
             checked_time=checked_time,
         )
-        return result
+        return report
     return None
 
 
-def save_result(workflow: str,
-                result: Result,
+def save_report(workflow: str,
+                report: Report,
                 base_path: str | Path,
                 overwrite: bool = False,
                 refresh_heads: bool = True) -> int:
     if workflow.startswith("cfg:"):
-        return save_config_key_history(workflow[4:], result, base_path)
+        return save_config_key_history(workflow[4:], report, base_path)
 
     logger.debug(
-        f'Saving result for "{workflow}", {result.in_spec=}, {result.bad_data=}, {result.fully_calibrated=}'
+        f'Saving report for "{workflow}", {report.in_spec=}, {report.bad_data=}, {report.fully_calibrated=}'
     )
     base_path = Path(base_path)
     if overwrite:
-        buf = lzma.compress(pickle.dumps(result))
-        path = result.path
+        buf = lzma.compress(pickle.dumps(report))
+        path = report.path
         if path is None:
-            raise ValueError("Result path is None, can't overwrite.")
+            raise ValueError("Report path is None, can't overwrite.")
         with open(base_path / 'objects' / path, "rb") as f:
             index = int.from_bytes(f.read(8), 'big')
-        result.index = index
+        report.index = index
     else:
-        result.previous_path = get_head(workflow, base_path)
-        buf = lzma.compress(pickle.dumps(result))
+        report.previous_path = get_head(workflow, base_path)
+        buf = lzma.compress(pickle.dumps(report))
         path = random_path(base_path / 'objects')
         (base_path / 'objects' / path).parent.mkdir(parents=True,
                                                     exist_ok=True)
-        result.path = path
-        result.index = create_index("result",
+        report.path = path
+        report.index = create_index("report",
                                     base_path,
                                     context=str(path),
                                     width=35)
 
     with open(base_path / 'objects' / path, "wb") as f:
-        f.write(result.index.to_bytes(8, 'big'))
+        f.write(report.index.to_bytes(8, 'big'))
         f.write(buf)
     if refresh_heads:
         set_head(workflow, path, base_path)
-    return result.index
+    return report.index
 
 
-def load_result(path: str | Path, base_path: str | Path) -> Result | None:
+def load_report(path: str | Path, base_path: str | Path) -> Report | None:
     base_path = Path(base_path)
     path = base_path / 'objects' / path
 
     with open(base_path / 'objects' / path, "rb") as f:
         index = int.from_bytes(f.read(8), 'big')
-        result = pickle.loads(lzma.decompress(f.read()))
-        result.base_path = base_path
-        result.index = index
-        return result
+        report = pickle.loads(lzma.decompress(f.read()))
+        report.base_path = base_path
+        report.index = index
+        return report
 
 
-def find_result(
+def find_report(
     workflow: str, base_path: str | Path = get_config_value("data", Path)
-) -> Result | None:
+) -> Report | None:
     if workflow.startswith("cfg:"):
         return find_config_key_history(workflow[4:], base_path)
 
@@ -199,25 +199,25 @@ def find_result(
     path = get_head(workflow, base_path)
     if path is None:
         return None
-    return load_result(path, base_path)
+    return load_report(path, base_path)
 
 
-def renew_result(workflow: str, base_path: str | Path):
-    logger.debug(f'Renewing result for "{workflow}"')
-    result = find_result(workflow, base_path)
-    if result is not None:
-        result.checked_time = datetime.now()
-        return save_result(workflow, result, base_path)
+def renew_report(workflow: str, report, base_path: str | Path):
+    logger.debug(f'Renewing report for "{workflow}"')
+    report = find_report(workflow, base_path)
+    if report is not None:
+        report.checked_time = datetime.now()
+        return save_report(workflow, report, base_path)
 
 
-def revoke_result(workflow: str, base_path: str | Path):
-    logger.debug(f'Revoking result for "{workflow}"')
+def revoke_report(workflow: str, report, base_path: str | Path):
+    logger.debug(f'Revoking report for "{workflow}"')
     base_path = Path(base_path)
     path = get_head(workflow, base_path)
     if path is not None:
-        result = load_result(path, base_path)
-        result.in_spec = False
-        return save_result(workflow, result, base_path)
+        report = load_report(path, base_path)
+        report.in_spec = False
+        return save_report(workflow, report, base_path)
 
 
 def set_head(workflow: str, path: Path, base_path: str | Path):
@@ -297,12 +297,12 @@ def query_index(name: str, base_path: str | Path, index: int):
     return context.rstrip()
 
 
-def get_result_by_index(
+def get_report_by_index(
     index: int, base_path: str | Path = get_config_value("data", Path)
-) -> Result | None:
+) -> Report | None:
     try:
-        path = query_index("result", base_path, index)
-        return load_result(path, base_path)
+        path = query_index("report", base_path, index)
+        return load_report(path, base_path)
     except:
         return None
 

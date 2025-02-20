@@ -15,7 +15,7 @@ from typing import Any
 
 from loguru import logger
 
-from .storage import Result
+from .storage import Report
 
 
 class SetConfigWorkflow():
@@ -29,7 +29,7 @@ class SetConfigWorkflow():
     def depends(self):
         return []
 
-    def check_state(self, history: Result) -> bool:
+    def check_state(self, history: Report) -> bool:
         from . import transform
         try:
             return self._equal(history.parameters[self.key],
@@ -45,21 +45,21 @@ class SetConfigWorkflow():
             value = eval(input(f'"{self.key}": '))
         return value
 
-    def analyze(self, result: Result, history: Result):
-        result.state = 'OK'
-        result.parameters = {self.key: result.data}
-        return result
+    def analyze(self, report: Report, history: Report):
+        report.state = 'OK'
+        report.parameters = {self.key: report.data}
+        return report
 
     def check(self):
         return self.calibrate()
 
-    def check_analyze(self, result: Result, history: Result | None):
+    def check_analyze(self, report: Report, history: Report | None):
         if self.check_state(history):
-            result.state = 'OK'
-            result.parameters = {self.key: history.data}
+            report.state = 'OK'
+            report.parameters = {self.key: history.data}
         else:
-            result.state = 'Outdated'
-        return result
+            report.state = 'Outdated'
+        return report
 
     @staticmethod
     def _equal(a, b):

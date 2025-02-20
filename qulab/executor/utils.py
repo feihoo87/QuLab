@@ -37,7 +37,7 @@ def workflow_template(workflow: str, deps: list[str]) -> str:
 import numpy as np
 from loguru import logger
 
-from qulab.typing import Result
+from qulab.typing import Report
 
 
 # 多长时间应该检查一次校准实验，单位是秒。
@@ -63,35 +63,35 @@ def calibrate():
     return x, y
 
 
-def analyze(result: Result, history: Result | None = None) -> Result:
+def analyze(report: Report, history: Report | None = None) -> Report:
     \"\"\"
     分析校准结果。
 
-    result: Result
+    report: Report
         本次校准实验的数据。
-    history: Result | None
+    history: Report | None
         上次校准实验数据和分析结果，如果有的话。
     \"\"\"
     import random
 
-    # 这里添加你的分析过程，运行 calibrate 得到的数据，在 result.data 里
+    # 这里添加你的分析过程，运行 calibrate 得到的数据，在 report.data 里
     # 你可以得到校准的结果，然后根据这个结果进行分析。
-    x, y = result.data
+    x, y = report.data
 
     # 完整校准后的状态有两种：OK 和 Bad，分别对应校准成功和校准失败。
     # 校准失败是指出现坏数据，无法简单通过重新运行本次校准解决，需要
     # 检查前置步骤。
-    result.state = random.choice(['OK', 'Bad'])
+    report.state = random.choice(['OK', 'Bad'])
 
     # 参数是一个字典，包含了本次校准得到的参数，后续会更新到config表中。
-    result.parameters = {{'gate.R.Q1.params.amp':1}}
+    report.parameters = {{'gate.R.Q1.params.amp':1}}
 
     # 其他信息可以是任何可序列化的内容，你可以将你想要记录的信息放在这里。
     # 下次校准分析时，这些信息也会在 history 参数中一起传入，帮助你在下
     # 次分析时对比参考。
-    result.other_infomation = {{}}
+    report.other_infomation = {{}}
 
-    return result
+    return report
 
 
 def check():
@@ -111,33 +111,33 @@ def check():
     return x, y
 
 
-def check_analyze(result: Result, history: Result | None = None) -> Result:
+def check_analyze(report: Report, history: Report | None = None) -> Report:
     \"\"\"
     分析检查结果。
 
-    result: Result
+    report: Report
         本次检查实验的数据。
-    history: Result | None
+    history: Report | None
         上次检查实验数据和分析结果，如果有的话。
     \"\"\"
     import random
 
-    # 这里添加你的分析过程，运行 check 得到的数据，在 result.data 里
+    # 这里添加你的分析过程，运行 check 得到的数据，在 report.data 里
     # 你可以得到校准的结果，然后根据这个结果进行分析。
-    x, y = result.data
+    x, y = report.data
 
     # 状态有三种：Outdated, OK, Bad，分别对应过时、正常、坏数据。
     # Outdated 是指数据过时，即参数漂了，需要重新校准。
     # OK 是指数据正常，参数也没漂，不用重新校准。
     # Bad 是指数据坏了，无法校准，需要检查前置步骤。
-    result.state = random.choice(['Outdated', 'OK', 'Bad'])
+    report.state = random.choice(['Outdated', 'OK', 'Bad'])
 
-    return result
+    return report
 
 
-def oracle(result: Result,
-           history: Result | None = None,
-           system_state: dict[str:str] | None = None) -> Result:
+def oracle(report: Report,
+           history: Report | None = None,
+           system_state: dict[str:str] | None = None) -> Report:
     \"\"\"
     谕示：指凭直觉或经验判断，改动某些配置，以期望下次校准成功。
     
@@ -145,31 +145,31 @@ def oracle(result: Result,
     比如通常我们在死活测不到 rabi 或能谱时，会换一个 idle bias 再试试。这
     里我们凭直觉设的那个 bias 值，就是一个谕示，可以通过 oracle 来设定。
 
-    该函数代入的参数 result 是 analyze 函数的返回值。
+    该函数代入的参数 report 是 analyze 函数的返回值。
     \"\"\"
 
-    # result.oracle['Q0.bias'] = 0.1
-    # result.oracle['Q1.bias'] = -0.03
+    # report.oracle['Q0.bias'] = 0.1
+    # report.oracle['Q1.bias'] = -0.03
 
-    return result
+    return report
 """
 
 
 def debug_analyze(
-        result_index: int,
+        report_index: int,
         code_path: str | Path = get_config_value('code', Path),
         data_path: str | Path = get_config_value('data', Path),
 ) -> None:
-    from .storage import get_result_by_index
+    from .storage import get_report_by_index
 
-    result = get_result_by_index(result_index, data_path)
-    if result is None:
-        raise ValueError(f'Invalid result index: {result_index}')
-    workflow = result.workflow
+    report = get_report_by_index(report_index, data_path)
+    if report is None:
+        raise ValueError(f'Invalid report index: {report_index}')
+    workflow = report.workflow
     wf = load_workflow(workflow, code_path)
     if wf is None:
         raise ValueError(f'Invalid workflow: {workflow}')
-    result = wf.analyze(result, result.previous)
+    report = wf.analyze(report, report.previous)
     if hasattr(wf, 'plot'):
-        wf.plot(result)
-    return result
+        wf.plot(report)
+    return report

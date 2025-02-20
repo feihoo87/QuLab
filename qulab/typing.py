@@ -1,2 +1,2 @@
-from .executor.storage import Result
+from .executor.storage import Report
 from .scan.record import Record

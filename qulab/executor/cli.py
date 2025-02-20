@@ -149,7 +149,7 @@ def get(key, api):
 
 @click.command()
 @click.argument('workflow')
-@click.option('--plot', '-p', is_flag=True, help='Plot the result.')
+@click.option('--plot', '-p', is_flag=True, help='Plot the report.')
 @click.option('--no-dependents',
               '-n',
               is_flag=True,
@@ -221,7 +221,7 @@ def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
 @click.command()
 @click.argument('workflow')
 @click.option('--retry', '-r', default=1, type=int, help='Retry times.')
-@click.option('--plot', '-p', is_flag=True, help='Plot the result.')
+@click.option('--plot', '-p', is_flag=True, help='Plot the report.')
 @log_options
 @command_option('maintain')
 def maintain(workflow, code, data, api, retry, plot):
