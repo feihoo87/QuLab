@@ -387,6 +387,7 @@ def diagnose(workflow: WorkflowType, code_path: str | Path,
             f'"{workflow.__workflow_id__}": All dependents passed, but calibration failed!'
         )
     update_parameters(report, state_path)
+    logger.debug(f'"{workflow.__workflow_id__}": parameters updated')
     return True
 
 
@@ -451,6 +452,9 @@ def maintain(workflow: WorkflowType,
         )
     if not freeze:
         update_parameters(report, state_path)
+        logger.debug(f'"{workflow.__workflow_id__}": parameters updated')
+    else:
+        logger.debug(f'"{workflow.__workflow_id__}": parameters freezed')
     return
 
 
@@ -471,4 +475,7 @@ def run(workflow: WorkflowType,
         )
     if not freeze:
         update_parameters(report, state_path)
+        logger.debug(f'"{workflow.__workflow_id__}": parameters updated')
+    else:
+        logger.debug(f'"{workflow.__workflow_id__}": parameters freezed')
     return

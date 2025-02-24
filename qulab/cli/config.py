@@ -68,6 +68,10 @@ def log_options(func):
                   type=click.Path(),
                   default=lambda: get_config_value("log", Path),
                   help=f"Log file path")
+    @click.option("--debug-log",
+                  type=click.Path(),
+                  default=lambda: get_config_value("debug_log", Path),
+                  help=f"Debug log file path")
     @click.option("--quiet",
                   is_flag=True,
                   default=get_config_value("quiet", bool),
@@ -76,6 +80,7 @@ def log_options(func):
     def wrapper(*args, **kwargs):
         debug = bool(kwargs.pop("debug"))
         log = kwargs.pop("log")
+        debug_log = kwargs.pop("debug_log")
         quiet = bool(kwargs.pop("quiet"))
 
         if debug:
@@ -85,7 +90,17 @@ def log_options(func):
 
         handlers = []
         if log is not None:
-            handlers.append(dict(sink=log, level=log_level))
+            handlers.append(
+                dict(sink=log,
+                     level="INFO",
+                     rotation="monday at 7:00",
+                     compression="zip"))
+        if debug_log is not None:
+            handlers.append(
+                dict(sink=debug_log,
+                     level="DEBUG",
+                     rotation="monday at 7:00",
+                     compression="zip"))
         if not quiet or debug:
             handlers.append(dict(sink=sys.stderr, level=log_level))
 
