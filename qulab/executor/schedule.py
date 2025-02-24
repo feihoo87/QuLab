@@ -142,7 +142,7 @@ def call_plot(node: WorkflowType, report: Report, check=False):
 
 
 def call_check(workflow: WorkflowType, session_id: str, state_path: Path):
-    report = get_cache(session_id, (workflow, 'check'))
+    report = get_cache(session_id, (workflow.__workflow_id__, 'check'))
     if report is not None:
         logger.debug(f'Cache hit for "{workflow.__workflow_id__}:check"')
         return report
@@ -164,12 +164,12 @@ def call_check(workflow: WorkflowType, session_id: str, state_path: Path):
 
     save_report(workflow.__workflow_id__, report, state_path)
 
-    set_cache(session_id, (workflow, 'check'), report)
+    set_cache(session_id, (workflow.__workflow_id__, 'check'), report)
     return report
 
 
 def call_calibrate(workflow: WorkflowType, session_id: str, state_path: Path):
-    report = get_cache(session_id, (workflow, 'calibrate'))
+    report = get_cache(session_id, (workflow.__workflow_id__, 'calibrate'))
     if report is not None:
         logger.debug(f'Cache hit for "{workflow.__workflow_id__}:calibrate"')
         return report
@@ -191,7 +191,7 @@ def call_calibrate(workflow: WorkflowType, session_id: str, state_path: Path):
 
     save_report(workflow.__workflow_id__, report, state_path)
 
-    set_cache(session_id, (workflow, 'calibrate'), report)
+    set_cache(session_id, (workflow.__workflow_id__, 'calibrate'), report)
     return report
 
 
