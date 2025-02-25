@@ -1,4 +1,5 @@
 import functools
+import inspect
 import pickle
 import uuid
 from datetime import datetime, timedelta
@@ -231,25 +232,40 @@ def call_analyzer(node: WorkflowType,
     if hasattr(node, 'oracle') and callable(node.oracle):
         logger.debug(
             f'"{node.__workflow_id__}" has oracle method, calling ...')
-        try:
-            report = node.oracle(report,
-                                 history=history,
-                                 system_state=get_heads(report.base_path))
-        except Exception as e:
-            logger.exception(e)
-            report.oracle = {}
-        if not isinstance(report, Report):
-            raise TypeError(
-                f'"{node.__workflow_id__}" : function "oracle" must return a Report object'
-            )
-        if not is_pickleable(report.oracle):
-            raise TypeError(
-                f'"{node.__workflow_id__}" : function "oracle" return not pickleable data'
-            )
+        report = call_oracle(node, report, history)
     report.fully_calibrated = True
     save_report(node.__workflow_id__, report, state_path, overwrite=True)
     if plot:
         call_plot(node, report)
+    return report
+
+
+def call_oracle(node: WorkflowType, report: Report, history: Report | None):
+    sig = inspect.signature(node.oracle)
+    try:
+        if 'history' in sig.parameters and 'system_state' in sig.parameters:
+            report = node.oracle(report,
+                                 history=history,
+                                 system_state=get_heads(report.base_path))
+        elif 'history' in sig.parameters:
+            report = node.oracle(report, history=history)
+        elif 'system_state' in sig.parameters:
+            report = node.oracle(report,
+                                 system_state=get_heads(report.base_path))
+        else:
+            report = node.oracle(report)
+    except Exception as e:
+        logger.exception(e)
+        report.oracle = {}
+        return report
+    if not isinstance(report, Report):
+        raise TypeError(
+            f'"{node.__workflow_id__}" : function "oracle" must return a Report object'
+        )
+    if not is_pickleable(report.oracle):
+        raise TypeError(
+            f'"{node.__workflow_id__}" : function "oracle" return not pickleable data'
+        )
     return report
 
 
