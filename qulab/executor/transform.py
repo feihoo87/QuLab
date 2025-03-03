@@ -79,6 +79,8 @@ def set_config_api(query_method, update_method, export_method):
             the method should take a key and return the value.
         update_method: The update method.
             the method should take a dict of updates.
+        export_method: The export method.
+            the method should return a dict of the config.
     """
     global query_config, update_config, export_config
 
