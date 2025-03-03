@@ -161,6 +161,15 @@ def get(key, api):
 def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
     """
     Run a workflow.
+
+    If the workflow has entries, run all entries.
+    If `--no-dependents` is set, only run the workflow itself.
+    If `--retry` is set, retry the workflow when calibration failed.
+    If `--freeze` is set, freeze the config table.
+    If `--plot` is set, plot the report.
+    If `--api` is set, use the api to get and update the config table.
+    If `--code` is not set, use the current working directory.
+    If `--data` is not set, use the `logs` directory in the code path.
     """
     logger.info(
         f'[CMD]: run {workflow} --code {code} --data {data} --api {api}'
@@ -227,6 +236,13 @@ def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
 def maintain(workflow, code, data, api, retry, plot):
     """
     Maintain a workflow.
+
+    If the workflow has entries, run all entries.
+    If `--retry` is set, retry the workflow when calibration failed.
+    If `--plot` is set, plot the report.
+    If `--api` is set, use the api to get and update the config table.
+    If `--code` is not set, use the current working directory.
+    If `--data` is not set, use the `logs` directory in the code path.
     """
     logger.info(
         f'[CMD]: maintain {workflow} --code {code} --data {data} --api {api}'
