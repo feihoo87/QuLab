@@ -334,12 +334,15 @@ def encode_mapping(mapping):
     mapping_bytes = lzma.compress(pickle.dumps(mapping))
     hash_str = hashlib.md5(mapping_bytes).hexdigest()[:8]
     mappping_code = '\n'.join(
-        textwrap.wrap(base64.b64encode(mapping_bytes).decode(), 100))
+        textwrap.wrap(base64.b64encode(mapping_bytes).decode(),
+                      90,
+                      initial_indent='    ',
+                      subsequent_indent='    '))
     return hash_str, mappping_code
 
 
 def decode_mapping(hash_str, mappping_code):
-    mapping_bytes = base64.b64decode(mappping_code.replace('\n', ''))
+    mapping_bytes = base64.b64decode(mappping_code)
     if hash_str != hashlib.md5(mapping_bytes).hexdigest()[:8]:
         raise ValueError("Hash does not match")
     mapping = pickle.loads(lzma.decompress(mapping_bytes))
@@ -385,8 +388,8 @@ def load_workflow_from_template(template_path: str,
 
     inject_code = [
         "from qulab.executor.load import decode_mapping",
-        f"__VAR_{hash_str} = decode_mapping(\"{hash_str}\",",
-        f"\"\"\"{mapping_code}\"\"\")"
+        f"__VAR_{hash_str} = decode_mapping(\"{hash_str}\", \"\"\"",
+        mapping_code, "    \"\"\")"
     ]
     content = '\n'.join(inject_code + [content])
     if target_path is None:
