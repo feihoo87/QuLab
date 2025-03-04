@@ -160,7 +160,7 @@ def inject_mapping(source: str, mapping: dict[str,
 
     code = '\n'.join(lines)
     inject_code = '\n'.join([
-        "from qulab.executor.load import decode_mapping",
+        "from qulab.executor.template import decode_mapping",
         f"__VAR_{hash_str} = decode_mapping(\"{hash_str}\", \"\"\"",
         mapping_code, "    \"\"\")", ""
     ])
