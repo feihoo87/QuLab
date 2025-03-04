@@ -28,13 +28,22 @@ def decode_mapping(hash_str, mappping_code):
     return mapping
 
 
+class TemplateTypeError(TypeError):
+    pass
+
+
+class TemplateKeyError(KeyError):
+    pass
+
+
 class TemplateVarExtractor(ast.NodeVisitor):
 
-    def __init__(self, mapping):
+    def __init__(self, fname, mapping):
         self.var_func_def = (0, 0)
         self.variables = set()
         self.str_variables = set()
         self.replacements = {}
+        self.fname = fname
         self.mapping = mapping
 
     def visit_Constant(self, node):
@@ -61,8 +70,8 @@ class TemplateVarExtractor(ast.NodeVisitor):
             arg = node.args[0]
             if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
                 if arg.value not in self.mapping:
-                    raise KeyError(
-                        f"The variable '{arg.value}' in line {node.lineno} is not provided in mapping."
+                    raise TemplateKeyError(
+                        f"The variable '{arg.value}' is not provided in mapping. {self.fname}:{node.lineno}"
                     )
                 self.variables.add(arg.value)
                 # new_node = ast.Subscript(value=ast.Name(id="__VAR",
@@ -76,8 +85,8 @@ class TemplateVarExtractor(ast.NodeVisitor):
                                    node.end_col_offset)] = ('VAR', arg.value,
                                                             None, None)
             else:
-                raise ValueError(
-                    f"Argument of VAR function must be a string in line {node.lineno}"
+                raise SyntaxError(
+                    f"Argument of VAR function must be a string. {self.fname}:{node.lineno}"
                 )
         self.generic_visit(node)
 
@@ -90,12 +99,12 @@ class TemplateVarExtractor(ast.NodeVisitor):
             template = string.Template(line)
             for var_name in template.get_identifiers():
                 if var_name not in self.mapping:
-                    raise KeyError(
-                        f"The variable '{var_name}' in line {current_lineno} is not provided in mapping."
+                    raise TemplateKeyError(
+                        f"The variable '{var_name}' is not provided in mapping. {self.fname}:{current_lineno}"
                     )
                 if not isinstance(self.mapping[var_name], str):
-                    raise TypeError(
-                        f"Mapping value for '{var_name}' must be a string in line {current_lineno}"
+                    raise TemplateTypeError(
+                        f"Mapping value for '{var_name}' must be a string. {self.fname}:{current_lineno}"
                     )
                 self.str_variables.add(var_name)
                 start, stop = 0, len(line)
@@ -107,13 +116,13 @@ class TemplateVarExtractor(ast.NodeVisitor):
                                    stop)] = ('STR', var_name, None, None)
 
 
-def inject_mapping(source: str, mapping: dict[str,
-                                              Any]) -> list[tuple[str, int]]:
+def inject_mapping(source: str, mapping: dict[str, Any],
+                   fname: str) -> list[tuple[str, int]]:
     title, _ = encode_mapping(mapping)
 
     tree = ast.parse(source)
     lines = source.splitlines()
-    extractor = TemplateVarExtractor(mapping)
+    extractor = TemplateVarExtractor(fname, mapping)
     extractor.visit(tree)
 
     # remove VAR function definition
