@@ -158,11 +158,10 @@ def inject_mapping(source: str, mapping: dict[str,
                     lines[i] = ''
                 lines[end_lineno - 1] = ']' + tail
 
-    code = '\n'.join(lines)
-    inject_code = '\n'.join([
-        "from qulab.executor.template import decode_mapping",
-        f"__VAR_{hash_str} = decode_mapping(\"{hash_str}\", \"\"\"",
-        mapping_code, "    \"\"\")", ""
+    injected_code = '\n'.join([
+        f"from qulab.executor.template import decode_mapping as __decode_{hash_str}",
+        f"__VAR_{hash_str} = __decode_{hash_str}(\"{hash_str}\", \"\"\"",
+        mapping_code, "    \"\"\")", *lines
     ])
 
-    return inject_code + code, title
+    return injected_code, title
