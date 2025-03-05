@@ -118,7 +118,7 @@ class TemplateVarExtractor(ast.NodeVisitor):
 
 def inject_mapping(source: str, mapping: dict[str, Any],
                    fname: str) -> list[tuple[str, int]]:
-    title, _ = encode_mapping(mapping)
+    hash_str, mapping_code = encode_mapping(mapping)
 
     tree = ast.parse(source)
     lines = source.splitlines()
@@ -130,10 +130,6 @@ def inject_mapping(source: str, mapping: dict[str, Any],
         for i in range(extractor.var_func_def[0] - 1,
                        extractor.var_func_def[1]):
             lines[i] = ''
-
-    hash_str, mapping_code = encode_mapping(
-        {k: mapping[k]
-         for k in extractor.variables})
 
     for (lineno, end_lineno, col_offset,
          end_col_offset), (kind, name, old_source,
@@ -168,9 +164,10 @@ def inject_mapping(source: str, mapping: dict[str, Any],
                 lines[end_lineno - 1] = ']' + tail
 
     injected_code = '\n'.join([
+        f"__QULAB_TEMPLATE__ = \"{fname}\"",
         f"from qulab.executor.template import decode_mapping as __decode_{hash_str}",
         f"__VAR_{hash_str} = __decode_{hash_str}(\"{hash_str}\", \"\"\"",
         mapping_code, "    \"\"\")", *lines
     ])
 
-    return injected_code, title
+    return injected_code, hash_str

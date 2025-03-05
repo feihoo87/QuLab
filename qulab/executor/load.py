@@ -377,16 +377,27 @@ def load_workflow_from_template(template_path: str,
 def load_workflow(workflow: str | tuple[str, dict],
                   base_path: str | Path,
                   package='workflows',
-                  mtime: float = 0) -> WorkflowType:
+                  mtime: float = 0,
+                  inject: dict | None = None) -> WorkflowType:
     if isinstance(workflow, tuple):
         if len(workflow) == 2:
             file_name, mapping = workflow
-            w = load_workflow_from_template(file_name, mapping, base_path,
-                                            None, package, mtime)
+            if inject is None:
+                w = load_workflow_from_template(file_name, mapping, base_path,
+                                                None, package, mtime)
+            else:
+                w = load_workflow_from_template(file_name, inject, base_path,
+                                                None, package, mtime)
         elif len(workflow) == 3:
             template_path, target_path, mapping = workflow
-            w = load_workflow_from_template(template_path, mapping, base_path,
-                                            target_path, package, mtime)
+            if inject is None:
+                w = load_workflow_from_template(template_path, mapping,
+                                                base_path, target_path,
+                                                package, mtime)
+            else:
+                w = load_workflow_from_template(template_path, inject,
+                                                base_path, target_path,
+                                                package, mtime)
         else:
             raise ValueError(f"Invalid workflow: {workflow}")
         w.__workflow_id__ = str(Path(w.__file__).relative_to(base_path))
