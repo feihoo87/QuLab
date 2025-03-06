@@ -388,7 +388,7 @@ def fill_layout(layout,
             else:
                 layout['couplers'][coupler]['color'] = coupler_color
                 if coupler_color is None:
-                    layout['couplers'][qubit]['lw'] = lw
+                    layout['couplers'][coupler]['lw'] = lw
             layout['couplers'][coupler]['width'] = params[coupler].get(
                 'width', coupler_size)
             layout['couplers'][coupler]['fontsize'] = params[coupler].get(
