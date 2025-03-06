@@ -121,7 +121,10 @@ def inject_mapping(source: str, mapping: dict[str, Any],
     hash_str, mapping_code = encode_mapping(mapping)
 
     tree = ast.parse(source)
+
     lines = source.splitlines()
+    lines_offset = [0 for _ in range(len(lines))]
+
     extractor = TemplateVarExtractor(fname, mapping)
     extractor.visit(tree)
 
@@ -134,8 +137,10 @@ def inject_mapping(source: str, mapping: dict[str, Any],
     for (lineno, end_lineno, col_offset,
          end_col_offset), (kind, name, old_source,
                            new_source) in extractor.replacements.items():
-        head = lines[lineno - 1][:col_offset]
-        tail = lines[end_lineno - 1][end_col_offset:]
+        head = lines[lineno - 1][:col_offset + lines_offset[lineno - 1]]
+        tail = lines[end_lineno - 1][end_col_offset +
+                                     lines_offset[end_lineno - 1]:]
+        length_of_last_line = len(lines[end_lineno - 1])
         content = lines[lineno - 1:end_lineno]
         content[0] = content[0].removeprefix(head)
         content[-1] = content[-1].removesuffix(tail)
@@ -148,8 +153,12 @@ def inject_mapping(source: str, mapping: dict[str, Any],
             formated_lines[-1] = formated_lines[-1] + tail
             if len(formated_lines) == 1:
                 lines[lineno - 1] = formated_lines[0]
+                lines_offset[lineno -
+                             1] += len(lines[lineno - 1]) - length_of_last_line
             else:
                 lines[lineno - 1:end_lineno] = formated_lines
+                lines_offset[end_lineno - 1] += len(
+                    lines[end_lineno - 1]) - length_of_last_line
         else:
             pattern = re.compile(r'VAR\s*\(\s*(["\'])(\w+)\1\s*\)')
             replacement = f'__VAR_{hash_str}' + r'[\1\2\1]'
@@ -157,11 +166,15 @@ def inject_mapping(source: str, mapping: dict[str, Any],
 
             if lineno == end_lineno:
                 lines[lineno - 1] = head + new_content + tail
+                lines_offset[lineno -
+                             1] += len(lines[lineno - 1]) - length_of_last_line
             else:
                 lines[lineno - 1] = head + new_content[:-1]
                 for i in range(lineno, end_lineno - 1):
                     lines[i] = ''
                 lines[end_lineno - 1] = ']' + tail
+                lines_offset[end_lineno - 1] += len(
+                    lines[end_lineno - 1]) - length_of_last_line
 
     injected_code = '\n'.join([
         f"__QULAB_TEMPLATE__ = \"{fname}\"",
