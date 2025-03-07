@@ -171,3 +171,5 @@ typings/
 .next
 
 package-lock.json
+
+tests/workflows/run
