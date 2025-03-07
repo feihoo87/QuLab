@@ -38,7 +38,7 @@ def get_cache(session_id, key) -> Report:
         return None
     if isinstance(index, tuple):
         base_path, path = index
-        return load_report(base_path, path)
+        return load_report(path, base_path)
     elif isinstance(index, Report):
         return index
     else:
