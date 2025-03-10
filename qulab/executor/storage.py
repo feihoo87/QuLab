@@ -36,6 +36,20 @@ class Report():
     config_path: Path | None = field(default=None, repr=False)
     script_path: Path | None = field(default=None, repr=False)
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop('base_path')
+        for k in ['path', 'previous_path', 'config_path', 'script_path']:
+            if state[k] is not None:
+                state[k] = str(state[k])
+        return state
+    
+    def __setstate__(self, state):
+        for k in ['path', 'previous_path', 'config_path', 'script_path']:
+            if state[k] is not None:
+                state[k] = Path(state[k])
+        self.__dict__.update(state)
+
     @property
     def previous(self):
         if self.previous_path is not None and self.base_path is not None:
@@ -84,7 +98,9 @@ class Report():
     @property
     def script(self):
         if self.script_path is not None and self.base_path is not None:
-            return load_item(self.script_path, self.base_path)
+            source = load_item(self.script_path, self.base_path)
+            if isinstance(source, str):
+                return source
         else:
             return None
 

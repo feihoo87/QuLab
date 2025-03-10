@@ -81,16 +81,6 @@ class SetConfigWorkflow():
 WorkflowType = ModuleType | SetConfigWorkflow
 
 
-def get_source(workflow: WorkflowType, code_path: str | Path) -> str:
-    if isinstance(code_path, str):
-        code_path = Path(code_path)
-    try:
-        with open(code_path / workflow.__workflow_id__, 'r') as f:
-            return f.read()
-    except:
-        return ''
-
-
 def can_call_without_args(func):
     if not callable(func):
         return False
@@ -320,6 +310,8 @@ def load_workflow_from_file(file_name: str,
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
     module.__mtime__ = (base_path / path).stat().st_mtime
+    source_code = (base_path / path).read_text()
+    module.__source__ = source_code
 
     if hasattr(module, 'entries'):
         verify_entries(module, base_path)
@@ -347,11 +339,11 @@ def load_workflow_from_template(template_path: str,
     path = Path(template_path)
 
     with open(base_path / path) as f:
-        content = f.read()
+        template = f.read()
 
     mtime = max((base_path / template_path).stat().st_mtime, mtime)
 
-    content, hash_str = inject_mapping(content, mapping, str(path))
+    content, hash_str = inject_mapping(template, mapping, str(path))
 
     if target_path is None:
         if path.stem == 'template':
@@ -365,22 +357,19 @@ def load_workflow_from_template(template_path: str,
         path = target_path
 
     file = base_path / path
-    if not file.exists():
+    if not file.exists() or file.stat().st_mtime < mtime:
         file.parent.mkdir(parents=True, exist_ok=True)
         with open(file, 'w') as f:
             f.write(content)
-    else:
-        if file.stat().st_mtime < mtime:
-            with open(file, 'w') as f:
-                f.write(content)
-        else:
-            if file.read_text() != content:
-                logger.warning(
-                    f"`{file}` already exists and is different from the new one generated from template `{template_path}`"
-                )
+    elif file.read_text() != content:
+        logger.warning(
+            f"`{file}` already exists and is different from the new one generated from template `{template_path}`"
+        )
 
     module = load_workflow_from_file(str(path), base_path, package)
     module.__mtime__ = max(mtime, module.__mtime__)
+    if module.__source__ == content:
+        module.__source__ = template, mapping, str(template_path)
 
     return module
 
@@ -422,8 +411,6 @@ def load_workflow(workflow: str | tuple[str, dict],
             w.__workflow_id__ = str(Path(w.__file__).relative_to(base_path))
     else:
         raise TypeError(f"Invalid workflow: {workflow}")
-    
-    w.__source__ = get_source(w, base_path)
 
     return w
 
