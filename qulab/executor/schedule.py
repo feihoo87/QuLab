@@ -70,16 +70,6 @@ def veryfy_analyzed_report(report: Report, script: str, method: str):
         )
 
 
-def get_source(workflow: WorkflowType, code_path: str | Path) -> str:
-    if isinstance(code_path, str):
-        code_path = Path(code_path)
-    try:
-        with open(code_path / workflow.__workflow_id__, 'r') as f:
-            return f.read()
-    except:
-        return ''
-
-
 def check_state(workflow: WorkflowType, code_path: str | Path,
                 state_path: str | Path) -> bool:
     """
@@ -160,8 +150,7 @@ def call_check(workflow: WorkflowType, session_id: str, state_path: Path):
                     heads=get_heads(state_path),
                     previous_path=get_head(workflow.__workflow_id__,
                                            state_path),
-                    script_path=save_item(get_source(workflow, state_path),
-                                          state_path))
+                    script_path=save_item(workflow.__source__, state_path))
 
     save_report(workflow.__workflow_id__, report, state_path)
 
@@ -187,8 +176,7 @@ def call_calibrate(workflow: WorkflowType, session_id: str, state_path: Path):
                     heads=get_heads(state_path),
                     previous_path=get_head(workflow.__workflow_id__,
                                            state_path),
-                    script_path=save_item(get_source(workflow, state_path),
-                                          state_path))
+                    script_path=save_item(workflow.__source__, state_path))
 
     save_report(workflow.__workflow_id__, report, state_path)
 
@@ -286,8 +274,7 @@ def check_data(workflow: WorkflowType, state_path: str | Path, plot: bool,
                         heads=get_heads(state_path),
                         previous_path=get_head(workflow.__workflow_id__,
                                                state_path),
-                        script_path=save_item(get_source(workflow, state_path),
-                                              state_path))
+                        script_path=save_item(workflow.__source__, state_path))
         report.in_spec = False
         report.bad_data = False
         return report

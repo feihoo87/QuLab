@@ -17,6 +17,7 @@ from .template import (TemplateKeyError, TemplateTypeError, decode_mapping,
 class SetConfigWorkflow():
     __timeout__ = None
     __mtime__ = 0
+    __source__ = ''
 
     def __init__(self, key):
         self.key = key
@@ -78,6 +79,16 @@ class SetConfigWorkflow():
 
 
 WorkflowType = ModuleType | SetConfigWorkflow
+
+
+def get_source(workflow: WorkflowType, code_path: str | Path) -> str:
+    if isinstance(code_path, str):
+        code_path = Path(code_path)
+    try:
+        with open(code_path / workflow.__workflow_id__, 'r') as f:
+            return f.read()
+    except:
+        return ''
 
 
 def can_call_without_args(func):
@@ -411,6 +422,8 @@ def load_workflow(workflow: str | tuple[str, dict],
             w.__workflow_id__ = str(Path(w.__file__).relative_to(base_path))
     else:
         raise TypeError(f"Invalid workflow: {workflow}")
+    
+    w.__source__ = get_source(w, base_path)
 
     return w
 
