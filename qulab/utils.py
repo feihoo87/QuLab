@@ -42,7 +42,7 @@ def _unix_detach_with_tmux_or_screen(executable_path):
             "-d",
             "-s",
             session_name,
-            safe_path + " ; tmux wait-for -S finished",  # 等待命令结束
+            executable_path + " ; tmux wait-for -S finished",  # 等待命令结束
             ";",
             "tmux",
             "wait-for",
@@ -55,7 +55,7 @@ def _unix_detach_with_tmux_or_screen(executable_path):
 
     # 尝试 screen
     elif _check_command_exists("screen"):
-        command = ["screen", "-dmS", session_name, safe_path]
+        command = ["screen", "-dmS", session_name, executable_path]
         subprocess.Popen(command, start_new_session=True)
         click.echo(f"已启动 screen 会话: {session_name}")
         click.echo(f"你可以使用 `screen -r {session_name}` 来查看输出")
@@ -66,18 +66,18 @@ def _unix_detach_with_tmux_or_screen(executable_path):
 
 def run_detached_with_terminal(executable_path):
     """回退到带终端窗口的方案"""
-    safe_path = shlex.quote(executable_path)
     if sys.platform == 'win32':
         _windows_start(executable_path)
     elif sys.platform == 'darwin':
-        script = f'tell app "Terminal" to do script "{safe_path}"'
+        script = f'tell app "Terminal" to do script "{executable_path}"'
         subprocess.Popen(["osascript", "-e", script], start_new_session=True)
     else:
         try:
-            subprocess.Popen(["gnome-terminal", "--", "sh", "-c", safe_path],
-                             start_new_session=True)
+            subprocess.Popen(
+                ["gnome-terminal", "--", "sh", "-c", executable_path],
+                start_new_session=True)
         except FileNotFoundError:
-            subprocess.Popen(["xterm", "-e", safe_path],
+            subprocess.Popen(["xterm", "-e", executable_path],
                              start_new_session=True)
 
 
