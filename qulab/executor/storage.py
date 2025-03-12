@@ -404,6 +404,7 @@ def load_item(id, data_path):
 
 def load_report_from_zipfile(path: str | Path,
                              base_path: str | Path) -> Report | None:
+    path = Path(path)
     with zipfile.ZipFile(base_path) as zf:
         path = '/'.join(path.parts)
         with zf.open(f"{base_path.stem}/reports/{path}") as f:
