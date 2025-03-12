@@ -2,6 +2,7 @@ import hashlib
 import lzma
 import pickle
 import uuid
+import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -43,7 +44,7 @@ class Report():
             if state[k] is not None:
                 state[k] = str(state[k])
         return state
-    
+
     def __setstate__(self, state):
         for k in ['path', 'previous_path', 'config_path', 'script_path']:
             if state[k] is not None:
@@ -101,6 +102,17 @@ class Report():
             source = load_item(self.script_path, self.base_path)
             if isinstance(source, str):
                 return source
+            else:
+                from .template import inject_mapping
+                return inject_mapping(*source)[0]
+        else:
+            return None
+
+    @property
+    def template_source(self):
+        if self.script_path is not None and self.base_path is not None:
+            source = load_item(self.script_path, self.base_path)
+            return source
         else:
             return None
 
@@ -203,6 +215,9 @@ def save_report(workflow: str,
 
 def load_report(path: str | Path, base_path: str | Path) -> Report | None:
     base_path = Path(base_path)
+    if zipfile.is_zipfile(base_path):
+        return load_report_from_zipfile(path, base_path)
+
     path = base_path / 'reports' / path
 
     with open(base_path / 'reports' / path, "rb") as f:
@@ -267,6 +282,8 @@ def set_head(workflow: str, path: Path, base_path: str | Path):
 
 def get_head(workflow: str, base_path: str | Path) -> Path | None:
     base_path = Path(base_path)
+    if zipfile.is_zipfile(base_path):
+        return get_heads_from_zipfile(base_path)[workflow]
     try:
         with open(base_path / "heads", "rb") as f:
             heads = pickle.load(f)
@@ -277,6 +294,8 @@ def get_head(workflow: str, base_path: str | Path) -> Path | None:
 
 def get_heads(base_path: str | Path) -> Path | None:
     base_path = Path(base_path)
+    if zipfile.is_zipfile(base_path):
+        return get_heads_from_zipfile(base_path)
     try:
         with open(base_path / "heads", "rb") as f:
             heads = pickle.load(f)
@@ -320,6 +339,9 @@ def create_index(name: str,
 
 @lru_cache(maxsize=4096)
 def query_index(name: str, base_path: str | Path, index: int):
+    base_path = Path(base_path)
+    if zipfile.is_zipfile(base_path):
+        return query_index_from_zipfile(name, base_path, index)
     path = Path(base_path) / "index" / name
     width = int(path.with_suffix('.width').read_text())
 
@@ -336,6 +358,7 @@ def get_report_by_index(
         path = query_index("report", base_path, index)
         return load_report(path, base_path)
     except:
+        raise
         return None
 
 
@@ -363,8 +386,52 @@ def save_item(item, data_path):
 
 @lru_cache(maxsize=4096)
 def load_item(id, data_path):
-    path = Path(data_path) / 'items' / id
-    with open(path, 'rb') as f:
-        buf = f.read()
-    cfg = pickle.loads(lzma.decompress(buf))
-    return cfg
+    data_path = Path(data_path)
+    if zipfile.is_zipfile(data_path):
+        buf = load_item_buf_from_zipfile(id, data_path)
+    else:
+        path = Path(data_path) / 'items' / id
+        with open(path, 'rb') as f:
+            buf = f.read()
+    item = pickle.loads(lzma.decompress(buf))
+    return item
+
+
+#########################################################################
+##                            Zipfile support                          ##
+#########################################################################
+
+
+def load_report_from_zipfile(path: str | Path,
+                             base_path: str | Path) -> Report | None:
+    with zipfile.ZipFile(base_path) as zf:
+        path = '/'.join(path.parts)
+        with zf.open(f"{base_path.stem}/reports/{path}") as f:
+            index = int.from_bytes(f.read(8), 'big')
+            report = pickle.loads(lzma.decompress(f.read()))
+            report.base_path = base_path
+            report.index = index
+            return report
+
+
+def get_heads_from_zipfile(base_path: str | Path) -> Path | None:
+    with zipfile.ZipFile(base_path) as zf:
+        with zf.open(f"{base_path.stem}/heads") as f:
+            heads = pickle.load(f)
+    return heads
+
+
+def query_index_from_zipfile(name: str, base_path: str | Path, index: int):
+    with zipfile.ZipFile(base_path) as zf:
+        with zf.open(f"{base_path.stem}/index/{name}.width") as f:
+            width = int(f.read().decode())
+        with zf.open(f"{base_path.stem}/index/{name}.idx") as f:
+            f.seek(index * (width + 1))
+            context = f.read(width).decode()
+    return context.rstrip()
+
+
+def load_item_buf_from_zipfile(id, base_path):
+    with zipfile.ZipFile(base_path) as zf:
+        with zf.open(f"{base_path.stem}/items/{id}") as f:
+            return f.read()
