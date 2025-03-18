@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from loguru import logger
+from paramiko import SSHClient
+from paramiko.ssh_exception import SSHException
 
 from ..cli.config import get_config_value
 
@@ -125,52 +127,72 @@ def random_path(base: Path) -> Path:
             return path
 
 
-def save_config_key_history(key: str, report: Report,
-                            base_path: str | Path) -> int:
-    global __current_config_cache
-    base_path = Path(base_path) / 'state'
+def find_report(
+    workflow: str, base_path: str | Path = get_config_value("data", Path)
+) -> Report | None:
+    if workflow.startswith("cfg:"):
+        return find_config_key_history(workflow[4:], base_path)
+
+    base_path = Path(base_path)
+    path = get_head(workflow, base_path)
+    if path is None:
+        return None
+    return load_report(path, base_path)
+
+
+def renew_report(workflow: str, report: Report | None, base_path: str | Path):
+    logger.debug(f'Renewing report for "{workflow}"')
+    if report is not None:
+        report.checked_time = datetime.now()
+        return save_report(workflow,
+                           report,
+                           base_path,
+                           overwrite=True,
+                           refresh_heads=True)
+    else:
+        raise ValueError(f"Can't renew report for {workflow}")
+
+
+def revoke_report(workflow: str, report: Report | None, base_path: str | Path):
+    logger.debug(f'Revoking report for "{workflow}"')
+    base_path = Path(base_path)
+    if report is not None:
+        report.in_spec = False
+        report.previous_path = report.path
+        return save_report(workflow,
+                           report,
+                           base_path,
+                           overwrite=False,
+                           refresh_heads=True)
+
+
+def get_report_by_index(
+    index: int, base_path: str | Path = get_config_value("data", Path)
+) -> Report | None:
+    try:
+        path = query_index("report", base_path, index)
+        return load_report(path, base_path)
+    except:
+        raise
+        return None
+
+
+#########################################################################
+##                           Basic Write API                           ##
+#########################################################################
+
+
+def set_head(workflow: str, path: Path, base_path: str | Path):
+    base_path = Path(base_path)
     base_path.mkdir(parents=True, exist_ok=True)
-
-    if __current_config_cache is None:
-        if (base_path / 'parameters.pkl').exists():
-            with open(base_path / 'parameters.pkl', 'rb') as f:
-                __current_config_cache = pickle.load(f)
-        else:
-            __current_config_cache = {}
-
-    __current_config_cache[
-        key] = report.data, report.calibrated_time, report.checked_time
-
-    with open(base_path / 'parameters.pkl', 'wb') as f:
-        pickle.dump(__current_config_cache, f)
-    return 0
-
-
-def find_config_key_history(key: str, base_path: str | Path) -> Report | None:
-    global __current_config_cache
-    base_path = Path(base_path) / 'state'
-    if __current_config_cache is None:
-        if (base_path / 'parameters.pkl').exists():
-            with open(base_path / 'parameters.pkl', 'rb') as f:
-                __current_config_cache = pickle.load(f)
-        else:
-            __current_config_cache = {}
-
-    if key in __current_config_cache:
-        value, calibrated_time, checked_time = __current_config_cache.get(
-            key, None)
-        report = Report(
-            workflow=f'cfg:{key}',
-            bad_data=False,
-            in_spec=True,
-            fully_calibrated=True,
-            parameters={key: value},
-            data=value,
-            calibrated_time=calibrated_time,
-            checked_time=checked_time,
-        )
-        return report
-    return None
+    try:
+        with open(base_path / "heads", "rb") as f:
+            heads = pickle.load(f)
+    except:
+        heads = {}
+    heads[workflow] = path
+    with open(base_path / "heads", "wb") as f:
+        pickle.dump(heads, f)
 
 
 def save_report(workflow: str,
@@ -213,97 +235,6 @@ def save_report(workflow: str,
     return report.index
 
 
-def load_report(path: str | Path, base_path: str | Path) -> Report | None:
-    base_path = Path(base_path)
-    if zipfile.is_zipfile(base_path):
-        return load_report_from_zipfile(path, base_path)
-
-    path = base_path / 'reports' / path
-
-    with open(base_path / 'reports' / path, "rb") as f:
-        index = int.from_bytes(f.read(8), 'big')
-        report = pickle.loads(lzma.decompress(f.read()))
-        report.base_path = base_path
-        report.index = index
-        return report
-
-
-def find_report(
-    workflow: str, base_path: str | Path = get_config_value("data", Path)
-) -> Report | None:
-    if workflow.startswith("cfg:"):
-        return find_config_key_history(workflow[4:], base_path)
-
-    base_path = Path(base_path)
-    path = get_head(workflow, base_path)
-    if path is None:
-        return None
-    return load_report(path, base_path)
-
-
-def renew_report(workflow: str, report: Report | None, base_path: str | Path):
-    logger.debug(f'Renewing report for "{workflow}"')
-    if report is not None:
-        report.checked_time = datetime.now()
-        return save_report(workflow,
-                           report,
-                           base_path,
-                           overwrite=True,
-                           refresh_heads=True)
-    else:
-        raise ValueError(f"Can't renew report for {workflow}")
-
-
-def revoke_report(workflow: str, report: Report | None, base_path: str | Path):
-    logger.debug(f'Revoking report for "{workflow}"')
-    base_path = Path(base_path)
-    if report is not None:
-        report.in_spec = False
-        report.previous_path = report.path
-        return save_report(workflow,
-                           report,
-                           base_path,
-                           overwrite=False,
-                           refresh_heads=True)
-
-
-def set_head(workflow: str, path: Path, base_path: str | Path):
-    base_path = Path(base_path)
-    base_path.mkdir(parents=True, exist_ok=True)
-    try:
-        with open(base_path / "heads", "rb") as f:
-            heads = pickle.load(f)
-    except:
-        heads = {}
-    heads[workflow] = path
-    with open(base_path / "heads", "wb") as f:
-        pickle.dump(heads, f)
-
-
-def get_head(workflow: str, base_path: str | Path) -> Path | None:
-    base_path = Path(base_path)
-    if zipfile.is_zipfile(base_path):
-        return get_heads_from_zipfile(base_path)[workflow]
-    try:
-        with open(base_path / "heads", "rb") as f:
-            heads = pickle.load(f)
-        return heads[workflow]
-    except:
-        return None
-
-
-def get_heads(base_path: str | Path) -> Path | None:
-    base_path = Path(base_path)
-    if zipfile.is_zipfile(base_path):
-        return get_heads_from_zipfile(base_path)
-    try:
-        with open(base_path / "heads", "rb") as f:
-            heads = pickle.load(f)
-        return heads
-    except:
-        return {}
-
-
 def create_index(name: str,
                  base_path: str | Path,
                  context: str,
@@ -337,31 +268,6 @@ def create_index(name: str,
     return index
 
 
-@lru_cache(maxsize=4096)
-def query_index(name: str, base_path: str | Path, index: int):
-    base_path = Path(base_path)
-    if zipfile.is_zipfile(base_path):
-        return query_index_from_zipfile(name, base_path, index)
-    path = Path(base_path) / "index" / name
-    width = int(path.with_suffix('.width').read_text())
-
-    with path.with_suffix('.idx').open("r") as f:
-        f.seek(index * (width + 1))
-        context = f.read(width)
-    return context.rstrip()
-
-
-def get_report_by_index(
-    index: int, base_path: str | Path = get_config_value("data", Path)
-) -> Report | None:
-    try:
-        path = query_index("report", base_path, index)
-        return load_report(path, base_path)
-    except:
-        raise
-        return None
-
-
 def save_item(item, data_path):
     salt = 0
     buf = pickle.dumps(item)
@@ -384,6 +290,85 @@ def save_item(item, data_path):
     return str(item_id)
 
 
+def save_config_key_history(key: str, report: Report,
+                            base_path: str | Path) -> int:
+    global __current_config_cache
+    base_path = Path(base_path) / 'state'
+    base_path.mkdir(parents=True, exist_ok=True)
+
+    if __current_config_cache is None:
+        if (base_path / 'parameters.pkl').exists():
+            with open(base_path / 'parameters.pkl', 'rb') as f:
+                __current_config_cache = pickle.load(f)
+        else:
+            __current_config_cache = {}
+
+    __current_config_cache[
+        key] = report.data, report.calibrated_time, report.checked_time
+
+    with open(base_path / 'parameters.pkl', 'wb') as f:
+        pickle.dump(__current_config_cache, f)
+    return 0
+
+
+#########################################################################
+##                            Basic Read API                           ##
+#########################################################################
+
+
+def load_report(path: str | Path, base_path: str | Path) -> Report | None:
+    base_path = Path(base_path)
+    if zipfile.is_zipfile(base_path):
+        return load_report_from_zipfile(path, base_path)
+
+    path = base_path / 'reports' / path
+
+    with open(base_path / 'reports' / path, "rb") as f:
+        index = int.from_bytes(f.read(8), 'big')
+        report = pickle.loads(lzma.decompress(f.read()))
+        report.base_path = base_path
+        report.index = index
+        return report
+
+
+def get_head(workflow: str, base_path: str | Path) -> Path | None:
+    base_path = Path(base_path)
+    if zipfile.is_zipfile(base_path):
+        return get_heads_from_zipfile(base_path)[workflow]
+    try:
+        with open(base_path / "heads", "rb") as f:
+            heads = pickle.load(f)
+        return heads[workflow]
+    except:
+        return None
+
+
+def get_heads(base_path: str | Path) -> Path | None:
+    base_path = Path(base_path)
+    if zipfile.is_zipfile(base_path):
+        return get_heads_from_zipfile(base_path)
+    try:
+        with open(base_path / "heads", "rb") as f:
+            heads = pickle.load(f)
+        return heads
+    except:
+        return {}
+
+
+@lru_cache(maxsize=4096)
+def query_index(name: str, base_path: str | Path, index: int):
+    base_path = Path(base_path)
+    if zipfile.is_zipfile(base_path):
+        return query_index_from_zipfile(name, base_path, index)
+    path = Path(base_path) / "index" / name
+    width = int(path.with_suffix('.width').read_text())
+
+    with path.with_suffix('.idx').open("r") as f:
+        f.seek(index * (width + 1))
+        context = f.read(width)
+    return context.rstrip()
+
+
 @lru_cache(maxsize=4096)
 def load_item(id, data_path):
     data_path = Path(data_path)
@@ -395,6 +380,33 @@ def load_item(id, data_path):
             buf = f.read()
     item = pickle.loads(lzma.decompress(buf))
     return item
+
+
+def find_config_key_history(key: str, base_path: str | Path) -> Report | None:
+    global __current_config_cache
+    base_path = Path(base_path) / 'state'
+    if __current_config_cache is None:
+        if (base_path / 'parameters.pkl').exists():
+            with open(base_path / 'parameters.pkl', 'rb') as f:
+                __current_config_cache = pickle.load(f)
+        else:
+            __current_config_cache = {}
+
+    if key in __current_config_cache:
+        value, calibrated_time, checked_time = __current_config_cache.get(
+            key, None)
+        report = Report(
+            workflow=f'cfg:{key}',
+            bad_data=False,
+            in_spec=True,
+            fully_calibrated=True,
+            parameters={key: value},
+            data=value,
+            calibrated_time=calibrated_time,
+            checked_time=checked_time,
+        )
+        return report
+    return None
 
 
 #########################################################################
@@ -436,3 +448,56 @@ def load_item_buf_from_zipfile(id, base_path):
     with zipfile.ZipFile(base_path) as zf:
         with zf.open(f"{base_path.stem}/items/{id}") as f:
             return f.read()
+
+
+#########################################################################
+##                             SCP support                             ##
+#########################################################################
+
+
+def load_report_from_scp(path: str | Path, base_path: Path,
+                         client: SSHClient) -> Report:
+    try:
+        path = Path(path)
+        with client.open_sftp() as sftp:
+            with sftp.open(base_path / path, 'rb') as f:
+                index = int.from_bytes(f.read(8), 'big')
+                report = pickle.loads(lzma.decompress(f.read()))
+                report.base_path = path
+                report.index = index
+                return report
+    except SSHException:
+        raise ValueError(f"Can't load report from {path}")
+
+
+def get_heads_from_scp(base_path: Path, client: SSHClient) -> Path | None:
+    try:
+        with client.open_sftp() as sftp:
+            with sftp.open(base_path / 'heads', 'rb') as f:
+                heads = pickle.load(f)
+        return heads
+    except SSHException:
+        return None
+
+
+def query_index_from_scp(name: str, base_path: Path, client: SSHClient,
+                         index: int):
+    try:
+        with client.open_sftp() as sftp:
+            with sftp.open(base_path / f'index/{name}.width', 'rb') as f:
+                width = int(f.read().decode())
+            with sftp.open(base_path / f'index/{name}.idx', 'rb') as f:
+                f.seek(index * (width + 1))
+                context = f.read(width).decode()
+        return context.rstrip()
+    except SSHException:
+        return None
+
+
+def load_item_buf_from_scp(id: str, base_path: Path, client: SSHClient):
+    try:
+        with client.open_sftp() as sftp:
+            with sftp.open(base_path / f'items/{id}', 'rb') as f:
+                return f.read()
+    except SSHException:
+        return None
