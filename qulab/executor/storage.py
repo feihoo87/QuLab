@@ -10,8 +10,22 @@ from pathlib import Path
 from typing import Any, Literal
 
 from loguru import logger
-from paramiko import SSHClient
-from paramiko.ssh_exception import SSHException
+
+try:
+    from paramiko import SSHClient
+    from paramiko.ssh_exception import SSHException
+except:
+    class SSHClient:
+
+        def __init__(self):
+            raise ImportError("Can't import paramiko, ssh support will be disabled.")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            pass
+
 
 from ..cli.config import get_config_value
 
@@ -177,6 +191,10 @@ def get_report_by_index(
         return None
 
 
+def get_head(workflow: str, base_path: str | Path) -> Path | None:
+    return get_heads(base_path).get(workflow, None)
+
+
 #########################################################################
 ##                           Basic Write API                           ##
 #########################################################################
@@ -317,6 +335,13 @@ def save_config_key_history(key: str, report: Report,
 
 
 def load_report(path: str | Path, base_path: str | Path) -> Report | None:
+    if isinstance(base_path, str) and base_path.startswith('ssh '):
+        with SSHClient() as client:
+            cfg, base_path = _pase_ssh_config(base_path[4:])
+            client.load_system_host_keys()
+            client.connect(**cfg)
+            return load_report_from_scp(path, base_path, client)
+
     base_path = Path(base_path)
     if zipfile.is_zipfile(base_path):
         return load_report_from_zipfile(path, base_path)
@@ -331,19 +356,14 @@ def load_report(path: str | Path, base_path: str | Path) -> Report | None:
         return report
 
 
-def get_head(workflow: str, base_path: str | Path) -> Path | None:
-    base_path = Path(base_path)
-    if zipfile.is_zipfile(base_path):
-        return get_heads_from_zipfile(base_path)[workflow]
-    try:
-        with open(base_path / "heads", "rb") as f:
-            heads = pickle.load(f)
-        return heads[workflow]
-    except:
-        return None
-
-
 def get_heads(base_path: str | Path) -> Path | None:
+    if isinstance(base_path, str) and base_path.startswith('ssh '):
+        with SSHClient() as client:
+            cfg, base_path = _pase_ssh_config(base_path[4:])
+            client.load_system_host_keys()
+            client.connect(**cfg)
+            return get_heads_from_scp(base_path, client)
+
     base_path = Path(base_path)
     if zipfile.is_zipfile(base_path):
         return get_heads_from_zipfile(base_path)
@@ -357,6 +377,13 @@ def get_heads(base_path: str | Path) -> Path | None:
 
 @lru_cache(maxsize=4096)
 def query_index(name: str, base_path: str | Path, index: int):
+    if isinstance(base_path, str) and base_path.startswith('ssh '):
+        with SSHClient() as client:
+            cfg, base_path = _pase_ssh_config(base_path[4:])
+            client.load_system_host_keys()
+            client.connect(**cfg)
+            return query_index_from_scp(name, base_path, client, index)
+
     base_path = Path(base_path)
     if zipfile.is_zipfile(base_path):
         return query_index_from_zipfile(name, base_path, index)
@@ -370,14 +397,21 @@ def query_index(name: str, base_path: str | Path, index: int):
 
 
 @lru_cache(maxsize=4096)
-def load_item(id, data_path):
-    data_path = Path(data_path)
-    if zipfile.is_zipfile(data_path):
-        buf = load_item_buf_from_zipfile(id, data_path)
+def load_item(id, base_path):
+    if isinstance(base_path, str) and base_path.startswith('ssh '):
+        with SSHClient() as client:
+            cfg, base_path = _pase_ssh_config(base_path[4:])
+            client.load_system_host_keys()
+            client.connect(**cfg)
+            buf = load_item_buf_from_scp(id, base_path, client)
     else:
-        path = Path(data_path) / 'items' / id
-        with open(path, 'rb') as f:
-            buf = f.read()
+        base_path = Path(base_path)
+        if zipfile.is_zipfile(base_path):
+            buf = load_item_buf_from_zipfile(id, base_path)
+        else:
+            path = Path(base_path) / 'items' / id
+            with open(path, 'rb') as f:
+                buf = f.read()
     item = pickle.loads(lzma.decompress(buf))
     return item
 
@@ -455,12 +489,23 @@ def load_item_buf_from_zipfile(id, base_path):
 #########################################################################
 
 
+def _pase_ssh_config(config: str):
+    config = config.split()
+    base_path = ' '.join(config[4:])
+    return {
+        'hostname': config[0],
+        'port': int(config[1]),
+        'username': config[2],
+        'key_filename': config[3]
+    }, Path(base_path)
+
+
 def load_report_from_scp(path: str | Path, base_path: Path,
                          client: SSHClient) -> Report:
     try:
         path = Path(path)
         with client.open_sftp() as sftp:
-            with sftp.open(base_path / path, 'rb') as f:
+            with sftp.open(str(Path(base_path) / 'reports' / path), 'rb') as f:
                 index = int.from_bytes(f.read(8), 'big')
                 report = pickle.loads(lzma.decompress(f.read()))
                 report.base_path = path
@@ -473,7 +518,7 @@ def load_report_from_scp(path: str | Path, base_path: Path,
 def get_heads_from_scp(base_path: Path, client: SSHClient) -> Path | None:
     try:
         with client.open_sftp() as sftp:
-            with sftp.open(base_path / 'heads', 'rb') as f:
+            with sftp.open(str(Path(base_path) / 'heads'), 'rb') as f:
                 heads = pickle.load(f)
         return heads
     except SSHException:
@@ -484,9 +529,11 @@ def query_index_from_scp(name: str, base_path: Path, client: SSHClient,
                          index: int):
     try:
         with client.open_sftp() as sftp:
-            with sftp.open(base_path / f'index/{name}.width', 'rb') as f:
+            s = str(Path(base_path) / 'index' / f'{name}.width')
+            with sftp.open(s, 'rb') as f:
                 width = int(f.read().decode())
-            with sftp.open(base_path / f'index/{name}.idx', 'rb') as f:
+            with sftp.open(str(base_path / 'index' / f'{name}.idx'),
+                           'rb') as f:
                 f.seek(index * (width + 1))
                 context = f.read(width).decode()
         return context.rstrip()
@@ -497,7 +544,8 @@ def query_index_from_scp(name: str, base_path: Path, client: SSHClient,
 def load_item_buf_from_scp(id: str, base_path: Path, client: SSHClient):
     try:
         with client.open_sftp() as sftp:
-            with sftp.open(base_path / f'items/{id}', 'rb') as f:
+            with sftp.open(str(Path(base_path) / 'items' / str(id)),
+                           'rb') as f:
                 return f.read()
     except SSHException:
         return None
