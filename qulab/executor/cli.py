@@ -2,6 +2,7 @@ import functools
 import graphlib
 import importlib
 import os
+import sys
 from pathlib import Path
 
 import click
@@ -68,6 +69,10 @@ def command_option(command_name):
             help='The path of the bootstrap.')
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            if 'code' in kwargs and kwargs['code'] is not None:
+                code = os.path.expanduser(kwargs['code'])
+                if code not in sys.path:
+                    sys.path.insert(0, code)
             bootstrap = kwargs.pop('bootstrap')
             if bootstrap is not None:
                 boot(bootstrap)
