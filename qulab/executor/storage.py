@@ -1,6 +1,7 @@
 import hashlib
 import lzma
 import pickle
+import re
 import uuid
 import zipfile
 from dataclasses import dataclass, field
@@ -8,6 +9,7 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import parse_qs
 
 from loguru import logger
 
@@ -15,16 +17,24 @@ try:
     from paramiko import SSHClient
     from paramiko.ssh_exception import SSHException
 except:
+    import warnings
+
+    warnings.warn("Can't import paramiko, ssh support will be disabled.")
+
     class SSHClient:
 
         def __init__(self):
-            raise ImportError("Can't import paramiko, ssh support will be disabled.")
+            raise ImportError(
+                "Can't import paramiko, ssh support will be disabled.")
 
         def __enter__(self):
             return self
 
         def __exit__(self, exc_type, exc_value, traceback):
             pass
+
+    class SSHException(Exception):
+        pass
 
 
 from ..cli.config import get_config_value
@@ -48,7 +58,7 @@ class Report():
     index: int = -1
     previous_path: Path | None = field(default=None, repr=False)
     heads: dict[str, Path] = field(default_factory=dict, repr=False)
-    base_path: Path | None = field(default=None, repr=False)
+    base_path: str | Path | None = field(default=None, repr=False)
     path: Path | None = field(default=None, repr=False)
     config_path: Path | None = field(default=None, repr=False)
     script_path: Path | None = field(default=None, repr=False)
@@ -335,12 +345,15 @@ def save_config_key_history(key: str, report: Report,
 
 
 def load_report(path: str | Path, base_path: str | Path) -> Report | None:
-    if isinstance(base_path, str) and base_path.startswith('ssh '):
+    if isinstance(base_path, str) and base_path.startswith('ssh://'):
         with SSHClient() as client:
-            cfg, base_path = _pase_ssh_config(base_path[4:])
+            cfg = parse_ssh_uri(base_path)
+            remote_base_path = cfg.pop('remote_file_path')
             client.load_system_host_keys()
             client.connect(**cfg)
-            return load_report_from_scp(path, base_path, client)
+            report = load_report_from_scp(path, remote_base_path, client)
+            report.base_path = base_path
+            return report
 
     base_path = Path(base_path)
     if zipfile.is_zipfile(base_path):
@@ -357,12 +370,13 @@ def load_report(path: str | Path, base_path: str | Path) -> Report | None:
 
 
 def get_heads(base_path: str | Path) -> Path | None:
-    if isinstance(base_path, str) and base_path.startswith('ssh '):
+    if isinstance(base_path, str) and base_path.startswith('ssh://'):
         with SSHClient() as client:
-            cfg, base_path = _pase_ssh_config(base_path[4:])
+            cfg = parse_ssh_uri(base_path)
+            remote_base_path = cfg.pop('remote_file_path')
             client.load_system_host_keys()
             client.connect(**cfg)
-            return get_heads_from_scp(base_path, client)
+            return get_heads_from_scp(remote_base_path, client)
 
     base_path = Path(base_path)
     if zipfile.is_zipfile(base_path):
@@ -377,12 +391,13 @@ def get_heads(base_path: str | Path) -> Path | None:
 
 @lru_cache(maxsize=4096)
 def query_index(name: str, base_path: str | Path, index: int):
-    if isinstance(base_path, str) and base_path.startswith('ssh '):
+    if isinstance(base_path, str) and base_path.startswith('ssh://'):
         with SSHClient() as client:
-            cfg, base_path = _pase_ssh_config(base_path[4:])
+            cfg = parse_ssh_uri(base_path)
+            remote_base_path = cfg.pop('remote_file_path')
             client.load_system_host_keys()
             client.connect(**cfg)
-            return query_index_from_scp(name, base_path, client, index)
+            return query_index_from_scp(name, remote_base_path, client, index)
 
     base_path = Path(base_path)
     if zipfile.is_zipfile(base_path):
@@ -398,12 +413,13 @@ def query_index(name: str, base_path: str | Path, index: int):
 
 @lru_cache(maxsize=4096)
 def load_item(id, base_path):
-    if isinstance(base_path, str) and base_path.startswith('ssh '):
+    if isinstance(base_path, str) and base_path.startswith('ssh://'):
         with SSHClient() as client:
-            cfg, base_path = _pase_ssh_config(base_path[4:])
+            cfg = parse_ssh_uri(base_path)
+            remote_base_path = cfg.pop('remote_file_path')
             client.load_system_host_keys()
             client.connect(**cfg)
-            buf = load_item_buf_from_scp(id, base_path, client)
+            buf = load_item_buf_from_scp(id, remote_base_path, client)
     else:
         base_path = Path(base_path)
         if zipfile.is_zipfile(base_path):
@@ -489,15 +505,56 @@ def load_item_buf_from_zipfile(id, base_path):
 #########################################################################
 
 
-def _pase_ssh_config(config: str):
-    config = config.split()
-    base_path = ' '.join(config[4:])
+def parse_ssh_uri(uri):
+    """
+    解析 SSH URI 字符串，返回包含连接参数和路径的字典。
+    
+    格式：ssh://[{username}[:{password}]@]{host}[:{port}][?key_filename={key_path}][/{remote_file_path}]
+
+    返回示例：
+    {
+        "username": "user",
+        "password": "pass",
+        "host": "example.com",
+        "port": 22,
+        "key_filename": "/path/to/key",
+        "remote_file_path": "/data/file.txt"
+    }
+    """
+    pattern = re.compile(
+        r"^ssh://"  # 协议头
+        r"(?:([^:@/]+))(?::([^@/]+))?@?"  # 用户名和密码（可选）
+        r"([^:/?#]+)"  # 主机名（必须）
+        r"(?::(\d+))?"  # 端口（可选）
+        r"(/?[^?#]*)?"  # 远程路径（可选）
+        r"(?:\?([^#]+))?"  # 查询参数（如 key_filename）
+        r"$",
+        re.IGNORECASE)
+
+    match = pattern.match(uri)
+    if not match:
+        raise ValueError(f"Invalid SSH URI format: {uri}")
+
+    # 提取分组
+    username, password, host, port, path, query = match.groups()
+
+    # 处理查询参数
+    key_filename = None
+    if query:
+        params = parse_qs(query)
+        key_filename = params.get("key_filename", [None])[0]  # 取第一个值
+
+    # 清理路径开头的斜杠
+    remote_file_path = path
+
     return {
-        'hostname': config[0],
-        'port': int(config[1]),
-        'username': config[2],
-        'key_filename': config[3]
-    }, Path(base_path)
+        "username": username,
+        "password": password,
+        "hostname": host,
+        "port": int(port) if port else 22,  # 默认端口 22
+        "key_filename": key_filename,
+        "remote_file_path": remote_file_path
+    }
 
 
 def load_report_from_scp(path: str | Path, base_path: Path,
@@ -508,7 +565,6 @@ def load_report_from_scp(path: str | Path, base_path: Path,
             with sftp.open(str(Path(base_path) / 'reports' / path), 'rb') as f:
                 index = int.from_bytes(f.read(8), 'big')
                 report = pickle.loads(lzma.decompress(f.read()))
-                report.base_path = path
                 report.index = index
                 return report
     except SSHException:
@@ -532,7 +588,7 @@ def query_index_from_scp(name: str, base_path: Path, client: SSHClient,
             s = str(Path(base_path) / 'index' / f'{name}.width')
             with sftp.open(s, 'rb') as f:
                 width = int(f.read().decode())
-            with sftp.open(str(base_path / 'index' / f'{name}.idx'),
+            with sftp.open(str(Path(base_path) / 'index' / f'{name}.idx'),
                            'rb') as f:
                 f.seek(index * (width + 1))
                 context = f.read(width).decode()
