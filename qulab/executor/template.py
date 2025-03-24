@@ -8,6 +8,12 @@ import string
 import textwrap
 from typing import Any
 
+_notset = object()
+
+
+def VAR(name: str, /, *, default: Any = _notset) -> Any:
+    return name
+
 
 def encode_mapping(mapping):
     mapping_bytes = lzma.compress(pickle.dumps(mapping))
@@ -68,26 +74,67 @@ class TemplateVarExtractor(ast.NodeVisitor):
     def visit_Call(self, node):
         if isinstance(node.func, ast.Name) and node.func.id == 'VAR':
             arg = node.args[0]
-            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                if arg.value not in self.mapping:
-                    raise TemplateKeyError(
-                        f"The variable '{arg.value}' is not provided in mapping. {self.fname}:{node.lineno}"
+            if not isinstance(arg, ast.Constant) or not isinstance(
+                    arg.value, str):
+                raise SyntaxError(
+                    f"Argument of VAR function must be a string. {self.fname}:{node.lineno}"
+                )
+            if len(node.args) != 1:
+                raise SyntaxError(
+                    f"VAR function only accept one argument. {self.fname}:{node.lineno}"
+                )
+            default = _notset
+            for k in node.keywords:
+                if k.arg == 'default':
+                    pass
+                    # if isinstance(k.value, ast.Constant):
+                    #     # default = k.value.value
+                    #     default = k.value
+                    # else:
+                    #     default = k.value
+                    #     # raise SyntaxError(
+                    #     #     f"Argument of 'default' must be a constant. {self.fname}:{node.lineno}"
+                    #     # )
+                else:
+                    raise SyntaxError(
+                        f"VAR function only accept keyword argument 'default'. {self.fname}:{node.lineno}"
                     )
-                self.variables.add(arg.value)
+
+            if default is _notset:
                 # new_node = ast.Subscript(value=ast.Name(id="__VAR",
                 #                                         ctx=ast.Load()),
                 #                          slice=ast.Constant(value=arg.value),
                 #                          ctx=ast.Load())
-                # ast.fix_missing_locations(new_node)
-                # new_source = ast.unparse(new_node)
+                if arg.value not in self.mapping:
+                    raise TemplateKeyError(
+                        f"The variable '{arg.value}' is not provided in mapping. {self.fname}:{node.lineno}"
+                    )
                 self.replacements[(node.lineno, node.end_lineno,
                                    node.col_offset,
                                    node.end_col_offset)] = ('VAR', arg.value,
                                                             None, None)
             else:
-                raise SyntaxError(
-                    f"Argument of VAR function must be a string. {self.fname}:{node.lineno}"
-                )
+                # new_node = ast.Call(
+                #     func=ast.Attribute(value=ast.Name(id='__VAR',
+                #                                       ctx=ast.Load()),
+                #                        attr='get',
+                #                        ctx=ast.Load()),
+                #     args=[ast.Constant(value=arg.value)],
+                #     keywords=[
+                #         ast.keyword(arg='default',
+                #                     value=value)
+                #     ],
+                #     ctx=ast.Load())
+                self.replacements[(node.lineno, node.end_lineno,
+                                   node.col_offset,
+                                   node.end_col_offset)] = ('VAR', arg.value,
+                                                            None, None)
+            # ast.fix_missing_locations(new_node)
+            # new_source = ast.unparse(new_node)
+            # print(new_source)
+
+            self.variables.add(arg.value)
+
         self.generic_visit(node)
 
     def _process_string(self, s: str, lineno: int, col_offset: int,
@@ -160,8 +207,24 @@ def inject_mapping(source: str, mapping: dict[str, Any],
                 lines_offset[end_lineno - 1] += len(
                     lines[end_lineno - 1]) - length_of_last_line
         else:
-            pattern = re.compile(r'VAR\s*\(\s*(["\'])(\w+)\1\s*\)')
-            replacement = f'__VAR_{hash_str}' + r'[\1\2\1]'
+            pattern = re.compile(
+                r'VAR\s*\(\s*'         # VAR(
+                r'(["\'])(\w+)\1'      # 第一个参数（引号包裹的变量名）
+                r'(?:\s*,\s*(.*?))?'   # 可选的其他参数
+                r'\s*\)',              # 闭合括号
+                re.DOTALL              # 允许.匹配换行符
+            ) # yapf: disable
+
+            def replacement(match):
+                quote = match.group(1)
+                var_name = match.group(2)
+                extra_args = match.group(3)
+                base = f'__VAR_{hash_str}'
+                if extra_args is not None:
+                    return f'{base}.get({quote}{var_name}{quote}, {extra_args})'
+                else:
+                    return f'{base}[{quote}{var_name}{quote}]'
+
             new_content = re.sub(pattern, replacement, content)
 
             if lineno == end_lineno:
@@ -172,7 +235,7 @@ def inject_mapping(source: str, mapping: dict[str, Any],
                 lines[lineno - 1] = head + new_content[:-1]
                 for i in range(lineno, end_lineno - 1):
                     lines[i] = ''
-                lines[end_lineno - 1] = ']' + tail
+                lines[end_lineno - 1] = new_content[-1] + tail
                 lines_offset[end_lineno - 1] += len(
                     lines[end_lineno - 1]) - length_of_last_line
 
