@@ -357,7 +357,8 @@ def load_workflow_from_template(template_path: str,
         path = target_path
 
     file = base_path / path
-    if not file.exists() or file.stat().st_mtime < mtime:
+    if not file.exists() or (file.stat().st_mtime < mtime
+                             and file.read_text() != content):
         file.parent.mkdir(parents=True, exist_ok=True)
         with open(file, 'w') as f:
             f.write(content)
