@@ -208,20 +208,25 @@ def inject_mapping(source: str, mapping: dict[str, Any],
                     lines[end_lineno - 1]) - length_of_last_line
         else:
             pattern = re.compile(
-                r'VAR\s*\(\s*'         # VAR(
-                r'(["\'])(\w+)\1'      # 第一个参数（引号包裹的变量名）
-                r'(?:\s*,\s*(.*?))?'   # 可选的其他参数
-                r'\s*\)',              # 闭合括号
-                re.DOTALL              # 允许.匹配换行符
+                r'VAR\s*\(\s*'                # VAR(
+                r'(["\'])(\w+)\1'             # 捕获引号和变量名
+                r'(?:\s*,\s*default\s*=\s*'   # 匹配 default 参数
+                r'([^),]*)'                   # 捕获 default 值（排除逗号和括号）
+                r')?'                         # 可选参数组
+                r'\s*\)',                     # 闭合括号
+                re.DOTALL
             ) # yapf: disable
 
             def replacement(match):
                 quote = match.group(1)
                 var_name = match.group(2)
-                extra_args = match.group(3)
+                default_value = match.group(3)
+
                 base = f'__VAR_{hash_str}'
-                if extra_args is not None:
-                    return f'{base}.get({quote}{var_name}{quote}, {extra_args})'
+                if default_value is not None:
+                    # 清除 default 值前后的空格
+                    clean_value = default_value.strip()
+                    return f'{base}.get({quote}{var_name}{quote}, {clean_value})'
                 else:
                     return f'{base}[{quote}{var_name}{quote}]'
 
