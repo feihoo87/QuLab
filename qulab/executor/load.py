@@ -421,14 +421,10 @@ def _load_workflow_list(workflow, lst, code_path):
     for i, n in enumerate(lst):
         try:
             ret.append(load_workflow(n, code_path, mtime=workflow.__mtime__))
-        except TemplateKeyError:
-            raise TemplateKeyError(
-                f"Workflow {workflow.__workflow_id__} missing key in {i}th {n[0]} dependent mapping."
-            )
-        except TemplateTypeError:
-            raise TemplateTypeError(
-                f"Workflow {workflow.__workflow_id__} type error in {i}th {n[0]} dependent mapping."
-            )
+        except TemplateKeyError as e:
+            msg, *_ = e.args
+            e.args = (f"Workflow {workflow.__workflow_id__} entry {i}: {msg}", )
+            raise e
     return ret
 
 
