@@ -77,16 +77,18 @@ class TemplateVarExtractor(ast.NodeVisitor):
             if not isinstance(arg, ast.Constant) or not isinstance(
                     arg.value, str):
                 raise SyntaxError(
-                    f"Argument of VAR function must be a string. {self.fname}:{node.lineno}"
+                    f"Argument of VAR function must be a string."
+                    f" {self.fname}:{node.lineno}"
                 )
             if len(node.args) != 1:
                 raise SyntaxError(
-                    f"VAR function only accept one argument. {self.fname}:{node.lineno}"
+                    f"VAR function only accept one argument."
+                    f" {self.fname}:{node.lineno}"
                 )
             default = _notset
             for k in node.keywords:
                 if k.arg == 'default':
-                    pass
+                    default = k.value
                     # if isinstance(k.value, ast.Constant):
                     #     # default = k.value.value
                     #     default = k.value
@@ -97,7 +99,8 @@ class TemplateVarExtractor(ast.NodeVisitor):
                     #     # )
                 else:
                     raise SyntaxError(
-                        f"VAR function only accept keyword argument 'default'. {self.fname}:{node.lineno}"
+                        f"VAR function only accept keyword argument 'default'."
+                        f" {self.fname}:{node.lineno}"
                     )
 
             if default is _notset:
@@ -107,7 +110,8 @@ class TemplateVarExtractor(ast.NodeVisitor):
                 #                          ctx=ast.Load())
                 if arg.value not in self.mapping:
                     raise TemplateKeyError(
-                        f"The variable '{arg.value}' is not provided in mapping. {self.fname}:{node.lineno}"
+                        f"The variable '{arg.value}' is not provided in mapping."
+                        f" {self.fname}:{node.lineno}"
                     )
                 self.replacements[(node.lineno, node.end_lineno,
                                    node.col_offset,
@@ -147,12 +151,13 @@ class TemplateVarExtractor(ast.NodeVisitor):
             for var_name in template.get_identifiers():
                 if var_name not in self.mapping:
                     raise TemplateKeyError(
-                        f"The variable '{var_name}' is not provided in mapping. {self.fname}:{current_lineno}"
-                    )
+                        f"The variable '{var_name}' is not provided in mapping."
+                        f" {self.fname}:{current_lineno}")
                 if not isinstance(self.mapping[var_name], str):
                     raise TemplateTypeError(
-                        f"Mapping value for '{var_name}' must be a string. {self.fname}:{current_lineno}"
-                    )
+                        f"Mapping value for '{var_name}' must be a string,"
+                        f" but got {type(self.mapping[var_name])}."
+                        f" {self.fname}:{current_lineno}")
                 self.str_variables.add(var_name)
                 start, stop = 0, len(line)
                 if current_lineno == lineno:
