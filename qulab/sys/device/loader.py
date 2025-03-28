@@ -79,7 +79,7 @@ def create_device(driver_name: str, *args, **kwds) -> BaseDevice:
             except:
                 pass
 
-        dev = create_device_from_module(f"waveforms.sys.drivers.{driver_name}",
+        dev = create_device_from_module(f"qulab.sys.drivers.{driver_name}",
                                         args, kwds)
         return dev
     except:

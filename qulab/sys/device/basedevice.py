@@ -1,6 +1,7 @@
 import itertools
 import logging
 import re
+import string
 from collections import defaultdict
 from functools import partial
 from typing import Any, Callable, Literal, NamedTuple
@@ -87,7 +88,8 @@ def _add_action(attrs: dict, key: str, method: str, func: Callable, doc: dict,
                 matrix[arg] = attrs[arg]
     for values in itertools.product(*[matrix[arg] for arg in arguments]):
         kwds = dict(zip(arguments, values))
-        mapping[key.format(**kwds)] = partial(func, **kwds)
+        # mapping[key.format(**kwds)] = partial(func, **kwds)
+        mapping[string.Template(key).substitute(kwds)] = partial(func, **kwds)
 
 
 def _build_docs(mapping: dict, attrs: dict) -> str:
@@ -180,6 +182,8 @@ class BaseDevice(metaclass=DeviceMeta):
 
 class VisaDevice(BaseDevice):
 
+    error_query = 'SYST:ERR?'
+
     def open(self) -> None:
         import pyvisa
         kwds = self.options.copy()
@@ -188,6 +192,7 @@ class VisaDevice(BaseDevice):
         else:
             rm = pyvisa.ResourceManager()
         self.resource = rm.open_resource(self.address, **kwds)
+        self.errors = []
 
     def close(self) -> None:
         self.resource.close()
@@ -195,6 +200,15 @@ class VisaDevice(BaseDevice):
     def reset(self) -> None:
         super().reset()
         self.resource.write('*RST')
+
+    def check_error(self):
+        if self.error_query:
+            while True:
+                error = self.resource.query(self.error_query)
+                error_code = int(error.split(',')[0])
+                if error_code == 0:
+                    break
+                self.errors.append(error)
 
     @get('idn')
     def get_idn(self) -> str:
@@ -209,13 +223,9 @@ class VisaDevice(BaseDevice):
     @get('errors')
     def get_errors(self) -> list[str]:
         """Get error queue."""
-        errors = []
-        while True:
-            error = self.resource.query('SYST:ERR?')
-            error_code = int(error.split(',')[0])
-            if error_code == 0:
-                break
-            errors.append(error)
+        self.check_error()
+        errors = self.errors
+        self.errors = []
         return errors
 
     @set('timeout')

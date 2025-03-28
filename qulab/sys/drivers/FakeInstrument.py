@@ -1,4 +1,6 @@
-from waveforms.sys.device import BaseDevice, exclude, get, set
+import numpy as np
+
+from qulab.sys import BaseDevice, exclude, get, set
 
 
 class Device(BaseDevice):
@@ -12,41 +14,55 @@ class Device(BaseDevice):
     def get_idn(self) -> str:
         return 'Fake Instrument'
 
-    @set('{channel}.Vpp', channel=exclude(['M1', 'M2']))
+    @get('${channel_type}${channel_num}.SampleRate',
+         channel_type=['X', 'Y'],
+         channel_num=[1, 2, 3, 4])
+    def get_sample_rate_DDS(self, channel_type: str,
+                            channel_num: int) -> float:
+        return 6e9
+
+    @get('${channel}.SampleRate', channel=['Z1', 'Z2', 'Z3', 'Z4'])
+    def get_sample_rate_Z(self, channel: str) -> float:
+        return 2e9
+
+    @get('${channel}.SampleRate', channel=['M1', 'M2'])
+    def get_sample_rate_AD(self, channel: str) -> float:
+        return 1e9
+
+    @set('${channel}.Vpp', channel=exclude(['M1', 'M2']))
     def set_voltage(self, value: float, channel: str) -> None:
         self.log.info(f'Set {channel} Vpp to {value}')
 
-    @get('{channel}.Vpp', channel=exclude(['M1', 'M2']))
-    def get_voltage(self, channel: str, default=0.0) -> float:
-        return self._status.get(f'{channel}.Vpp', default)
+    # @get('${channel}.Vpp', channel=exclude(['M1', 'M2']))
+    # def get_voltage(self, channel: str, default=0.0) -> float:
+    #     return self._status.get(f'{channel}.Vpp', default)
 
-    @set('{channel}.Offset', channel=exclude(['M1', 'M2']))
-    def set_frequency(
+    @set('${channel}.Offset', channel=exclude(['M1', 'M2']))
+    def set_offset(
         self,
         value: float,
         channel: str,
     ) -> None:
         self.log.info(f'Set {channel} offset to {value}')
 
-    @get('{channel}.Offset', channel=exclude(['M1', 'M2']))
-    def get_frequency(self, channel: str, default=0.0) -> float:
-        return self._status.get(f'{channel}.Offset', default)
+    # @get('${channel}.Offset', channel=exclude(['M1', 'M2']))
+    # def get_offset(self, channel: str, default=0.0) -> float:
+    #     return self._status.get(f'{channel}.Offset', default)
 
-    @set('{channel}.Waveform', channel=exclude(['M1', 'M2']))
+    @set('${channel}.Waveform', channel=exclude(['M1', 'M2']))
     def set_waveform(self, value, channel: str) -> None:
         self.log.info(f'Set {channel} waveform to {value!r}')
 
-    @get('{channel}.Waveform', channel=exclude(['M1', 'M2']))
-    def get_waveform(self, channel: str, default=None) -> str:
-        return self._status.get(f'{channel}.Waveform', default)
+    # @get('${channel}.Waveform', channel=exclude(['M1', 'M2']))
+    # def get_waveform(self, channel: str, default=None) -> str:
+    #     return self._status.get(f'{channel}.Waveform', default)
 
-    @set('{channel}.Size', channel=['M1', 'M2'])
+    @set('${channel}.Size', channel=['M1', 'M2'])
     def set_size(self, value, channel: str) -> None:
         self.log.info(f'Set {channel} size to {value!r}')
 
-    @get('{channel}.Trace', channel=['M1', 'M2'])
-    def get_size(self, channel: str) -> str:
-        import numpy as np
+    @get('${channel}.Trace', channel=['M1', 'M2'])
+    def get_random_data(self, channel: str) -> np.ndarray:
         size = self._status.get(f'{channel}.Size', 1024)
         shots = self._status.get(f'{channel}.Shots', 128)
         return np.random.randn(shots, size)
