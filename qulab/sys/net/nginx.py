@@ -6,6 +6,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+NGINX_DIR = 'C:/Users/Administrator/Desktop/nginx/nginx-1.20.2'
+HOST_URL = 'https://systemq.baqis.ac.cn'
+
 db = {
     "n01": {
         "notebook_port": 1000,
@@ -28,7 +31,8 @@ db = {
 }
 
 
-def fmt_config(ip, notebook_port, codeserver_port, local_notebook_port, local_codeserver_port, page):
+def fmt_config(ip, notebook_port, codeserver_port, local_notebook_port,
+               local_codeserver_port, page):
     return """
 server {""" + f"""
     listen {notebook_port} ssl;
@@ -108,6 +112,7 @@ server {""" + f"""
 }
 """
 
+
 def fmt_page(notebook_url, codeserver_url):
     return """
 <!DOCTYPE html>
@@ -142,7 +147,7 @@ class Node(BaseModel):
 app = FastAPI()
 
 
-@app.post("/ping")
+@app.post("/auth")
 async def auth(request: Request, node: Node):
     try:
         assert node.name in db
@@ -156,34 +161,31 @@ async def auth(request: Request, node: Node):
         else:
             print("    CHANGE IP", db[node.name]['ip'], "===>", ip)
             db[node.name]['ip'] = ip
-        
+
         #ip = request.headers.get('x-real-ip')
         local_notebook_port = node.notebook_port
         local_codeserver_port = node.codeserver_port
         codeserver_path = quote_plus(node.codeserver_path)
 
-        codeserver_url = f"https://systemq.baqis.ac.cn:{codeserver_port}?tkn=lZBAQISFF532&folder={codeserver_path}"
-        notebook_url = f"https://systemq.baqis.ac.cn:{notebook_port}/tree"
+        codeserver_url = f"{HOST_URL}:{codeserver_port}?tkn=lZBAQISFF532&folder={codeserver_path}"
+        notebook_url = f"{HOST_URL}:{notebook_port}/tree"
 
         page = fmt_page(notebook_url, codeserver_url)
         page = ''.join(page.splitlines())
 
-        config = fmt_config(ip, notebook_port, codeserver_port, local_notebook_port, local_codeserver_port, page)
+        config = fmt_config(ip, notebook_port, codeserver_port,
+                            local_notebook_port, local_codeserver_port, page)
 
-        with open(
-                f"C:/Users/Administrator/Desktop/nginx/nginx-1.20.2/conf/servers/{node.name}.conf",
-                "w") as f:
+        with open(f"{NGINX_DIR}/conf/servers/{node.name}.conf", "w") as f:
             f.write(config)
 
         await asyncio.sleep(0.1)
-        
+
         cwd = os.getcwd()
 
-        os.chdir(r'C:\Users\Administrator\Desktop\nginx\nginx-1.20.2')
+        os.chdir(NGINX_DIR)
 
-        os.system(
-            r'C:\Users\Administrator\Desktop\nginx\nginx-1.20.2\nginx.exe -s reload'
-        )
+        os.system(f'{NGINX_DIR}/nginx.exe -s reload')
 
         os.chdir(cwd)
 

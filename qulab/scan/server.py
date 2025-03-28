@@ -125,7 +125,8 @@ def get_record(session: Session, id: int, datapath: Path) -> Record:
         record = record_cache[id][1]
     clear_cache()
     logger.debug(f"update lru time for record cache: {id=}")
-    record_cache[id] = time.time(), record
+    if record:
+        record_cache[id] = time.time(), record
     return record
 
 
