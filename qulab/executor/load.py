@@ -466,8 +466,7 @@ def get_entries(workflow: WorkflowType,
 
 def make_graph(workflow: WorkflowType, graph: dict, code_path: str | Path):
     if workflow.__workflow_id__ in graph:
-        raise graphlib.CycleError(
-            f"Workflow {workflow.__workflow_id__} has a circular dependency")
+        return graph
     graph[workflow.__workflow_id__] = []
 
     if hasattr(workflow, 'entries'):
