@@ -329,6 +329,23 @@ def load_workflow_from_file(file_name: str,
     return module
 
 
+def _generate_target_file_path(template_path: str | Path, hash_str: str,
+                               content: str, base_path: str | Path) -> Path:
+    path = Path(template_path)
+    if path.stem == 'template':
+        path = path.parent / f'tmp{hash_str}.py'
+    elif path.stem.endswith('_template'):
+        path = path.parent / path.stem.replace('_template',
+                                               f'_tmp{hash_str}.py')
+    else:
+        path = path.parent / f'{path.stem}_tmp{hash_str}.py'
+
+    if 'templates' in path.parts:
+        path = Path(*['run' if p == 'templates' else p for p in path.parts])
+    else:
+        return Path('run') / path
+
+
 def load_workflow_from_template(template_path: str,
                                 mapping: dict[str, str],
                                 base_path: str | Path,
@@ -346,13 +363,8 @@ def load_workflow_from_template(template_path: str,
     content, hash_str = inject_mapping(template, mapping, str(path))
 
     if target_path is None:
-        if path.stem == 'template':
-            path = path.parent / f'tmp{hash_str}.py'
-        elif path.stem.endswith('_template'):
-            path = path.parent / path.stem.replace('_template',
-                                                   f'_tmp{hash_str}.py')
-        else:
-            path = path.parent / f'{path.stem}_tmp{hash_str}.py'
+        path = _generate_target_file_path(template_path, hash_str, content,
+                                          base_path)
     else:
         path = target_path
 
@@ -423,7 +435,8 @@ def _load_workflow_list(workflow, lst, code_path):
             ret.append(load_workflow(n, code_path, mtime=workflow.__mtime__))
         except TemplateKeyError as e:
             msg, *_ = e.args
-            e.args = (f"Workflow {workflow.__workflow_id__} entry {i}: {msg}", )
+            e.args = (
+                f"Workflow {workflow.__workflow_id__} entry {i}: {msg}", )
             raise e
     return ret
 
