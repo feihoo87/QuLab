@@ -341,7 +341,7 @@ def _generate_target_file_path(template_path: str | Path, hash_str: str,
         path = path.parent / f'{path.stem}_tmp{hash_str}.py'
 
     if 'templates' in path.parts:
-        path = Path(*['run' if p == 'templates' else p for p in path.parts])
+        return Path(*['run' if p == 'templates' else p for p in path.parts])
     else:
         return Path('run') / path
 
