@@ -118,14 +118,14 @@ class Report():
     @property
     def config(self):
         if self.config_path is not None and self.base_path is not None:
-            return load_item(self.config_path, self.base_path)
+            return load_item(self.config_path, 'items', self.base_path)
         else:
             return None
 
     @property
     def script(self):
         if self.script_path is not None and self.base_path is not None:
-            source = load_item(self.script_path, self.base_path)
+            source = load_item(self.script_path, 'items', self.base_path)
             if isinstance(source, str):
                 return source
             else:
@@ -137,7 +137,7 @@ class Report():
     @property
     def template_source(self):
         if self.script_path is not None and self.base_path is not None:
-            source = load_item(self.script_path, self.base_path)
+            source = load_item(self.script_path, 'items', self.base_path)
             return source
         else:
             return None
@@ -296,7 +296,7 @@ def create_index(name: str,
     return index
 
 
-def save_item(item, data_path):
+def save_item(item, group, data_path):
     salt = 0
     buf = pickle.dumps(item)
     buf = lzma.compress(buf)
@@ -306,7 +306,7 @@ def save_item(item, data_path):
         h.update(f"{salt}".encode())
         hashstr = h.hexdigest()
         item_id = Path(hashstr[:2]) / hashstr[2:4] / hashstr[4:]
-        path = Path(data_path) / 'items' / item_id
+        path = Path(data_path) / group / item_id
         if not path.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
             with open(path, 'wb') as f:
@@ -316,6 +316,14 @@ def save_item(item, data_path):
             break
         salt += 1
     return str(item_id)
+
+
+def append_item_data(data, id, group, base_path):
+    path = Path(base_path) / group / id
+    if not path.exists():
+        raise ValueError(f"Item {id} does not exist.")
+    with open(path, 'ab') as f:
+        f.write(data)
 
 
 def save_config_key_history(key: str, report: Report,
@@ -412,20 +420,20 @@ def query_index(name: str, base_path: str | Path, index: int):
 
 
 @lru_cache(maxsize=4096)
-def load_item(id, base_path):
+def load_item(id, group, base_path):
     if isinstance(base_path, str) and base_path.startswith('ssh://'):
         with SSHClient() as client:
             cfg = parse_ssh_uri(base_path)
             remote_base_path = cfg.pop('remote_file_path')
             client.load_system_host_keys()
             client.connect(**cfg)
-            buf = load_item_buf_from_scp(id, remote_base_path, client)
+            buf = load_item_buf_from_scp(id, group, remote_base_path, client)
     else:
         base_path = Path(base_path)
         if zipfile.is_zipfile(base_path):
-            buf = load_item_buf_from_zipfile(id, base_path)
+            buf = load_item_buf_from_zipfile(id, group, base_path)
         else:
-            path = Path(base_path) / 'items' / id
+            path = Path(base_path) / group / id
             with open(path, 'rb') as f:
                 buf = f.read()
     item = pickle.loads(lzma.decompress(buf))
@@ -494,9 +502,9 @@ def query_index_from_zipfile(name: str, base_path: str | Path, index: int):
     return context.rstrip()
 
 
-def load_item_buf_from_zipfile(id, base_path):
+def load_item_buf_from_zipfile(id, group, base_path):
     with zipfile.ZipFile(base_path) as zf:
-        with zf.open(f"{base_path.stem}/items/{id}") as f:
+        with zf.open(f"{base_path.stem}/{group}/{id}") as f:
             return f.read()
 
 
@@ -597,11 +605,11 @@ def query_index_from_scp(name: str, base_path: Path, client: SSHClient,
         return None
 
 
-def load_item_buf_from_scp(id: str, base_path: Path, client: SSHClient):
+def load_item_buf_from_scp(id: str, group: str, base_path: Path,
+                           client: SSHClient):
     try:
         with client.open_sftp() as sftp:
-            with sftp.open(str(Path(base_path) / 'items' / str(id)),
-                           'rb') as f:
+            with sftp.open(str(Path(base_path) / group / str(id)), 'rb') as f:
                 return f.read()
     except SSHException:
         return None

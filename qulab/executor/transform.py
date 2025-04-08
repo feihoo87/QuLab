@@ -47,21 +47,21 @@ def obey_the_oracle(report: Report, data_path):
     global __current_config_id
     update_config(report.oracle)
     cfg = export_config()
-    __current_config_id = save_item(cfg, data_path)
+    __current_config_id = save_item(cfg, 'items', data_path)
 
 
 def update_parameters(report: Report, data_path):
     global __current_config_id
     update_config(report.parameters)
     cfg = export_config()
-    __current_config_id = save_item(cfg, data_path)
+    __current_config_id = save_item(cfg, 'items', data_path)
 
 
 def current_config(data_path):
     global __current_config_id
     if __current_config_id is None:
         cfg = export_config()
-        __current_config_id = save_item(cfg, data_path)
+        __current_config_id = save_item(cfg, 'items', data_path)
     return __current_config_id
 
 

@@ -150,7 +150,8 @@ def call_check(workflow: WorkflowType, session_id: str, state_path: Path):
                     heads=get_heads(state_path),
                     previous_path=get_head(workflow.__workflow_id__,
                                            state_path),
-                    script_path=save_item(workflow.__source__, state_path))
+                    script_path=save_item(workflow.__source__, 'items',
+                                          state_path))
 
     save_report(workflow.__workflow_id__, report, state_path)
 
@@ -176,7 +177,8 @@ def call_calibrate(workflow: WorkflowType, session_id: str, state_path: Path):
                     heads=get_heads(state_path),
                     previous_path=get_head(workflow.__workflow_id__,
                                            state_path),
-                    script_path=save_item(workflow.__source__, state_path))
+                    script_path=save_item(workflow.__source__, 'items',
+                                          state_path))
 
     save_report(workflow.__workflow_id__, report, state_path)
 
@@ -274,7 +276,8 @@ def check_data(workflow: WorkflowType, state_path: str | Path, plot: bool,
                         heads=get_heads(state_path),
                         previous_path=get_head(workflow.__workflow_id__,
                                                state_path),
-                        script_path=save_item(workflow.__source__, state_path))
+                        script_path=save_item(workflow.__source__, 'items',
+                                              state_path))
         report.in_spec = False
         report.bad_data = False
         return report
