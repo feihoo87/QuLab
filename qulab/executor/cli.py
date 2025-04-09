@@ -290,3 +290,40 @@ def maintain(workflow, code, data, api, retry, plot):
                 raise e
             logger.warning(f'Calibration failed, retrying ({i + 1}/{retry})')
             continue
+
+
+@click.command()
+@click.argument('report_id')
+@click.option('--plot', '-p', is_flag=True, help='Plot the report.')
+@log_options
+@command_option('reproduce')
+def reproduce(report_id, code, data, api, plot):
+    """
+    Reproduce a report.
+
+    If `--plot` is set, plot the report.
+    If `--api` is set, use the api to get and update the config table.
+    If `--code` is not set, use the current working directory.
+    If `--data` is not set, use the `logs` directory in the code path.
+    """
+    logger.info(
+        f'[CMD]: reproduce {report_id} --code {code} --data {data} --api {api}'
+        f'{" --plot" if plot else ""}')
+    if api is not None:
+        api = importlib.import_module(api)
+        set_config_api(api.query_config, api.update_config, api.export_config)
+    if code is None:
+        code = Path.cwd()
+    if data is None:
+        data = Path(code) / 'logs'
+
+    code = Path(os.path.expanduser(code))
+    data = Path(os.path.expanduser(data))
+
+    from .load import load_workflow_from_source_code
+    from .storage import get_report_by_index
+
+    r = get_report_by_index(int(report_id), data)
+
+    wf = load_workflow_from_source_code(r.workflow, r.script)
+    run_workflow(wf, code, data, plot=plot, freeze=True)

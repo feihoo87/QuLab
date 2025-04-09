@@ -1,6 +1,7 @@
 import graphlib
 import inspect
 import pickle
+import sys
 import warnings
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -325,6 +326,34 @@ def load_workflow_from_file(file_name: str,
     verify_depends(module, base_path)
     verify_calibrate_method(module)
     verify_check_method(module)
+
+    return module
+
+
+def load_workflow_from_source_code(workflow_id: str,
+                                   source_code: str,
+                                   package='workflows') -> WorkflowType:
+    path = Path(workflow_id)
+    module_name = f"{package}.{'.'.join([*path.parts[:-1], path.stem])}"
+
+    # 创建一个新的模块对象
+    module = ModuleType(module_name)
+    # 将模块注册到sys.modules中
+    sys.modules[module_name] = module
+    # 将源代码编译成字节码
+    code = compile(source_code, '<string>', 'exec')
+    # 在模块的命名空间中执行字节码
+    exec(code, module.__dict__)
+
+    module.__source__ = source_code
+    module.__mtime__ = 0
+    module.__workflow_id__ = workflow_id
+
+    if not hasattr(module, '__timeout__'):
+        module.__timeout__ = None
+
+    if not hasattr(module, 'depends'):
+        module.depends = lambda: []
 
     return module
 
