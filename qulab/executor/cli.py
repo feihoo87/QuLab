@@ -126,7 +126,8 @@ def set(key, value, api):
     from . import transform
     if api is not None:
         api = importlib.import_module(api)
-        set_config_api(api.query_config, api.update_config, api.export_config)
+        set_config_api(api.query_config, api.update_config, api.delete_config,
+                       api.export_config, api.clear_config)
     try:
         value = eval(value)
     except:
@@ -148,7 +149,8 @@ def get(key, api):
     from . import transform
     if api is not None:
         api = importlib.import_module(api)
-        set_config_api(api.query_config, api.update_config, api.export_config)
+        set_config_api(api.query_config, api.update_config, api.delete_config,
+                       api.export_config, api.clear_config)
     click.echo(transform.query_config(key))
 
 
@@ -184,7 +186,8 @@ def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
         f'{" --freeze " if freeze else ""}')
     if api is not None:
         api = importlib.import_module(api)
-        set_config_api(api.query_config, api.update_config, api.export_config)
+        set_config_api(api.query_config, api.update_config, api.delete_config,
+                       api.export_config, api.clear_config)
     if code is None:
         code = Path.cwd()
     if data is None:
@@ -255,7 +258,8 @@ def maintain(workflow, code, data, api, retry, plot):
         f'{" --plot" if plot else ""}')
     if api is not None:
         api = importlib.import_module(api)
-        set_config_api(api.query_config, api.update_config, api.export_config)
+        set_config_api(api.query_config, api.update_config, api.delete_config,
+                       api.export_config, api.clear_config)
     if code is None:
         code = Path.cwd()
     if data is None:
@@ -311,7 +315,8 @@ def reproduce(report_id, code, data, api, plot):
         f'{" --plot" if plot else ""}')
     if api is not None:
         api = importlib.import_module(api)
-        set_config_api(api.query_config, api.update_config, api.export_config)
+        set_config_api(api.query_config, api.update_config, api.delete_config,
+                       api.export_config, api.clear_config)
     if code is None:
         code = Path.cwd()
     if data is None:
@@ -320,10 +325,16 @@ def reproduce(report_id, code, data, api, plot):
     code = Path(os.path.expanduser(code))
     data = Path(os.path.expanduser(data))
 
+    from . import transform
     from .load import load_workflow_from_source_code
     from .storage import get_report_by_index
 
     r = get_report_by_index(int(report_id), data)
 
     wf = load_workflow_from_source_code(r.workflow, r.script)
+    cfg = transform.export_config()
+    transform.clear_config()
+    transform.update_config(r.config)
     run_workflow(wf, code, data, plot=plot, freeze=True)
+    transform.clear_config()
+    transform.update_config(cfg)
