@@ -91,7 +91,8 @@ class Env():
         }
 
     def __contains__(self, key):
-        return key in self.consts or key in self.variables or key in self.functions or key in self.refs
+        return (key in self.consts or key in self.variables
+                or key in self.functions or key in self.refs)
 
     def __getitem__(self, key):
         if key in self.consts:
@@ -107,6 +108,8 @@ class Env():
     def __setitem__(self, key, value):
         if key in self.consts:
             raise KeyError(f"Key {key:r} is const")
+        if key in self.functions:
+            raise KeyError(f"Key {key:r} is function")
         elif isinstance(value, Ref):
             self.create_ref(key, value.name)
         elif key in self.refs:
@@ -117,6 +120,8 @@ class Env():
     def __delitem__(self, key):
         if key in self.consts:
             raise KeyError(f"Key {key:r} is const")
+        if key in self.functions:
+            raise KeyError(f"Key {key:r} is function")
         elif key in self.refs:
             del self[self.refs[key]]
         else:
@@ -604,7 +609,11 @@ class Symbol(Expression):
 
     def eval(self, env):
         if self.name in env:
-            return env[self.name]
+            value = env[self.name]
+            if isinstance(value, Expression):
+                return value.eval(env)
+            else:
+                return value
         else:
             return self
 
@@ -644,3 +653,29 @@ sign = Symbol('sign')
 heaviside = Symbol('heaviside')
 erf = Symbol('erf')
 erfc = Symbol('erfc')
+
+
+def calc(exp: str | Expression, **kwargs) -> Expression:
+    """
+    Calculate the expression.
+
+    Parameters
+    ----------
+    exp : str | Expression
+        The expression to be calculated.
+    env : Env, optional
+        The environment to be used for the calculation. Default is _default_env.
+    **kwargs : dict
+        Additional arguments to be passed to the expression.
+
+    Returns
+    -------
+    Expression
+        The calculated expression.
+    """
+    env = Env()
+    for k, v in kwargs.items():
+        env[k] = v
+    if isinstance(exp, str):
+        exp = expr.parseString(exp, parseAll=True)[0]
+    return exp.eval(env)

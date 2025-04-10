@@ -327,6 +327,98 @@ async def _unpack(key, variables):
     del variables[key]
 
 
+class BaseScan():
+
+    id = None
+    record = None
+    config = None
+    description = None
+
+    @property
+    def current_level(self):
+        pass
+
+    @property
+    def variables(self) -> dict[str, Any]:
+        pass
+
+    def start(self):
+        pass
+
+    def cancel(self):
+        pass
+
+    async def done(self):
+        pass
+
+    def hide(self, name: str):
+        pass
+
+    def get(self, name: str):
+        pass
+
+    def set(self,
+            name: str,
+            value,
+            depends: Iterable[str] | None = None,
+            setter: Callable | None = None):
+        pass
+
+    def search(self,
+               name: str,
+               space: Iterable | Expression | Callable | OptimizeSpace,
+               level: int | None = None,
+               setter: Callable | None = None,
+               intrinsic: bool = False):
+        pass
+
+    def repeat(self, n: int, level: int = 0):
+        pass
+
+    def trace(self,
+              name: str,
+              depends: list[str],
+              getter: Callable | None = None):
+        pass
+
+    def minimize(self,
+                 name: str,
+                 level: int,
+                 method=NgOptimizer,
+                 maxiter=100,
+                 getter: Callable | None = None,
+                 **kwds) -> Optimizer:
+        pass
+
+    def maximize(self,
+                 name: str,
+                 level: int,
+                 method=NgOptimizer,
+                 maxiter=100,
+                 getter: Callable | None = None,
+                 **kwds) -> Optimizer:
+        pass
+
+    def add_filter(self, func: Callable, level: int = -1):
+        pass
+
+    def mount(self, action: Callable, level: int):
+        pass
+
+    async def promise(self, awaitable: Awaitable | Callable, *args,
+                      **kwds) -> Promise:
+        pass
+
+    async def iter(self, **kwds):
+        pass
+
+    async def work(self, **kwds):
+        pass
+
+    async def do_something(self, **kwds):
+        pass
+
+
 class Scan():
 
     def __new__(cls, *args, mixin=None, **kwds):
