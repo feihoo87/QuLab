@@ -1,3 +1,4 @@
+from .executor.analyze import manual_analysis
 from .executor.storage import find_report
 from .executor.storage import get_report_by_index as get_report
 from .executor.template import VAR
