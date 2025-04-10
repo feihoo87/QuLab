@@ -65,7 +65,7 @@ class Report():
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        state.pop('base_path')
+        state.pop('base_path', None)
         for k in ['path', 'previous_path', 'config_path', 'script_path']:
             if state[k] is not None:
                 state[k] = str(state[k])

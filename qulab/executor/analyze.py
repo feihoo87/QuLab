@@ -18,8 +18,13 @@ report, history = get_report_{server_port}("tcp://{server_address}:{server_port}
 """
 
 analysis_code = """
+# report.state = 'OK'
 # report.parameters = {}
 # report.oracle = {}
+# report.other_infomation = {}
+
+report.parameters
+
 """
 
 
@@ -86,10 +91,15 @@ class ServerThread(threading.Thread):
 
 
 # 进入分析流程，启动服务并打印等待提示
-def get_result_or_wait_until_timeout(data: tuple[Report, Report | None],
+def get_result_or_wait_until_timeout(report: Report, history: Report | None,
                                      timeout: float) -> Report:
-    server = ServerThread(data, timeout)
+    server = ServerThread((report, history), timeout)
     server.start()
+
+    parameters = report.parameters
+    oracle = report.oracle
+    other_infomation = report.other_infomation
+    state = report.state
 
     # 格式化代码模板
     code = clip_template.format(server_address="127.0.0.1",
@@ -116,12 +126,20 @@ def get_result_or_wait_until_timeout(data: tuple[Report, Report | None],
             break
 
     result = server.wait_for_result()
-    return result if result is not None else data
+    if result is None:
+        return (state, parameters, oracle, other_infomation, code)
+    else:
+        return result
 
 
 def manual_analysis(report: Report, history=None, timeout=3600):
     try:
-        report = get_result_or_wait_until_timeout((report, history), timeout)
+        (state, parameters, oracle, other_infomation,
+         code) = get_result_or_wait_until_timeout(report, history, timeout)
+        report.parameters = parameters
+        report.oracle = oracle
+        report.state = state
+        report.other_infomation = other_infomation
     except Exception as e:
         pass
     return report
@@ -152,13 +170,19 @@ def submit_report(report: Report, address: str):
     ipy = IPython.get_ipython()
     if ipy is None:
         raise RuntimeError("请在 Jupyter Notebook 中运行此函数。")
-    
-    # ipy.user_ns['In'][-2]
+
+    code = ipy.user_ns['In'][-2]
+
+    parameters = report.parameters
+    oracle = report.oracle
+    other_infomation = report.other_infomation
+    state = report.state
 
     context = zmq.Context()
     sock = context.socket(zmq.REQ)
     sock.connect(address)
     # 提交处理后的结果
-    sock.send(pickle.dumps(report))
+    sock.send(pickle.dumps(
+        (state, parameters, oracle, other_infomation, code)))
     ack = sock.recv()
     print("结果已提交。")
