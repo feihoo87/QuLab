@@ -4,42 +4,153 @@ import operator
 
 import numpy as np
 from pyparsing import (CaselessKeyword, Combine, Forward, Group, Keyword,
-                       Literal, Optional, ParserElement, Suppress, Word,
-                       alphanums, alphas, delimitedList, nums, oneOf, opAssoc,
-                       pyparsing_common, restOfLine, srange, stringEnd,
-                       stringStart)
+                       Literal, Optional, ParserElement, ParseResults,
+                       Suppress, Word, alphanums, alphas, delimitedList,
+                       infixNotation, nums, oneOf, opAssoc, pyparsing_common,
+                       restOfLine, srange, stringEnd, stringStart)
 from scipy import special
 
-LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE, DOT, TILDE, BANG, PLUS, MINUS = map(
-    Suppress, "()[]{}.~!+-")
+# 启用 Packrat 优化以提高解析效率
+ParserElement.enablePackrat()
 
-INT = Combine(srange("[1-9]") +
-              Optional(Word(nums))).set_parse_action(lambda t: int(t[0]))
-OCT = Combine("0" + Word("01234567")).set_parse_action(lambda t: int(t[0], 8))
-HEX = Combine("0x" + Word("0123456789abcdefABCDEF")).set_parse_action(
+# 定义符号（括号、方括号、花括号、点号等）的 Suppress 版
+LPAREN, RPAREN = map(Suppress, "()")
+LBRACK, RBRACK = map(Suppress, "[]")
+LBRACE, RBRACE = map(Suppress, "{}")
+DOT = Suppress(".")
+COMMA = Suppress(",")
+
+# 数字定义：整数（十进制、八进制、十六进制）和浮点数
+INT = Combine(Word("123456789", nums)).setParseAction(lambda t: int(t[0]))
+OCT = Combine("0" + Word("01234567")).setParseAction(lambda t: int(t[0], 8))
+HEX = Combine("0x" + Word("0123456789abcdefABCDEF")).setParseAction(
     lambda t: int(t[0], 16))
-FLOAT = Combine(Word(nums) + DOT + Word(nums)) | \
-        Combine(DOT + Word(nums)) | \
-        Combine(Word(nums) + DOT) | \
-        Combine(Word(nums) + DOT + Word(nums) + CaselessKeyword("e") + Word("+-") + Word(nums)) | \
-        Combine(Word(nums) + DOT + CaselessKeyword("e") + Word("+-") + Word(nums)) | \
-        Combine(DOT + Word(nums) + CaselessKeyword("e") + Word("+-") + Word(nums)) | \
-        Combine(Word(nums) + CaselessKeyword("e") + Word("+-") + Word(nums))
-FLOAT.set_parse_action(lambda t: float(t[0]))
-SYMBOL = Word(alphas, alphanums + "_")
-SYMBOL.set_parse_action(lambda t: Symbol(t[0]))
+FLOAT = Combine(
+    Word(nums) + '.' + Word(nums) | '.' + Word(nums) | Word(nums) + '.'
+    | Word(nums) + (Literal('e') | Literal('E')) +
+    Word("+-" + nums)).setParseAction(lambda t: float(t[0]))
+
+
+# 定义标识符，转换为 Symbol 对象（在 Expression 类中已定义）
+def symbol_parse_action(t):
+    return Symbol(t[0])
+
+
+SYMBOL = Word(alphas, alphanums + "_").setParseAction(symbol_parse_action)
+
+#------------------------------------------------------------------------------
+# 定义运算表达式的解析动作转换函数
+
+# 一元运算符映射（注意：此处 ! 使用逻辑非 operator.not_）
+unary_ops = {
+    '+': operator.pos,
+    '-': operator.neg,
+    '~': operator.invert,
+    '!': operator.not_
+}
+
+
+def unary_parse_action(tokens: ParseResults) -> Expression:
+    # tokens 形如：[['-', operand]]
+    op, operand = tokens[0]
+    # operand 已经是 Expression 对象（或常量），构造 UnaryExpression
+    return UnaryExpression(operand, unary_ops[op])
+
+
+# 二元运算符映射
+binary_ops = {
+    '+': operator.add,
+    '-': operator.sub,
+    '*': operator.mul,
+    '/': operator.truediv,
+    '//': operator.floordiv,
+    '%': operator.mod,
+    '**': operator.pow,
+    '@': operator.matmul,
+    '<<': operator.lshift,
+    '>>': operator.rshift,
+    '&': operator.and_,
+    '^': operator.xor,
+    '|': operator.or_,
+    '<': operator.lt,
+    '<=': operator.le,
+    '>': operator.gt,
+    '>=': operator.ge,
+    '==': operator.eq,
+    '!=': operator.ne
+}
+
+
+def binary_parse_action(tokens: ParseResults) -> Expression:
+    # tokens[0] 为形如：[operand1, op, operand2, op, operand3, ...]
+    t = tokens[0]
+    expr = t[0]
+    for i in range(1, len(t), 2):
+        op = t[i]
+        right = t[i + 1]
+        expr = BinaryExpression(expr, right, binary_ops[op])
+    return expr
+
 
 expr = Forward()
-unary = Forward()
-binary = Forward()
-atom = Forward()
+#------------------------------------------------------------------------------
+# 构造基元表达式：包括数值、标识符、括号内表达式
+atom = (
+    FLOAT | INT | OCT | HEX | SYMBOL |
+    (LPAREN + expr + RPAREN)  # 注意：后面我们将使用递归定义 expr
+)
 
-atom << (INT | OCT | HEX | FLOAT | SYMBOL | (LPAREN + expr + RPAREN) |
-         (LBRACK + expr + RBRACK) | (LBRACE + expr + RBRACE) | (MINUS + atom) |
-         (PLUS + atom) | (TILDE + atom) | (BANG + atom) | (nums + DOT + nums))
 
-unary << (atom | (MINUS + unary) | (PLUS + unary) | (TILDE + unary) |
-          (BANG + unary))
+# 为支持函数调用和属性访问，构造后缀表达式：
+# 例如： func(x,y).attr
+def parse_function_call(expr_obj):
+    # 参数列表可能为空，或者用逗号分隔的表达式列表
+    arg_list = Optional(delimitedList(expr), default=[])
+    return LPAREN + Group(arg_list) + RPAREN
+
+
+postfix = Forward()
+# 后缀可以是函数调用，也可以是属性访问
+postfix_operation = ((parse_function_call(atom)
+                      ).setParseAction(lambda t: ('CALL', t[0].asList())) |
+                     (DOT + SYMBOL).setParseAction(lambda t: ('ATTR', t[0])))
+
+
+# 定义 factor：先解析 atom，然后再依次处理后缀操作
+def attach_postfix(tokens: ParseResults) -> Expression:
+    # tokens[0] 为初始的 atom 对象
+    expr_obj = tokens[0]
+    # 遍历后缀操作序列
+    for op, arg in tokens[1:]:
+        if op == 'CALL':
+            # 对于函数调用，arg 是参数列表，调用 __call__ 运算符（由 Expression.__call__ 实现）
+            expr_obj = expr_obj(*arg)
+        elif op == 'ATTR':
+            # 对于属性访问，用 ObjectMethod 构造
+            expr_obj = ObjectMethod(expr_obj, '__getattr__', arg)
+    return expr_obj
+
+
+# 将 atom 与后缀操作连接
+postfix << (atom + Optional(
+    (postfix_operation[...]))).setParseAction(attach_postfix)
+
+#------------------------------------------------------------------------------
+# 现在构造整个表达式解析器，利用 infixNotation 建立运算符优先级
+expr <<= infixNotation(
+    postfix,
+    [
+        (oneOf('! ~ + -'), 1, opAssoc.RIGHT, unary_parse_action),
+        # 指数运算，右结合
+        (Literal("**"), 2, opAssoc.RIGHT, binary_parse_action),
+        (oneOf('* / // % @'), 2, opAssoc.LEFT, binary_parse_action),
+        (oneOf('+ -'), 2, opAssoc.LEFT, binary_parse_action),
+        (oneOf('<< >>'), 2, opAssoc.LEFT, binary_parse_action),
+        (oneOf('&'), 2, opAssoc.LEFT, binary_parse_action),
+        (oneOf('^'), 2, opAssoc.LEFT, binary_parse_action),
+        (oneOf('|'), 2, opAssoc.LEFT, binary_parse_action),
+        (oneOf('< <= > >= == !='), 2, opAssoc.LEFT, binary_parse_action),
+    ])
 
 ConstType = (int, float, complex)
 _empty = object()
@@ -91,7 +202,8 @@ class Env():
         }
 
     def __contains__(self, key):
-        return key in self.consts or key in self.variables or key in self.functions or key in self.refs
+        return (key in self.consts or key in self.variables
+                or key in self.functions or key in self.refs)
 
     def __getitem__(self, key):
         if key in self.consts:
@@ -107,6 +219,8 @@ class Env():
     def __setitem__(self, key, value):
         if key in self.consts:
             raise KeyError(f"Key {key:r} is const")
+        if key in self.functions:
+            raise KeyError(f"Key {key:r} is function")
         elif isinstance(value, Ref):
             self.create_ref(key, value.name)
         elif key in self.refs:
@@ -117,6 +231,8 @@ class Env():
     def __delitem__(self, key):
         if key in self.consts:
             raise KeyError(f"Key {key:r} is const")
+        if key in self.functions:
+            raise KeyError(f"Key {key:r} is function")
         elif key in self.refs:
             del self[self.refs[key]]
         else:
@@ -604,7 +720,11 @@ class Symbol(Expression):
 
     def eval(self, env):
         if self.name in env:
-            return env[self.name]
+            value = env[self.name]
+            if isinstance(value, Expression):
+                return value.eval(env)
+            else:
+                return value
         else:
             return self
 
@@ -644,3 +764,29 @@ sign = Symbol('sign')
 heaviside = Symbol('heaviside')
 erf = Symbol('erf')
 erfc = Symbol('erfc')
+
+
+def calc(exp: str | Expression, **kwargs) -> Expression:
+    """
+    Calculate the expression.
+
+    Parameters
+    ----------
+    exp : str | Expression
+        The expression to be calculated.
+    env : Env, optional
+        The environment to be used for the calculation. Default is _default_env.
+    **kwargs : dict
+        Additional arguments to be passed to the expression.
+
+    Returns
+    -------
+    Expression
+        The calculated expression.
+    """
+    env = Env()
+    for k, v in kwargs.items():
+        env[k] = v
+    if isinstance(exp, str):
+        exp = expr.parseString(exp, parseAll=True)[0]
+    return exp.eval(env)
