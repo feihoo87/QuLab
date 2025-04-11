@@ -21,7 +21,8 @@ DOT = Suppress(".")
 COMMA = Suppress(",")
 
 # 数字定义：整数（十进制、八进制、十六进制）和浮点数
-INT = Combine(Word("123456789", nums)).setParseAction(lambda t: int(t[0]))
+INT = (Combine(Word("123456789", nums))
+       | Literal("0")).setParseAction(lambda t: int(t[0]))
 OCT = Combine("0" + Word("01234567")).setParseAction(lambda t: int(t[0], 8))
 HEX = Combine("0x" + Word("0123456789abcdefABCDEF")).setParseAction(
     lambda t: int(t[0], 16))
@@ -692,8 +693,14 @@ class ObjectMethod(Expression):
         if isinstance(obj, Expression) or any(
                 isinstance(x, Expression) for x in args):
             return ObjectMethod(obj, self.method, *args)
+        elif self.method == '__getattr__':
+            print(f"getattr {obj} {args}")
+            return getattr(
+                obj, *[a.name if isinstance(a, Symbol) else a for a in args])
         else:
-            return getattr(obj, self.method)(*args)
+            return getattr(obj, self.method)(*[
+                a.value(env) if isinstance(a, Expression) else a for a in args
+            ])
 
     def __repr__(self):
         if self.method == '__call__':
