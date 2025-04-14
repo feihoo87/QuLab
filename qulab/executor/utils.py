@@ -1,3 +1,4 @@
+import inspect
 from pathlib import Path
 
 from ..cli.config import get_config_value
@@ -155,7 +156,7 @@ def oracle(report: Report,
 """
 
 
-def debug_analyze(
+async def debug_analyze(
         report_index: int,
         code_path: str | Path = get_config_value('code', Path),
         data_path: str | Path = get_config_value('data', Path),
@@ -170,7 +171,8 @@ def debug_analyze(
     if wf is None:
         raise ValueError(f'Invalid workflow: {workflow}')
     if hasattr(wf, '__QULAB_TEMPLATE__'):
-        template_mtime = (Path(code_path) / wf.__QULAB_TEMPLATE__).stat().st_mtime
+        template_mtime = (Path(code_path) /
+                          wf.__QULAB_TEMPLATE__).stat().st_mtime
         if template_mtime > wf.__mtime__:
             for k in dir(wf):
                 if k.startswith('__VAR_') and len(k) == len('__VAR_17fb4dde'):
@@ -182,6 +184,11 @@ def debug_analyze(
                                code_path)
 
     report = wf.analyze(report, report.previous)
+    if inspect.isawaitable(report):
+        report = await report
     if hasattr(wf, 'plot'):
-        wf.plot(report)
+        if inspect.iscoroutinefunction(wf.plot):
+            await wf.plot(report)
+        else:
+            wf.plot(report)
     return report

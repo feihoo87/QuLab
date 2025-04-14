@@ -127,18 +127,25 @@ def check_state(workflow: WorkflowType, code_path: str | Path,
 
 
 @logger.catch()
-def call_plot(node: WorkflowType, report: Report, check=False):
+async def call_plot(node: WorkflowType, report: Report, check=False):
     if hasattr(node, 'plot') and callable(node.plot):
-        node.plot(report)
+        if inspect.iscoroutinefunction(node.plot):
+            await node.plot(report, check=check)
+        else:
+            node.plot(report)
 
 
-def call_check(workflow: WorkflowType, session_id: str, state_path: Path):
+async def call_check(workflow: WorkflowType, session_id: str,
+                     state_path: Path):
     report = get_cache(session_id, (workflow.__workflow_id__, 'check'))
     if report is not None:
         logger.debug(f'Cache hit for "{workflow.__workflow_id__}:check"')
         return report
 
-    data = workflow.check()
+    if inspect.iscoroutinefunction(workflow.check):
+        data = await workflow.check()
+    else:
+        data = workflow.check()
     if not is_pickleable(data):
         raise TypeError(
             f'"{workflow.__workflow_id__}" : "check" return not pickleable data'
@@ -159,13 +166,17 @@ def call_check(workflow: WorkflowType, session_id: str, state_path: Path):
     return report
 
 
-def call_calibrate(workflow: WorkflowType, session_id: str, state_path: Path):
+async def call_calibrate(workflow: WorkflowType, session_id: str,
+                         state_path: Path):
     report = get_cache(session_id, (workflow.__workflow_id__, 'calibrate'))
     if report is not None:
         logger.debug(f'Cache hit for "{workflow.__workflow_id__}:calibrate"')
         return report
 
-    data = workflow.calibrate()
+    if inspect.iscoroutinefunction(workflow.calibrate):
+        data = await workflow.calibrate()
+    else:
+        data = workflow.calibrate()
     if not is_pickleable(data):
         raise TypeError(
             f'"{workflow.__workflow_id__}" : "calibrate" return not pickleable data'
@@ -186,12 +197,15 @@ def call_calibrate(workflow: WorkflowType, session_id: str, state_path: Path):
     return report
 
 
-def call_check_analyzer(node: WorkflowType,
-                        report: Report,
-                        history: Report | None,
-                        state_path: Path,
-                        plot=False) -> Report:
-    report = node.check_analyze(report, history=history)
+async def call_check_analyzer(node: WorkflowType,
+                              report: Report,
+                              history: Report | None,
+                              state_path: Path,
+                              plot=False) -> Report:
+    if inspect.iscoroutinefunction(node.check_analyze):
+        report = await node.check_analyze(report, history=history)
+    else:
+        report = node.check_analyze(report, history=history)
     veryfy_analyzed_report(report, node.__workflow_id__, "check_analyze")
     report.fully_calibrated = False
     if report.in_spec:
@@ -211,26 +225,29 @@ def call_check_analyzer(node: WorkflowType,
     return report
 
 
-def call_analyzer(node: WorkflowType,
-                  report: Report,
-                  history: Report | None,
-                  state_path: Path,
-                  plot=False) -> Report:
-
-    report = node.analyze(report, history=history)
+async def call_analyzer(node: WorkflowType,
+                        report: Report,
+                        history: Report | None,
+                        state_path: Path,
+                        plot=False) -> Report:
+    if inspect.iscoroutinefunction(node.analyze):
+        report = await node.analyze(report, history=history)
+    else:
+        report = node.analyze(report, history=history)
     veryfy_analyzed_report(report, node.__workflow_id__, "analyze")
     if hasattr(node, 'oracle') and callable(node.oracle):
         logger.debug(
             f'"{node.__workflow_id__}" has oracle method, calling ...')
-        report = call_oracle(node, report, history)
+        report = await call_oracle(node, report, history)
     report.fully_calibrated = True
     save_report(node.__workflow_id__, report, state_path, overwrite=True)
     if plot:
-        call_plot(node, report)
+        await call_plot(node, report)
     return report
 
 
-def call_oracle(node: WorkflowType, report: Report, history: Report | None):
+async def call_oracle(node: WorkflowType, report: Report,
+                      history: Report | None):
     sig = inspect.signature(node.oracle)
     try:
         if 'history' in sig.parameters and 'system_state' in sig.parameters:
@@ -244,6 +261,8 @@ def call_oracle(node: WorkflowType, report: Report, history: Report | None):
                                  system_state=get_heads(report.base_path))
         else:
             report = node.oracle(report)
+        if inspect.isawaitable(report):
+            report = await report
     except Exception as e:
         logger.exception(e)
         report.oracle = {}
@@ -259,8 +278,8 @@ def call_oracle(node: WorkflowType, report: Report, history: Report | None):
     return report
 
 
-def check_data(workflow: WorkflowType, state_path: str | Path, plot: bool,
-               session_id: str) -> Report:
+async def check_data(workflow: WorkflowType, state_path: str | Path,
+                     plot: bool, session_id: str) -> Report:
     """
     check data answers two questions:
     Is the parameter associated with this cal in spec,
@@ -299,52 +318,56 @@ def check_data(workflow: WorkflowType, state_path: str | Path, plot: bool,
         logger.debug(
             f'Checking "{workflow.__workflow_id__}" with "check" method ...')
 
-        report = call_check(workflow, session_id, state_path)
+        report = await call_check(workflow, session_id, state_path)
 
         logger.debug(f'Checked "{workflow.__workflow_id__}" !')
-        report = call_check_analyzer(workflow,
-                                     report,
-                                     history,
-                                     state_path,
-                                     plot=plot)
+        report = await call_check_analyzer(workflow,
+                                           report,
+                                           history,
+                                           state_path,
+                                           plot=plot)
     else:
         logger.debug(
             f'Checking "{workflow.__workflow_id__}" with "calibrate" method ...'
         )
 
-        report = call_calibrate(workflow, session_id, state_path)
+        report = await call_calibrate(workflow, session_id, state_path)
 
         logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
-        report = call_analyzer(workflow,
-                               report,
-                               history,
-                               state_path,
-                               plot=plot)
+        report = await call_analyzer(workflow,
+                                     report,
+                                     history,
+                                     state_path,
+                                     plot=plot)
     return report
 
 
-def calibrate(workflow: WorkflowType, state_path: str | Path, plot: bool,
-              session_id: str) -> Report:
+async def calibrate(workflow: WorkflowType, state_path: str | Path, plot: bool,
+                    session_id: str) -> Report:
     history = find_report(workflow.__workflow_id__, state_path)
 
     logger.debug(f'Calibrating "{workflow.__workflow_id__}" ...')
 
-    report = call_calibrate(workflow, session_id, state_path)
+    report = await call_calibrate(workflow, session_id, state_path)
 
     logger.debug(f'Calibrated "{workflow.__workflow_id__}" !')
 
-    report = call_analyzer(workflow, report, history, state_path, plot=plot)
+    report = await call_analyzer(workflow,
+                                 report,
+                                 history,
+                                 state_path,
+                                 plot=plot)
     return report
 
 
-def diagnose(workflow: WorkflowType, code_path: str | Path,
-             state_path: str | Path, plot: bool, session_id: str):
+async def diagnose(workflow: WorkflowType, code_path: str | Path,
+                   state_path: str | Path, plot: bool, session_id: str):
     '''
     Returns: True if node or dependent recalibrated.
     '''
     logger.debug(f'diagnose "{workflow.__workflow_id__}"')
     # check_data
-    report = check_data(workflow, state_path, plot, session_id)
+    report = await check_data(workflow, state_path, plot, session_id)
     # in spec case
     if report.in_spec:
         logger.debug(
@@ -357,7 +380,7 @@ def diagnose(workflow: WorkflowType, code_path: str | Path,
         logger.debug(
             f'"{workflow.__workflow_id__}": Bad data, diagnosing dependents')
         recalibrated = [
-            diagnose(n, code_path, state_path, plot, session_id)
+            await diagnose(n, code_path, state_path, plot, session_id)
             for n in get_dependents(workflow, code_path)
         ]
     if not any(recalibrated):
@@ -386,7 +409,7 @@ def diagnose(workflow: WorkflowType, code_path: str | Path,
     else:
         logger.error(f'Never reach: recalibrate "{workflow.__workflow_id__}"')
 
-    report = calibrate(workflow, state_path, plot, session_id)
+    report = await calibrate(workflow, state_path, plot, session_id)
     if report.bad_data or not report.in_spec:
         obey_the_oracle(report, state_path)
         raise CalibrationFailedError(
@@ -398,13 +421,13 @@ def diagnose(workflow: WorkflowType, code_path: str | Path,
 
 
 @logger.catch(reraise=True)
-def maintain(workflow: WorkflowType,
-             code_path: str | Path,
-             state_path: str | Path,
-             session_id: str | None = None,
-             run: bool = False,
-             plot: bool = False,
-             freeze: bool = False):
+async def maintain(workflow: WorkflowType,
+                   code_path: str | Path,
+                   state_path: str | Path,
+                   session_id: str | None = None,
+                   run: bool = False,
+                   plot: bool = False,
+                   freeze: bool = False):
     if session_id is None:
         session_id = uuid.uuid4().hex
     logger.debug(f'run "{workflow.__workflow_id__}"'
@@ -414,13 +437,13 @@ def maintain(workflow: WorkflowType,
         logger.debug(
             f'maintain "{n.__workflow_id__}" because it is depended by "{workflow.__workflow_id__}"'
         )
-        maintain(n,
-                 code_path,
-                 state_path,
-                 session_id,
-                 run=False,
-                 plot=plot,
-                 freeze=freeze)
+        await maintain(n,
+                       code_path,
+                       state_path,
+                       session_id,
+                       run=False,
+                       plot=plot,
+                       freeze=freeze)
     else:
         logger.debug(
             f'"{workflow.__workflow_id__}": All dependents maintained')
@@ -430,7 +453,7 @@ def maintain(workflow: WorkflowType,
             f'"{workflow.__workflow_id__}": In spec, no need to maintain')
         return
     # check_data
-    report = check_data(workflow, state_path, plot, session_id)
+    report = await check_data(workflow, state_path, plot, session_id)
     if report.in_spec:
         if not run:
             logger.debug(
@@ -443,13 +466,13 @@ def maintain(workflow: WorkflowType,
             logger.debug(
                 f'diagnose "{n.__workflow_id__}" because of "{workflow.__workflow_id__}" bad data'
             )
-            diagnose(n, code_path, state_path, plot, session_id)
+            await diagnose(n, code_path, state_path, plot, session_id)
         else:
             logger.debug(
                 f'"{workflow.__workflow_id__}": All dependents diagnosed')
     # calibrate
     logger.debug(f'recalibrate "{workflow.__workflow_id__}"')
-    report = calibrate(workflow, state_path, plot, session_id)
+    report = await calibrate(workflow, state_path, plot, session_id)
     if report.bad_data or not report.in_spec:
         if not freeze:
             obey_the_oracle(report, state_path)
@@ -465,14 +488,14 @@ def maintain(workflow: WorkflowType,
 
 
 @logger.catch(reraise=True)
-def run(workflow: WorkflowType,
-        code_path: str | Path,
-        state_path: str | Path,
-        plot: bool = False,
-        freeze: bool = False):
+async def run(workflow: WorkflowType,
+              code_path: str | Path,
+              state_path: str | Path,
+              plot: bool = False,
+              freeze: bool = False):
     session_id = uuid.uuid4().hex
     logger.debug(f'run "{workflow.__workflow_id__}" without dependences.')
-    report = calibrate(workflow, state_path, plot, session_id=session_id)
+    report = await calibrate(workflow, state_path, plot, session_id=session_id)
     if report.bad_data or not report.in_spec:
         if not freeze:
             obey_the_oracle(report, state_path)

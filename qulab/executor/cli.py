@@ -9,6 +9,7 @@ import click
 from loguru import logger
 
 from ..cli.config import get_config_value, log_options
+from ..cli.decorators import async_command
 from .load import (WorkflowType, find_unreferenced_workflows, get_entries,
                    load_workflow, make_graph)
 from .schedule import CalibrationFailedError
@@ -165,7 +166,8 @@ def get(key, api):
 @click.option('--freeze', is_flag=True, help='Freeze the config table.')
 @log_options
 @command_option('run')
-def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
+@async_command
+async def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
     """
     Run a workflow.
 
@@ -204,29 +206,33 @@ def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
             if no_dependents:
                 if hasattr(wf, 'entries'):
                     for entry in get_entries(wf, code):
-                        run_workflow(entry,
-                                     code,
-                                     data,
-                                     plot=plot,
-                                     freeze=freeze)
+                        await run_workflow(entry,
+                                           code,
+                                           data,
+                                           plot=plot,
+                                           freeze=freeze)
                 else:
-                    run_workflow(wf, code, data, plot=plot, freeze=freeze)
+                    await run_workflow(wf,
+                                       code,
+                                       data,
+                                       plot=plot,
+                                       freeze=freeze)
             else:
                 if hasattr(wf, 'entries'):
                     for entry in get_entries(wf, code):
-                        maintain_workflow(entry,
-                                          code,
-                                          data,
-                                          run=True,
-                                          plot=plot,
-                                          freeze=freeze)
+                        await maintain_workflow(entry,
+                                                code,
+                                                data,
+                                                run=True,
+                                                plot=plot,
+                                                freeze=freeze)
                 else:
-                    maintain_workflow(wf,
-                                      code,
-                                      data,
-                                      run=True,
-                                      plot=plot,
-                                      freeze=freeze)
+                    await maintain_workflow(wf,
+                                            code,
+                                            data,
+                                            run=True,
+                                            plot=plot,
+                                            freeze=freeze)
             break
         except CalibrationFailedError as e:
             if i == retry - 1:
@@ -241,7 +247,8 @@ def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
 @click.option('--plot', '-p', is_flag=True, help='Plot the report.')
 @log_options
 @command_option('maintain')
-def maintain(workflow, code, data, api, retry, plot):
+@async_command
+async def maintain(workflow, code, data, api, retry, plot):
     """
     Maintain a workflow.
 
@@ -275,19 +282,19 @@ def maintain(workflow, code, data, api, retry, plot):
         try:
             if hasattr(wf, 'entries'):
                 for entry in get_entries(wf, code):
-                    maintain_workflow(entry,
-                                      code,
-                                      data,
-                                      run=False,
-                                      plot=plot,
-                                      freeze=False)
+                    await maintain_workflow(entry,
+                                            code,
+                                            data,
+                                            run=False,
+                                            plot=plot,
+                                            freeze=False)
             else:
-                maintain_workflow(wf,
-                                  code,
-                                  data,
-                                  run=False,
-                                  plot=plot,
-                                  freeze=False)
+                await maintain_workflow(wf,
+                                        code,
+                                        data,
+                                        run=False,
+                                        plot=plot,
+                                        freeze=False)
             break
         except CalibrationFailedError as e:
             if i == retry - 1:
@@ -301,7 +308,8 @@ def maintain(workflow, code, data, api, retry, plot):
 @click.option('--plot', '-p', is_flag=True, help='Plot the report.')
 @log_options
 @command_option('reproduce')
-def reproduce(report_id, code, data, api, plot):
+@async_command
+async def reproduce(report_id, code, data, api, plot):
     """
     Reproduce a report.
 
@@ -335,6 +343,6 @@ def reproduce(report_id, code, data, api, plot):
     cfg = transform.export_config()
     transform.clear_config()
     transform.update_config(r.config)
-    run_workflow(wf, code, data, plot=plot, freeze=True)
+    await run_workflow(wf, code, data, plot=plot, freeze=True)
     transform.clear_config()
     transform.update_config(cfg)
