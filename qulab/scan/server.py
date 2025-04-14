@@ -14,6 +14,7 @@ from loguru import logger
 
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
+from ..cli.config import get_config_value, log_options
 from .curd import (create_cell, create_config, create_notebook, get_config,
                    query_record, remove_tags, tag, update_tags)
 from .models import Cell, Notebook
@@ -411,123 +412,36 @@ async def serv(port,
                     last_flush_time = time.time()
 
 
-async def main(port,
-               datapath,
-               url,
-               timeout=1,
-               buffer=1024,
-               interval=60,
-               log='stderr',
-               no_watch=True,
-               debug=False):
-    if no_watch:
-        logger.remove()
-        if debug:
-            level = 'DEBUG'
-        else:
-            level = 'INFO'
-        if log == 'stderr':
-            logger.add(sys.stderr, level=level)
-        elif log == 'stdout':
-            logger.add(sys.stdout, level=level)
-        else:
-            logger.add(sys.stderr, level=level)
-            logger.add(log, level=level)
-        logger.debug(f"logging level: {level}")
-        logger.info('Server starting...')
-        await serv(port, datapath, url, buffer * 1024 * 1024, interval)
-    else:
-        process = None
-
-        while True:
-            try:
-                with ZMQContextManager(
-                        zmq.DEALER, connect=f"tcp://127.0.0.1:{port}") as sock:
-                    sock.setsockopt(zmq.LINGER, 0)
-                    sock.send_pyobj({"method": "ping"})
-                    logger.debug('ping.')
-                    if sock.poll(int(1000 * timeout)):
-                        sock.recv()
-                        logger.debug('recv pong.')
-                    else:
-                        logger.debug('timeout.')
-                        raise asyncio.TimeoutError()
-            except (zmq.error.ZMQError, asyncio.TimeoutError):
-                if process is not None:
-                    logger.debug(
-                        f'killing process... PID={process.pid}, returncode={process.returncode}'
-                    )
-                    process.kill()
-                    logger.debug(
-                        f'killed process. PID={process.pid}, returncode={process.returncode}'
-                    )
-                cmd = [
-                    sys.executable,
-                    "-m",
-                    "qulab",
-                    "server",
-                    "--port",
-                    f"{port}",
-                    "--datapath",
-                    f"{datapath}",
-                    "--url",
-                    f"{url}",
-                    "--timeout",
-                    f"{timeout}",
-                    "--buffer",
-                    f"{buffer}",
-                    "--interval",
-                    f"{interval}",
-                    "--log",
-                    f"{log}",
-                ]
-                if url:
-                    cmd.extend(['--url', url])
-                if debug:
-                    cmd.append('--debug')
-                cmd.append("--no-watch")
-                logger.debug(f"starting process: {' '.join(cmd)}")
-                process = subprocess.Popen(cmd, cwd=os.getcwd())
-                logger.debug(
-                    f'process started. PID={process.pid}, returncode={process.returncode}'
-                )
-
-                # Capture and log the output
-                # stdout, stderr = process.communicate(timeout=5)
-                # if stdout:
-                #     logger.info(f'Server stdout: {stdout.decode()}')
-                # if stderr:
-                #     logger.error(f'Server stderr: {stderr.decode()}')
-
-                await asyncio.sleep(5)
-            await asyncio.sleep(timeout)
+async def main(port, datapath, url, buffer=1024, interval=60):
+    logger.info('Server starting...')
+    await serv(port, datapath, url, buffer * 1024 * 1024, interval)
 
 
 @click.command()
 @click.option('--port',
-              default=os.getenv('QULAB_RECORD_PORT', 6789),
+              default=get_config_value('port',
+                                       int,
+                                       command_name='server',
+                                       default=6789),
               help='Port of the server.')
-@click.option('--datapath', default=datapath, help='Path of the data.')
+@click.option('--datapath',
+              default=get_config_value('data',
+                                       Path,
+                                       command_name='server',
+                                       default=Path.home() / 'qulab' / 'data'),
+              help='Path of the data.')
 @click.option('--url', default='sqlite', help='URL of the database.')
-@click.option('--timeout', default=1, help='Timeout of ping.')
 @click.option('--buffer', default=1024, help='Buffer size (MB).')
 @click.option('--interval',
               default=60,
               help='Interval of flush cache, in unit of second.')
-@click.option('--log', default='stderr', help='Log file.')
-@click.option('--no-watch', is_flag=True, help='Watch the server.')
-@click.option('--debug', is_flag=True, help='Debug mode.')
-def server(port, datapath, url, timeout, buffer, interval, log, no_watch,
-           debug):
+@log_options(command_name='server')
+def server(port, datapath, url, buffer, interval):
     try:
         import uvloop
-        uvloop.run(
-            main(port, Path(datapath), url, timeout, buffer, interval, log,
-                 True, debug))
+        uvloop.run(main(port, Path(datapath), url, buffer, interval))
     except ImportError:
-        asyncio.run(
-            main(port, Path(datapath), url, timeout, buffer, interval, log,
-                 True, debug))
+        asyncio.run(main(port, Path(datapath), url, buffer, interval))
 
 
 if __name__ == "__main__":

@@ -98,7 +98,7 @@ def get_config_value(option_name,
     return value
 
 
-def log_options(func, command_name=None):
+def log_options(func=None, command_name=None):
     """通用配置装饰器（所有命令共用)
     
     添加 --debug, --log, --debug-log, --quiet 选项
@@ -110,6 +110,8 @@ def log_options(func, command_name=None):
 
     if isinstance(func, str):
         return functools.partial(log_options, command_name=func)
+    if func is None:
+        return functools.partial(log_options, command_name=command_name)
 
     @click.option("--debug",
                   is_flag=True,
