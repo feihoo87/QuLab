@@ -1,3 +1,4 @@
+import copy
 import itertools
 import logging
 import re
@@ -127,7 +128,8 @@ class BaseDevice(metaclass=DeviceMeta):
     __log__ = None
 
     def __init__(self, address: str = None, **options):
-        self._status = {}
+        self._state = {}
+        self._status = "NOT CONNECTED"
         self.address = address
         self.options = options
 
@@ -144,28 +146,40 @@ class BaseDevice(metaclass=DeviceMeta):
                 f"{self.__class__.__module__}.{self.__class__.__name__}")
         return self.__log__
 
+    @property
+    def state(self):
+        return copy.deepcopy(self._state)
+    
+    def get_state(self, key: str, default=None) -> Any:
+        return self._state.get(key, default)
+
+    @property
+    def status(self):
+        return self._status
+
     def open(self) -> None:
-        pass
+        self._status = "CONNECTED"
 
     def close(self) -> None:
-        pass
+        self._status = "NOT CONNECTED"
+        self._state.clear()
 
     def reset(self) -> None:
-        self._status.clear()
+        self._state.clear()
 
     def get(self, key: str, default: Any = None) -> Any:
         self.log.info(f'Get {key!r}')
         if key in self.__get_actions__:
             result = self.__get_actions__[key](self)
-            self._status[key] = result
+            self._state[key] = result
             return result
         else:
-            return self._status.get(key, default)
+            return self._state.get(key, default)
 
     def set(self, key: str, value: Any = None) -> None:
         self.log.info(f'Set {key!r} = {value!r}')
         self.__set_actions__[key](self, value)
-        self._status[key] = value
+        self._state[key] = value
 
     def post(self, key: str, value: Any = None) -> Any:
         self.log.info(f'Post {key!r} = {value!r}')
@@ -174,7 +188,7 @@ class BaseDevice(metaclass=DeviceMeta):
     def delete(self, key: str) -> None:
         self.log.info(f'Delete {key!r}')
         self.__delete_actions__[key](self)
-        del self._status[key]
+        del self._state[key]
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.address!r})'
@@ -193,8 +207,10 @@ class VisaDevice(BaseDevice):
             rm = pyvisa.ResourceManager()
         self.resource = rm.open_resource(self.address, **kwds)
         self.errors = []
+        super().open()
 
     def close(self) -> None:
+        super().close()
         self.resource.close()
 
     def reset(self) -> None:

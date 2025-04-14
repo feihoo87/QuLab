@@ -35,7 +35,7 @@ class Device(BaseDevice):
 
     # @get('${channel}.Vpp', channel=exclude(['M1', 'M2']))
     # def get_voltage(self, channel: str, default=0.0) -> float:
-    #     return self._status.get(f'{channel}.Vpp', default)
+    #     return self._state.get(f'{channel}.Vpp', default)
 
     @set('${channel}.Offset', channel=exclude(['M1', 'M2']))
     def set_offset(
@@ -47,7 +47,7 @@ class Device(BaseDevice):
 
     # @get('${channel}.Offset', channel=exclude(['M1', 'M2']))
     # def get_offset(self, channel: str, default=0.0) -> float:
-    #     return self._status.get(f'{channel}.Offset', default)
+    #     return self._state.get(f'{channel}.Offset', default)
 
     @set('${channel}.Waveform', channel=exclude(['M1', 'M2']))
     def set_waveform(self, value, channel: str) -> None:
@@ -55,7 +55,7 @@ class Device(BaseDevice):
 
     # @get('${channel}.Waveform', channel=exclude(['M1', 'M2']))
     # def get_waveform(self, channel: str, default=None) -> str:
-    #     return self._status.get(f'{channel}.Waveform', default)
+    #     return self._state.get(f'{channel}.Waveform', default)
 
     @set('${channel}.Size', channel=['M1', 'M2'])
     def set_size(self, value, channel: str) -> None:
@@ -63,6 +63,6 @@ class Device(BaseDevice):
 
     @get('${channel}.Trace', channel=['M1', 'M2'])
     def get_random_data(self, channel: str) -> np.ndarray:
-        size = self._status.get(f'{channel}.Size', 1024)
-        shots = self._status.get(f'{channel}.Shots', 128)
+        size = self._state.get(f'{channel}.Size', 1024)
+        shots = self._state.get(f'{channel}.Shots', 128)
         return np.random.randn(shots, size)
