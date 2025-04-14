@@ -135,10 +135,14 @@ def verify_dependence_key(workflow: str | tuple[str, dict[str, Any]]
     if not isinstance(workflow, tuple) or len(workflow) not in [2, 3]:
         raise ValueError(f"Invalid workflow: {workflow}")
 
-    if len(workflow) == 2:
+    if len(workflow) == 2 and isinstance(workflow[1], str):
         file_name, mapping = workflow
         if not Path(file_name).exists():
             raise FileNotFoundError(f"File not found: {file_name}")
+    elif len(workflow) == 2 and isinstance(workflow[1], dict):
+        template_path, mapping = workflow
+        if not (Path(base_path) / template_path).exists():
+            raise FileNotFoundError(f"File not found: {template_path}")
     elif len(workflow) == 3:
         template_path, target_path, mapping = workflow
         if not (Path(base_path) / template_path).exists():
