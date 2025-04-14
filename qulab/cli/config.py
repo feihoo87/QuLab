@@ -98,24 +98,40 @@ def get_config_value(option_name,
     return value
 
 
-def log_options(func):
-    """通用配置装饰器（所有命令共用）"""
+def log_options(func, command_name=None):
+    """通用配置装饰器（所有命令共用)
+    
+    添加 --debug, --log, --debug-log, --quiet 选项
+    1. --debug: 是否开启调试模式
+    2. --log: 日志文件路径
+    3. --debug-log: 调试日志文件路径
+    4. --quiet: 是否静默输出
+    """
+
+    if isinstance(func, str):
+        return functools.partial(log_options, command_name=func)
 
     @click.option("--debug",
                   is_flag=True,
-                  default=get_config_value("debug", bool),
+                  default=get_config_value("debug",
+                                           bool,
+                                           command_name=command_name),
                   help=f"Enable debug mode")
     @click.option("--log",
                   type=click.Path(),
-                  default=lambda: get_config_value("log", Path),
+                  default=lambda: get_config_value(
+                      "log", Path, command_name=command_name),
                   help=f"Log file path")
     @click.option("--debug-log",
                   type=click.Path(),
-                  default=lambda: get_config_value("debug_log", Path),
+                  default=lambda: get_config_value(
+                      "debug_log", Path, command_name=command_name),
                   help=f"Debug log file path")
     @click.option("--quiet",
                   is_flag=True,
-                  default=get_config_value("quiet", bool),
+                  default=get_config_value("quiet",
+                                           bool,
+                                           command_name=command_name),
                   help=f"Disable log output")
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
