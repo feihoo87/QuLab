@@ -71,7 +71,7 @@ def veryfy_analyzed_report(report: Report, script: str, method: str):
 
 
 def check_state(workflow: WorkflowType, code_path: str | Path,
-                state_path: str | Path) -> bool:
+                state_path: str | Path, veryfy_source_code: bool) -> bool:
     """
     check state should report a pass if and only if the following are satisfied:
     
@@ -110,15 +110,15 @@ def check_state(workflow: WorkflowType, code_path: str | Path,
         logger.debug(
             f'check_state failed: "{workflow.__workflow_id__}" has bad data')
         return False
-    for n in get_dependents(workflow, code_path):
+    for n in get_dependents(workflow, code_path, veryfy_source_code):
         r = find_report(n.__workflow_id__, state_path)
         if r is None or r.checked_time > report.checked_time:
             logger.debug(
                 f'check_state failed: "{workflow.__workflow_id__}" has outdated dependencies'
             )
             return False
-    for n in get_dependents(workflow, code_path):
-        if not check_state(n, code_path, state_path):
+    for n in get_dependents(workflow, code_path, veryfy_source_code):
+        if not check_state(n, code_path, state_path, veryfy_source_code):
             logger.debug(
                 f'check_state failed: "{workflow.__workflow_id__}" has bad dependencies'
             )
@@ -361,7 +361,8 @@ async def calibrate(workflow: WorkflowType, state_path: str | Path, plot: bool,
 
 
 async def diagnose(workflow: WorkflowType, code_path: str | Path,
-                   state_path: str | Path, plot: bool, session_id: str):
+                   state_path: str | Path, plot: bool, session_id: str,
+                   veryfy_source_code: bool):
     '''
     Returns: True if node or dependent recalibrated.
     '''
@@ -380,8 +381,9 @@ async def diagnose(workflow: WorkflowType, code_path: str | Path,
         logger.debug(
             f'"{workflow.__workflow_id__}": Bad data, diagnosing dependents')
         recalibrated = [
-            await diagnose(n, code_path, state_path, plot, session_id)
-            for n in get_dependents(workflow, code_path)
+            await diagnose(n, code_path, state_path, plot, session_id,
+                           veryfy_source_code)
+            for n in get_dependents(workflow, code_path, veryfy_source_code)
         ]
     if not any(recalibrated):
         if report.bad_data:
@@ -427,13 +429,14 @@ async def maintain(workflow: WorkflowType,
                    session_id: str | None = None,
                    run: bool = False,
                    plot: bool = False,
-                   freeze: bool = False):
+                   freeze: bool = False,
+                   veryfy_source_code: bool = True):
     if session_id is None:
         session_id = uuid.uuid4().hex
     logger.debug(f'run "{workflow.__workflow_id__}"'
                  if run else f'maintain "{workflow.__workflow_id__}"')
     # recursive maintain
-    for n in get_dependents(workflow, code_path):
+    for n in get_dependents(workflow, code_path, veryfy_source_code):
         logger.debug(
             f'maintain "{n.__workflow_id__}" because it is depended by "{workflow.__workflow_id__}"'
         )
@@ -443,12 +446,14 @@ async def maintain(workflow: WorkflowType,
                        session_id,
                        run=False,
                        plot=plot,
-                       freeze=freeze)
+                       freeze=freeze,
+                       veryfy_source_code=veryfy_source_code)
     else:
         logger.debug(
             f'"{workflow.__workflow_id__}": All dependents maintained')
     # check_state
-    if check_state(workflow, code_path, state_path) and not run:
+    if check_state(workflow, code_path, state_path,
+                   veryfy_source_code) and not run:
         logger.debug(
             f'"{workflow.__workflow_id__}": In spec, no need to maintain')
         return
@@ -462,11 +467,12 @@ async def maintain(workflow: WorkflowType,
     elif report.bad_data:
         logger.debug(
             f'"{workflow.__workflow_id__}": Bad data, diagnosing dependents')
-        for n in get_dependents(workflow, code_path):
+        for n in get_dependents(workflow, code_path, veryfy_source_code):
             logger.debug(
                 f'diagnose "{n.__workflow_id__}" because of "{workflow.__workflow_id__}" bad data'
             )
-            await diagnose(n, code_path, state_path, plot, session_id)
+            await diagnose(n, code_path, state_path, plot, session_id,
+                           veryfy_source_code)
         else:
             logger.debug(
                 f'"{workflow.__workflow_id__}": All dependents diagnosed')

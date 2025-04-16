@@ -30,11 +30,16 @@ def boot(script_path):
 
 
 @logger.catch(reraise=True)
-def check_toplogy(workflow: WorkflowType, code_path: str | Path) -> dict:
+def check_toplogy(workflow: WorkflowType,
+                  code_path: str | Path,
+                  veryfy_source_code: bool = True) -> dict:
     graph = {}
     try:
-        graphlib.TopologicalSorter(make_graph(workflow, graph,
-                                              code_path)).static_order()
+        graphlib.TopologicalSorter(
+            make_graph(workflow,
+                       graph,
+                       code_path,
+                       veryfy_source_code=veryfy_source_code)).static_order()
     except graphlib.CycleError as e:
         logger.error(
             f"Workflow {workflow.__workflow_id__} has a circular dependency: {e}"
@@ -167,7 +172,15 @@ def get(key, api):
 @log_options
 @command_option('run')
 @async_command
-async def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
+async def run(workflow,
+              code,
+              data,
+              api,
+              plot,
+              no_dependents,
+              retry,
+              freeze,
+              veryfy_source_code=True):
     """
     Run a workflow.
 
@@ -198,41 +211,55 @@ async def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
     code = Path(os.path.expanduser(code))
     data = Path(os.path.expanduser(data))
 
-    wf = load_workflow(workflow, code)
-    check_toplogy(wf, code)
+    wf = load_workflow(workflow, code, veryfy_source_code=veryfy_source_code)
+    check_toplogy(wf, code, veryfy_source_code=veryfy_source_code)
 
     for i in range(retry):
         try:
             if no_dependents:
                 if hasattr(wf, 'entries'):
-                    for entry in get_entries(wf, code):
-                        await run_workflow(entry,
-                                           code,
-                                           data,
-                                           plot=plot,
-                                           freeze=freeze)
+                    for entry in get_entries(
+                            wf, code, veryfy_source_code=veryfy_source_code):
+                        await run_workflow(
+                            entry,
+                            code,
+                            data,
+                            plot=plot,
+                            freeze=freeze,
+                            veryfy_source_code=veryfy_source_code,
+                        )
                 else:
-                    await run_workflow(wf,
-                                       code,
-                                       data,
-                                       plot=plot,
-                                       freeze=freeze)
+                    await run_workflow(
+                        wf,
+                        code,
+                        data,
+                        plot=plot,
+                        freeze=freeze,
+                        veryfy_source_code=veryfy_source_code,
+                    )
             else:
                 if hasattr(wf, 'entries'):
-                    for entry in get_entries(wf, code):
-                        await maintain_workflow(entry,
-                                                code,
-                                                data,
-                                                run=True,
-                                                plot=plot,
-                                                freeze=freeze)
+                    for entry in get_entries(
+                            wf, code, veryfy_source_code=veryfy_source_code):
+                        await maintain_workflow(
+                            entry,
+                            code,
+                            data,
+                            run=True,
+                            plot=plot,
+                            freeze=freeze,
+                            veryfy_source_code=veryfy_source_code,
+                        )
                 else:
-                    await maintain_workflow(wf,
-                                            code,
-                                            data,
-                                            run=True,
-                                            plot=plot,
-                                            freeze=freeze)
+                    await maintain_workflow(
+                        wf,
+                        code,
+                        data,
+                        run=True,
+                        plot=plot,
+                        freeze=freeze,
+                        veryfy_source_code=veryfy_source_code,
+                    )
             break
         except CalibrationFailedError as e:
             if i == retry - 1:
@@ -248,7 +275,13 @@ async def run(workflow, code, data, api, plot, no_dependents, retry, freeze):
 @log_options
 @command_option('maintain')
 @async_command
-async def maintain(workflow, code, data, api, retry, plot):
+async def maintain(workflow,
+                   code,
+                   data,
+                   api,
+                   retry,
+                   plot,
+                   veryfy_source_code=True):
     """
     Maintain a workflow.
 
@@ -275,26 +308,33 @@ async def maintain(workflow, code, data, api, retry, plot):
     code = Path(os.path.expanduser(code))
     data = Path(os.path.expanduser(data))
 
-    wf = load_workflow(workflow, code)
-    check_toplogy(wf, code)
+    wf = load_workflow(workflow, code, veryfy_source_code=veryfy_source_code)
+    check_toplogy(wf, code, veryfy_source_code=veryfy_source_code)
 
     for i in range(retry):
         try:
             if hasattr(wf, 'entries'):
-                for entry in get_entries(wf, code):
-                    await maintain_workflow(entry,
-                                            code,
-                                            data,
-                                            run=False,
-                                            plot=plot,
-                                            freeze=False)
+                for entry in get_entries(
+                        wf, code, veryfy_source_code=veryfy_source_code):
+                    await maintain_workflow(
+                        entry,
+                        code,
+                        data,
+                        run=False,
+                        plot=plot,
+                        freeze=False,
+                        veryfy_source_code=veryfy_source_code,
+                    )
             else:
-                await maintain_workflow(wf,
-                                        code,
-                                        data,
-                                        run=False,
-                                        plot=plot,
-                                        freeze=False)
+                await maintain_workflow(
+                    wf,
+                    code,
+                    data,
+                    run=False,
+                    plot=plot,
+                    freeze=False,
+                    veryfy_source_code=veryfy_source_code,
+                )
             break
         except CalibrationFailedError as e:
             if i == retry - 1:

@@ -1,6 +1,9 @@
 import atexit
 import inspect
 import pickle
+import os
+import time
+import shutil
 import tempfile
 import warnings
 from importlib.util import module_from_spec, spec_from_file_location
@@ -305,7 +308,8 @@ def find_unreferenced_workflows(path: str) -> list[str]:
 
 def load_workflow_from_file(file_name: str,
                             base_path: str | Path,
-                            package='workflows') -> WorkflowType:
+                            package='workflows',
+                            veryfy_source_code: bool = True) -> WorkflowType:
     base_path = Path(base_path)
     path = Path(file_name)
     if not (base_path / path).exists():
@@ -319,7 +323,8 @@ def load_workflow_from_file(file_name: str,
     module.__source__ = source_code
 
     if hasattr(module, 'entries'):
-        verify_entries(module, base_path)
+        if veryfy_source_code:
+            verify_entries(module, base_path)
         return module
 
     if not hasattr(module, '__timeout__'):
@@ -327,9 +332,11 @@ def load_workflow_from_file(file_name: str,
 
     if not hasattr(module, 'depends'):
         module.depends = lambda: []
-    verify_depends(module, base_path)
-    verify_calibrate_method(module)
-    verify_check_method(module)
+
+    if veryfy_source_code:
+        verify_depends(module, base_path)
+        verify_calibrate_method(module)
+        verify_check_method(module)
 
     return module
 
@@ -380,12 +387,14 @@ def _generate_target_file_path(template_path: str | Path, hash_str: str,
         return Path('run') / path
 
 
-def load_workflow_from_template(template_path: str,
-                                mapping: dict[str, str],
-                                base_path: str | Path,
-                                target_path: str | None = None,
-                                package='workflows',
-                                mtime: float = 0) -> WorkflowType:
+def load_workflow_from_template(
+        template_path: str,
+        mapping: dict[str, str],
+        base_path: str | Path,
+        target_path: str | None = None,
+        package='workflows',
+        mtime: float = 0,
+        veryfy_source_code: bool = True) -> WorkflowType:
     base_path = Path(base_path)
     path = Path(template_path)
 
@@ -413,7 +422,8 @@ def load_workflow_from_template(template_path: str,
             f"`{file}` already exists and is different from the new one generated from template `{template_path}`"
         )
 
-    module = load_workflow_from_file(str(path), base_path, package)
+    module = load_workflow_from_file(str(path), base_path, package,
+                                     veryfy_source_code)
     module.__mtime__ = max(mtime, module.__mtime__)
     if module.__source__ == content:
         module.__source__ = template, mapping, str(template_path)
@@ -425,26 +435,31 @@ def load_workflow(workflow: str | tuple[str, dict],
                   base_path: str | Path,
                   package='workflows',
                   mtime: float = 0,
-                  inject: dict | None = None) -> WorkflowType:
+                  inject: dict | None = None,
+                  veryfy_source_code: bool = True) -> WorkflowType:
     if isinstance(workflow, tuple):
         if len(workflow) == 2:
             file_name, mapping = workflow
             if inject is None:
                 w = load_workflow_from_template(file_name, mapping, base_path,
-                                                None, package, mtime)
+                                                None, package, mtime,
+                                                veryfy_source_code)
             else:
                 w = load_workflow_from_template(file_name, inject, base_path,
-                                                None, package, mtime)
+                                                None, package, mtime,
+                                                veryfy_source_code)
         elif len(workflow) == 3:
             template_path, target_path, mapping = workflow
             if inject is None:
                 w = load_workflow_from_template(template_path, mapping,
                                                 base_path, target_path,
-                                                package, mtime)
+                                                package, mtime,
+                                                veryfy_source_code)
             else:
                 w = load_workflow_from_template(template_path, inject,
                                                 base_path, target_path,
-                                                package, mtime)
+                                                package, mtime,
+                                                veryfy_source_code)
         else:
             raise ValueError(f"Invalid workflow: {workflow}")
         w.__workflow_id__ = str(Path(w.__file__).relative_to(base_path))
@@ -454,7 +469,8 @@ def load_workflow(workflow: str | tuple[str, dict],
             w = SetConfigWorkflow(key)
             w.__workflow_id__ = workflow
         else:
-            w = load_workflow_from_file(workflow, base_path, package)
+            w = load_workflow_from_file(workflow, base_path, package,
+                                        veryfy_source_code)
             w.__workflow_id__ = str(Path(w.__file__).relative_to(base_path))
     else:
         raise TypeError(f"Invalid workflow: {workflow}")
@@ -462,11 +478,15 @@ def load_workflow(workflow: str | tuple[str, dict],
     return w
 
 
-def _load_workflow_list(workflow, lst, code_path):
+def _load_workflow_list(workflow, lst, code_path, veryfy_source_code):
     ret = []
     for i, n in enumerate(lst):
         try:
-            ret.append(load_workflow(n, code_path, mtime=workflow.__mtime__))
+            ret.append(
+                load_workflow(n,
+                              code_path,
+                              mtime=workflow.__mtime__,
+                              veryfy_source_code=veryfy_source_code))
         except TemplateKeyError as e:
             msg, *_ = e.args
             e.args = (
@@ -475,16 +495,18 @@ def _load_workflow_list(workflow, lst, code_path):
     return ret
 
 
-def get_dependents(workflow: WorkflowType,
-                   code_path: str | Path) -> list[WorkflowType]:
+def get_dependents(workflow: WorkflowType, code_path: str | Path,
+                   veryfy_source_code: bool) -> list[WorkflowType]:
     if callable(getattr(workflow, 'depends', None)):
         if not can_call_without_args(workflow.depends):
             raise AttributeError(
                 f'Workflow {workflow.__workflow_id__} "depends" function should not have any parameters'
             )
-        return _load_workflow_list(workflow, workflow.depends(), code_path)
+        return _load_workflow_list(workflow, workflow.depends(), code_path,
+                                   veryfy_source_code)
     elif isinstance(getattr(workflow, 'depends', None), (list, tuple)):
-        return _load_workflow_list(workflow, workflow.depends, code_path)
+        return _load_workflow_list(workflow, workflow.depends, code_path,
+                                   veryfy_source_code)
     elif getattr(workflow, 'depends', None) is None:
         return []
     else:
@@ -493,16 +515,18 @@ def get_dependents(workflow: WorkflowType,
         )
 
 
-def get_entries(workflow: WorkflowType,
-                code_path: str | Path) -> list[WorkflowType]:
+def get_entries(workflow: WorkflowType, code_path: str | Path,
+                veryfy_source_code: bool) -> list[WorkflowType]:
     if callable(getattr(workflow, 'entries', None)):
         if not can_call_without_args(workflow.entries):
             raise AttributeError(
                 f'Workflow {workflow.__workflow_id__} "entries" function should not have any parameters'
             )
-        return _load_workflow_list(workflow, workflow.entries(), code_path)
+        return _load_workflow_list(workflow, workflow.entries(), code_path,
+                                   veryfy_source_code)
     elif isinstance(getattr(workflow, 'entries', None), (list, tuple)):
-        return _load_workflow_list(workflow, workflow.entries, code_path)
+        return _load_workflow_list(workflow, workflow.entries, code_path,
+                                   veryfy_source_code)
     elif getattr(workflow, 'entries', None) is None:
         return []
     else:
@@ -511,19 +535,28 @@ def get_entries(workflow: WorkflowType,
         )
 
 
-def make_graph(workflow: WorkflowType, graph: dict, code_path: str | Path):
+def make_graph(workflow: WorkflowType,
+               graph: dict,
+               code_path: str | Path,
+               veryfy_source_code: bool = True):
     if workflow.__workflow_id__ in graph:
         return graph
     graph[workflow.__workflow_id__] = []
 
     if hasattr(workflow, 'entries'):
-        for w in get_entries(workflow, code_path):
+        for w in get_entries(workflow, code_path, veryfy_source_code):
             graph[workflow.__workflow_id__].append(w.__workflow_id__)
-            make_graph(w, graph=graph, code_path=code_path)
+            make_graph(w,
+                       graph=graph,
+                       code_path=code_path,
+                       veryfy_source_code=veryfy_source_code)
     elif hasattr(workflow, 'depends'):
-        for w in get_dependents(workflow, code_path):
+        for w in get_dependents(workflow, code_path, veryfy_source_code):
             graph[workflow.__workflow_id__].append(w.__workflow_id__)
-            make_graph(w, graph=graph, code_path=code_path)
+            make_graph(w,
+                       graph=graph,
+                       code_path=code_path,
+                       veryfy_source_code=veryfy_source_code)
     if graph[workflow.__workflow_id__] == []:
         del graph[workflow.__workflow_id__]
 
