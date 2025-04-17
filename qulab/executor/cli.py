@@ -12,10 +12,10 @@ from ..cli.config import get_config_value, log_options
 from ..cli.decorators import async_command
 from .load import (WorkflowType, find_unreferenced_workflows, get_entries,
                    load_workflow, make_graph)
+from .registry import Registry, set_config_api
 from .schedule import CalibrationFailedError
 from .schedule import maintain as maintain_workflow
 from .schedule import run as run_workflow
-from .transform import set_config_api
 from .utils import workflow_template
 
 
@@ -95,6 +95,7 @@ def command_option(command_name):
               '-c',
               default=lambda: get_config_value("code", str, 'create'),
               help='The path of the code.')
+@log_options('create')
 def create(workflow, code):
     """
     Create a new workflow file.
@@ -124,12 +125,13 @@ def create(workflow, code):
               '-a',
               default=lambda: get_config_value("api", str, 'set'),
               help='The modlule name of the api.')
+@log_options('set')
 def set(key, value, api):
     """
     Set a config.
     """
     logger.info(f'[CMD]: set {key} {value} --api {api}')
-    from . import transform
+    reg = Registry()
     if api is not None:
         api = importlib.import_module(api)
         set_config_api(api.query_config, api.update_config, api.delete_config,
@@ -138,7 +140,7 @@ def set(key, value, api):
         value = eval(value)
     except:
         pass
-    transform.update_config({key: value})
+    reg.set(key, value)
 
 
 @click.command()
@@ -147,17 +149,18 @@ def set(key, value, api):
               '-a',
               default=lambda: get_config_value("api", str, 'get'),
               help='The modlule name of the api.')
+@log_options('get')
 def get(key, api):
     """
     Get a config.
     """
     logger.info(f'[CMD]: get {key} --api {api}')
-    from . import transform
+    reg = Registry()
     if api is not None:
         api = importlib.import_module(api)
         set_config_api(api.query_config, api.update_config, api.delete_config,
                        api.export_config, api.clear_config)
-    click.echo(transform.query_config(key))
+    click.echo(reg.get(key))
 
 
 @click.command()
@@ -176,7 +179,7 @@ def get(key, api):
 @click.option('--veryfy-source-code',
               is_flag=True,
               help='Veryfy the source code.')
-@log_options
+@log_options('run')
 @command_option('run')
 @async_command
 async def run(workflow,
@@ -303,7 +306,7 @@ async def run(workflow,
 @click.option('--veryfy-source-code',
               is_flag=True,
               help='Veryfy the source code.')
-@log_options
+@log_options('maintain')
 @command_option('maintain')
 @async_command
 async def maintain(workflow,
@@ -388,7 +391,7 @@ async def maintain(workflow,
 @click.command()
 @click.argument('report_id')
 @click.option('--plot', '-p', is_flag=True, help='Plot the report.')
-@log_options
+@log_options('reproduce')
 @command_option('reproduce')
 @async_command
 async def reproduce(report_id, code, data, api, plot):
@@ -415,16 +418,17 @@ async def reproduce(report_id, code, data, api, plot):
     code = Path(os.path.expanduser(code))
     data = Path(os.path.expanduser(data))
 
-    from . import transform
     from .load import load_workflow_from_source_code
     from .storage import get_report_by_index
+
+    reg = Registry()
 
     r = get_report_by_index(int(report_id), data)
 
     wf = load_workflow_from_source_code(r.workflow, r.script)
-    cfg = transform.export_config()
-    transform.clear_config()
-    transform.update_config(r.config)
+    cfg = reg.export()
+    reg.clear()
+    reg.update(r.config)
     await run_workflow(wf, code, data, plot=plot, freeze=True)
-    transform.clear_config()
-    transform.update_config(cfg)
+    reg.clear()
+    reg.update(cfg)

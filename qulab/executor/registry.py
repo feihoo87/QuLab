@@ -1,3 +1,9 @@
+import importlib
+import os
+import sys
+from typing import Any
+
+from ..cli.config import get_config_value
 from .storage import Report, save_item
 
 __current_config_id = None
@@ -132,3 +138,44 @@ def set_config_api(query_method,
     clear_config = clear_method
 
     return query_config, update_config, delete_config, export_config, clear_config
+
+
+def _init():
+    code = get_config_value("code", str, default=None)
+    if code is not None:
+        code = os.path.expanduser(code)
+        if code not in sys.path:
+            sys.path.insert(0, code)
+
+    api = get_config_value('api', str, None)
+    if api is not None:
+        api = importlib.import_module(api)
+        set_config_api(api.query_config, api.update_config, api.delete_config,
+                       api.export_config, api.clear_config)
+
+
+_init()
+
+
+class Registry():
+
+    def query(self, key: str) -> Any:
+        return query_config(key)
+
+    def get(self, key: str) -> Any:
+        return self.query(key)
+
+    def export(self) -> dict[str, dict[str, Any]]:
+        return export_config()
+
+    def set(self, key: str, value: Any):
+        return update_config({key: value})
+
+    def delete(self, key: str):
+        return delete_config(key)
+
+    def clear(self):
+        return clear_config()
+
+    def update(self, parameters: dict[str, Any]):
+        return update_config(parameters)

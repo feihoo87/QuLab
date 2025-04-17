@@ -8,9 +8,9 @@ from pathlib import Path
 from loguru import logger
 
 from .load import WorkflowType, get_dependents
+from .registry import current_config, obey_the_oracle, update_parameters
 from .storage import (Report, find_report, get_head, get_heads, renew_report,
                       revoke_report, save_item, save_report)
-from .transform import current_config, obey_the_oracle, update_parameters
 
 __session_id = None
 __session_cache = {}
