@@ -33,11 +33,11 @@ def dependent_tree(node: str, code_path: str | Path) -> dict[str, list[str]]:
 
 
 def workflow_template(workflow: str, deps: list[str]) -> str:
-    return f"""def VAR(s): pass  # 没有实际作用，只是用来抑制编辑器的警告。
-
+    return f"""
 import numpy as np
 from loguru import logger
 
+from qulab import VAR
 from qulab.typing import Report
 
 
@@ -48,7 +48,7 @@ def depends():
     return {deps!r}
 
 
-def calibrate():
+async def calibrate():
     logger.info(f"running {workflow} ...")
 
     # calibrate 是一个完整的校准实验，如power Rabi，Ramsey等。
@@ -64,7 +64,7 @@ def calibrate():
     return x, y
 
 
-def analyze(report: Report, history: Report | None = None) -> Report:
+async def analyze(report: Report, history: Report | None = None) -> Report:
     \"\"\"
     分析校准结果。
 
@@ -95,7 +95,7 @@ def analyze(report: Report, history: Report | None = None) -> Report:
     return report
 
 
-def check():
+async def check():
     logger.info(f"checking {workflow} ...")
 
     # check 是一个快速检查实验，用于检查校准是否过时。
@@ -112,7 +112,7 @@ def check():
     return x, y
 
 
-def check_analyze(report: Report, history: Report | None = None) -> Report:
+async def check_analyze(report: Report, history: Report | None = None) -> Report:
     \"\"\"
     分析检查结果。
 
@@ -136,7 +136,7 @@ def check_analyze(report: Report, history: Report | None = None) -> Report:
     return report
 
 
-def oracle(report: Report,
+async def oracle(report: Report,
            history: Report | None = None,
            system_state: dict[str:str] | None = None) -> Report:
     \"\"\"
