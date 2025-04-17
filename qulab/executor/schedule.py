@@ -362,7 +362,7 @@ async def calibrate(workflow: WorkflowType, state_path: str | Path, plot: bool,
 
 async def diagnose(workflow: WorkflowType, code_path: str | Path,
                    state_path: str | Path, plot: bool, session_id: str,
-                   veryfy_source_code: bool):
+                   fail_fast: bool, veryfy_source_code: bool):
     '''
     Returns: True if node or dependent recalibrated.
     '''
@@ -385,8 +385,11 @@ async def diagnose(workflow: WorkflowType, code_path: str | Path,
         for n in get_dependents(workflow, code_path, veryfy_source_code):
             try:
                 flag = await diagnose(n, code_path, state_path, plot,
-                                      session_id, veryfy_source_code)
+                                      session_id, fail_fast,
+                                      veryfy_source_code)
             except Exception as e:
+                if fail_fast:
+                    raise e
                 exceptions.append(e)
             recalibrated.append(flag)
         if any(exceptions):
@@ -436,6 +439,7 @@ async def maintain(workflow: WorkflowType,
                    run: bool = False,
                    plot: bool = False,
                    freeze: bool = False,
+                   fail_fast: bool = False,
                    veryfy_source_code: bool = True):
     if session_id is None:
         session_id = uuid.uuid4().hex
@@ -455,8 +459,11 @@ async def maintain(workflow: WorkflowType,
                            run=False,
                            plot=plot,
                            freeze=freeze,
+                           fail_fast=fail_fast,
                            veryfy_source_code=veryfy_source_code)
         except Exception as e:
+            if fail_fast:
+                raise e
             exceptions.append(e)
     else:
         logger.debug(
@@ -486,8 +493,10 @@ async def maintain(workflow: WorkflowType,
             )
             try:
                 await diagnose(n, code_path, state_path, plot, session_id,
-                               veryfy_source_code)
+                               fail_fast, veryfy_source_code)
             except Exception as e:
+                if fail_fast:
+                    raise e
                 exceptions.append(e)
         else:
             logger.debug(

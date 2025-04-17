@@ -169,6 +169,13 @@ def get(key, api):
               help='Do not run dependents.')
 @click.option('--retry', '-r', default=1, type=int, help='Retry times.')
 @click.option('--freeze', is_flag=True, help='Freeze the config table.')
+@click.option('--fail-fast',
+              '-f',
+              is_flag=True,
+              help='Fail immediately on first error.')
+@click.option('--veryfy-source-code',
+              is_flag=True,
+              help='Veryfy the source code.')
 @log_options
 @command_option('run')
 @async_command
@@ -180,6 +187,7 @@ async def run(workflow,
               no_dependents,
               retry,
               freeze,
+              fail_fast,
               veryfy_source_code=True):
     """
     Run a workflow.
@@ -231,6 +239,8 @@ async def run(workflow,
                                 veryfy_source_code=veryfy_source_code,
                             )
                         except Exception as e:
+                            if fail_fast:
+                                raise e
                             exceptions.append(e)
                     if any(exceptions):
                         raise exceptions[0]
@@ -256,9 +266,12 @@ async def run(workflow,
                                 run=True,
                                 plot=plot,
                                 freeze=freeze,
+                                fail_fast=fail_fast,
                                 veryfy_source_code=veryfy_source_code,
                             )
                         except Exception as e:
+                            if fail_fast:
+                                raise e
                             exceptions.append(e)
                     if any(exceptions):
                         raise exceptions[0]
@@ -270,6 +283,7 @@ async def run(workflow,
                         run=True,
                         plot=plot,
                         freeze=freeze,
+                        fail_fast=fail_fast,
                         veryfy_source_code=veryfy_source_code,
                     )
             break
@@ -284,6 +298,13 @@ async def run(workflow,
 @click.argument('workflow')
 @click.option('--retry', '-r', default=1, type=int, help='Retry times.')
 @click.option('--plot', '-p', is_flag=True, help='Plot the report.')
+@click.option('--fail-fast',
+              '-f',
+              is_flag=True,
+              help='Fail immediately on first error.')
+@click.option('--veryfy-source-code',
+              is_flag=True,
+              help='Veryfy the source code.')
 @log_options
 @command_option('maintain')
 @async_command
@@ -293,6 +314,7 @@ async def maintain(workflow,
                    api,
                    retry,
                    plot,
+                   fail_fast,
                    veryfy_source_code=True):
     """
     Maintain a workflow.
@@ -337,9 +359,12 @@ async def maintain(workflow,
                             run=False,
                             plot=plot,
                             freeze=False,
+                            fail_fast=fail_fast,
                             veryfy_source_code=veryfy_source_code,
                         )
                     except Exception as e:
+                        if fail_fast:
+                            raise e
                         exceptions.append(e)
                 if any(exceptions):
                     raise exceptions[0]
@@ -351,6 +376,7 @@ async def maintain(workflow,
                     run=False,
                     plot=plot,
                     freeze=False,
+                    fail_fast=fail_fast,
                     veryfy_source_code=veryfy_source_code,
                 )
             break
