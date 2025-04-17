@@ -22,7 +22,7 @@ def run(main, *args, **kwds):
         try:
             import uvloop
             uvloop.run(main(*args, **kwds))
-        except ImportError:
+        except (ImportError, ModuleNotFoundError):
             asyncio.run(main(*args, **kwds))
     else:
         main(*args, **kwds)
