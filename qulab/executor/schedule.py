@@ -126,7 +126,7 @@ def check_state(workflow: WorkflowType, code_path: str | Path,
     return True
 
 
-@logger.catch()
+@logger.catch(reraise=False)
 async def call_plot(node: WorkflowType, report: Report, check=False):
     if hasattr(node, 'plot') and callable(node.plot):
         if inspect.iscoroutinefunction(node.plot):
@@ -380,11 +380,17 @@ async def diagnose(workflow: WorkflowType, code_path: str | Path,
     if report.bad_data:
         logger.debug(
             f'"{workflow.__workflow_id__}": Bad data, diagnosing dependents')
-        recalibrated = [
-            await diagnose(n, code_path, state_path, plot, session_id,
-                           veryfy_source_code)
-            for n in get_dependents(workflow, code_path, veryfy_source_code)
-        ]
+        recalibrated = []
+        exceptions = []
+        for n in get_dependents(workflow, code_path, veryfy_source_code):
+            try:
+                flag = await diagnose(n, code_path, state_path, plot,
+                                      session_id, veryfy_source_code)
+            except Exception as e:
+                exceptions.append(e)
+            recalibrated.append(flag)
+        if any(exceptions):
+            raise exceptions[0]
     if not any(recalibrated):
         if report.bad_data:
             raise CalibrationFailedError(
@@ -436,21 +442,27 @@ async def maintain(workflow: WorkflowType,
     logger.debug(f'run "{workflow.__workflow_id__}"'
                  if run else f'maintain "{workflow.__workflow_id__}"')
     # recursive maintain
+    exceptions = []
     for n in get_dependents(workflow, code_path, veryfy_source_code):
         logger.debug(
             f'maintain "{n.__workflow_id__}" because it is depended by "{workflow.__workflow_id__}"'
         )
-        await maintain(n,
-                       code_path,
-                       state_path,
-                       session_id,
-                       run=False,
-                       plot=plot,
-                       freeze=freeze,
-                       veryfy_source_code=veryfy_source_code)
+        try:
+            await maintain(n,
+                           code_path,
+                           state_path,
+                           session_id,
+                           run=False,
+                           plot=plot,
+                           freeze=freeze,
+                           veryfy_source_code=veryfy_source_code)
+        except Exception as e:
+            exceptions.append(e)
     else:
         logger.debug(
             f'"{workflow.__workflow_id__}": All dependents maintained')
+    if any(exceptions):
+        raise exceptions[0]
     # check_state
     if check_state(workflow, code_path, state_path,
                    veryfy_source_code) and not run:
@@ -467,15 +479,21 @@ async def maintain(workflow: WorkflowType,
     elif report.bad_data:
         logger.debug(
             f'"{workflow.__workflow_id__}": Bad data, diagnosing dependents')
+        exceptions = []
         for n in get_dependents(workflow, code_path, veryfy_source_code):
             logger.debug(
                 f'diagnose "{n.__workflow_id__}" because of "{workflow.__workflow_id__}" bad data'
             )
-            await diagnose(n, code_path, state_path, plot, session_id,
-                           veryfy_source_code)
+            try:
+                await diagnose(n, code_path, state_path, plot, session_id,
+                               veryfy_source_code)
+            except Exception as e:
+                exceptions.append(e)
         else:
             logger.debug(
                 f'"{workflow.__workflow_id__}": All dependents diagnosed')
+        if any(exceptions):
+            raise exceptions[0]
     # calibrate
     logger.debug(f'recalibrate "{workflow.__workflow_id__}"')
     report = await calibrate(workflow, state_path, plot, session_id)

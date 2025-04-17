@@ -218,16 +218,22 @@ async def run(workflow,
         try:
             if no_dependents:
                 if hasattr(wf, 'entries'):
+                    exceptions = []
                     for entry in get_entries(
                             wf, code, veryfy_source_code=veryfy_source_code):
-                        await run_workflow(
-                            entry,
-                            code,
-                            data,
-                            plot=plot,
-                            freeze=freeze,
-                            veryfy_source_code=veryfy_source_code,
-                        )
+                        try:
+                            await run_workflow(
+                                entry,
+                                code,
+                                data,
+                                plot=plot,
+                                freeze=freeze,
+                                veryfy_source_code=veryfy_source_code,
+                            )
+                        except Exception as e:
+                            exceptions.append(e)
+                    if any(exceptions):
+                        raise exceptions[0]
                 else:
                     await run_workflow(
                         wf,
@@ -239,17 +245,23 @@ async def run(workflow,
                     )
             else:
                 if hasattr(wf, 'entries'):
+                    exceptions = []
                     for entry in get_entries(
                             wf, code, veryfy_source_code=veryfy_source_code):
-                        await maintain_workflow(
-                            entry,
-                            code,
-                            data,
-                            run=True,
-                            plot=plot,
-                            freeze=freeze,
-                            veryfy_source_code=veryfy_source_code,
-                        )
+                        try:
+                            await maintain_workflow(
+                                entry,
+                                code,
+                                data,
+                                run=True,
+                                plot=plot,
+                                freeze=freeze,
+                                veryfy_source_code=veryfy_source_code,
+                            )
+                        except Exception as e:
+                            exceptions.append(e)
+                    if any(exceptions):
+                        raise exceptions[0]
                 else:
                     await maintain_workflow(
                         wf,
@@ -314,17 +326,23 @@ async def maintain(workflow,
     for i in range(retry):
         try:
             if hasattr(wf, 'entries'):
+                exceptions = []
                 for entry in get_entries(
                         wf, code, veryfy_source_code=veryfy_source_code):
-                    await maintain_workflow(
-                        entry,
-                        code,
-                        data,
-                        run=False,
-                        plot=plot,
-                        freeze=False,
-                        veryfy_source_code=veryfy_source_code,
-                    )
+                    try:
+                        await maintain_workflow(
+                            entry,
+                            code,
+                            data,
+                            run=False,
+                            plot=plot,
+                            freeze=False,
+                            veryfy_source_code=veryfy_source_code,
+                        )
+                    except Exception as e:
+                        exceptions.append(e)
+                if any(exceptions):
+                    raise exceptions[0]
             else:
                 await maintain_workflow(
                     wf,
