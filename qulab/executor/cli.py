@@ -236,7 +236,6 @@ async def run(workflow,
                                 data,
                                 plot=plot,
                                 freeze=freeze,
-                                veryfy_source_code=veryfy_source_code,
                             )
                         except Exception as e:
                             if fail_fast:
@@ -251,7 +250,6 @@ async def run(workflow,
                         data,
                         plot=plot,
                         freeze=freeze,
-                        veryfy_source_code=veryfy_source_code,
                     )
             else:
                 if hasattr(wf, 'entries'):
