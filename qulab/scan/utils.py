@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 import dill
 
-from .expression import Env, Expression
+from ..expression import Env, Expression
 
 
 class Unpicklable:

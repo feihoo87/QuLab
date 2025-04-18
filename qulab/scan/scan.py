@@ -18,8 +18,8 @@ import dill
 import numpy as np
 import zmq
 
+from ..expression import Env, Expression, Symbol
 from ..sys.rpc.zmq_socket import ZMQContextManager
-from .expression import Env, Expression, Symbol
 from .optimize import NgOptimizer
 from .record import Record
 from .server import default_record_port
@@ -509,7 +509,8 @@ class Scan():
 
         if self.config:
             self.description['config'] = await create_config(
-                self._raw_config_copy, self.description['database'], self._sock)
+                self._raw_config_copy, self.description['database'],
+                self._sock)
         if current_notebook() is None:
             await create_notebook('untitle', self.description['database'],
                                   self._sock)
