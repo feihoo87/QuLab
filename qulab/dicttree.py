@@ -297,8 +297,8 @@ def update_tree(result, updates):
     return result
 
 
-def queryref_tree(q, keys, dct, prefix=[], chain=None):
-    q = q[1:]
+def queryref_tree(q: str, keys, dct, prefix=[], chain=None):
+    q = q.removeprefix('$')
     if q.startswith('.'):
         while q.startswith('.'):
             keys.pop()
@@ -340,7 +340,7 @@ class Env():
         self.prefix = prefix
 
     def get(self, name):
-        return queryref_tree(name[1:],
+        return queryref_tree(name,
                              self.keys,
                              self.dct,
                              prefix=self.prefix,
@@ -405,8 +405,9 @@ internal_functions = {
 
 
 def eval_expr(expression, env=None, functions=None):
-    from pyparsing import (Forward, Literal, ParseResults, Suppress, Word,
-                           alphanums, delimitedList, infixNotation, oneOf,
+    from pyparsing import (Combine, Forward, Literal, MatchFirst, ParseResults,
+                           Regex, Suppress, Word, ZeroOrMore, alphanums,
+                           alphas, delimitedList, infixNotation, oneOf,
                            opAssoc, pyparsing_common)
     if functions is None:
         functions = internal_functions
@@ -436,8 +437,19 @@ def eval_expr(expression, env=None, functions=None):
         'e': math.e
     }.get(t[0]))
 
-    variable = Word("$", alphanums +
-                    "._").setParseAction(lambda s, l, t: lookup(t[0]))
+    identifier = Word(alphas + '_', alphanums + '_')
+    dollar = Literal('$')
+    dot_sequence = Regex(r'\.{1,}')
+    attr = Combine(Literal('.') + identifier)
+    attr_chain = ZeroOrMore(attr)
+    dollar_named_chain = Combine(dollar + identifier + attr_chain)
+    dollar_dotN_chain = Combine(dollar + dot_sequence + identifier +
+                                attr_chain)
+    dollar_simple = Combine(dollar + identifier)
+
+    variable = MatchFirst(
+        [dollar_dotN_chain, dollar_named_chain,
+         dollar_simple]).setParseAction(lambda s, l, t: lookup(t[0]))
 
     bracket = Suppress('(') + expr + Suppress(')')
     bracket.setParseAction(lambda s, l, t: t[0])
