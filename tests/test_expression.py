@@ -4,7 +4,7 @@ import operator
 import numpy as np
 import pytest
 
-from qulab.scan.expression import Env, calc
+from qulab.expression import Env, calc
 
 
 # ----------------------------
