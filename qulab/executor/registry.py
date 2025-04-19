@@ -129,7 +129,7 @@ def set_config_api(query_method,
         clear_method: The clear method.
             the method should clear the config.
     """
-    global query_config, update_config, delete_config, export_config, clear_config
+    global query_config, update_config, delete_config, export_config, clear_config, _api
 
     query_config = query_method
     update_config = update_method
@@ -159,23 +159,27 @@ _init()
 
 class Registry():
 
+    def __init__(self):
+        self.api = (query_config, update_config, delete_config, export_config,
+                    clear_config)
+
     def query(self, key: str) -> Any:
-        return query_config(key)
+        return self.api[0](key)
 
     def get(self, key: str) -> Any:
         return self.query(key)
 
     def export(self) -> dict[str, dict[str, Any]]:
-        return export_config()
+        return self.api[3]()
 
     def set(self, key: str, value: Any):
-        return update_config({key: value})
+        return self.api[1]({key: value})
 
     def delete(self, key: str):
-        return delete_config(key)
+        return self.api[2](key)
 
     def clear(self):
-        return clear_config()
+        return self.api[4]()
 
     def update(self, parameters: dict[str, Any]):
-        return update_config(parameters)
+        return self.api[1](parameters)

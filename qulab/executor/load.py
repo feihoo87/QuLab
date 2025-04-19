@@ -1,10 +1,10 @@
 import atexit
 import inspect
-import pickle
 import os
-import time
+import pickle
 import shutil
 import tempfile
+import time
 import warnings
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -13,6 +13,7 @@ from typing import Any
 
 from loguru import logger
 
+from .registry import Registry
 from .storage import Report
 from .template import (TemplateKeyError, TemplateTypeError, decode_mapping,
                        inject_mapping)
@@ -31,17 +32,16 @@ class SetConfigWorkflow():
         return []
 
     def check_state(self, history: Report) -> bool:
-        from . import transform
+        reg = Registry()
         try:
-            return self._equal(history.parameters[self.key],
-                               transform.query_config(self.key))
+            return self._equal(history.parameters[self.key], reg.get(self.key))
         except:
             return False
 
     def calibrate(self):
-        from . import transform
+        reg = Registry()
         try:
-            value = transform.query_config(self.key)
+            value = reg.get(self.key)
         except:
             value = eval(input(f'"{self.key}": '))
         return value
