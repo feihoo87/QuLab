@@ -1164,4 +1164,3 @@ def assymbly(description):
     _make_axis(description)
 
     return description
-    return description
