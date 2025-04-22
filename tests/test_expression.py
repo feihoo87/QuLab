@@ -162,10 +162,10 @@ def test_environment():
     env = Env()
     # 在自定义环境中绑定变量
     env["x"] = 10
-    result = calc("x+5", x=env["x"])
+    result = calc("x+5", env)
     assert result == 15, "通过环境变量传值x=10，应得15"
 
     # 绑定新变量并验证其值
     env["y"] = 20
-    result = calc("x+y", x=env["x"], y=env["y"])
+    result = calc("x+y", env)
     assert result == 30, "x+y 应为30，当x=10且y=20"
