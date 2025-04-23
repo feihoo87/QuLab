@@ -198,8 +198,13 @@ def yapf_reformat(cell_text):
             return '\n'.join(lines)
 
         cell_text = re.sub('^%', '#%#', cell_text, flags=re.M)
-        reformated_text = unwrap(
-            yapf.yapflib.yapf_api.FormatCode(wrap(isort.code(cell_text)))[0])
+        try:
+            reformated_text = yapf.yapflib.yapf_api.FormatCode(
+                isort.code(cell_text))[0]
+        except:
+            reformated_text = unwrap(
+                yapf.yapflib.yapf_api.FormatCode(wrap(
+                    isort.code(cell_text)))[0])
         return re.sub('^#%#', '%', reformated_text, flags=re.M)
     except:
         return cell_text
