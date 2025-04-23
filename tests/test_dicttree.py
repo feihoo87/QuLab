@@ -5,6 +5,31 @@ step2 = {'a': {'x': 2}, 'b': {'x': 3, 'y': 5}, 'c': {'x': 15}, 'd': 1, 'e': 1}
 step3 = {'a': {'x': 3, 'y': 2, 'p': {'w': 10}}, 'c': {'x': 16}, 'd': 1, 'e': 2}
 step4 = {'a': {'x': 4, 'y': 2}, 'b': {'x': 6, 'y': 4}, 'c': {'x': 17}}
 
+data = {
+    'qubits': {
+        'Q1': {
+            'frequency': 3.5,
+        },
+        'Q2': {
+            'frequency': 3.6,
+        },
+    },
+    'gate': {
+        'pi2': {
+            'Q1': {
+                'freq': '$qubits.Q1.frequency',
+                'amp': 0.5,
+                'duration': '& 1/$.amp',
+            },
+            'Q2': {
+                'freq': '$....qubits.Q2.frequency',
+                'amp': 0.6,
+                'duration': '& sin(1/$.amp)',
+            }
+        }
+    }
+}
+
 
 def test_flattenDict():
     assert flattenDict({}) == {}
@@ -109,6 +134,16 @@ def test_query():
     assert query_tree('a.p', step3) == {'w': 10}
     assert query_tree('a.p.w', step3) == 10
     assert query_tree('a.p.w', step1) == (NOTSET, 'a.p')
+
+
+def test_ref():
+    assert query_tree('gate.pi2.Q1.freq', data) == 3.5
+    assert query_tree('gate.pi2.Q2.freq', data) == 3.6
+
+
+# def test_eval():
+#     assert query_tree('gate.pi2.Q1.duration', data) == 2.0
+#     assert query_tree('gate.pi2.Q2.duration', data) == 0.9954079577517649
 
 
 def test_print():
