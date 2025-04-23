@@ -23,15 +23,16 @@ from .models import Session, create_engine, create_tables, sessionmaker, utcnow
 from .record import BufferList, Record, random_path
 from .utils import dump_dict, load_dict
 
-try:
-    default_record_port = int(os.getenv('QULAB_RECORD_PORT', 6789))
-except:
-    default_record_port = 6789
+default_record_port = get_config_value('port',
+                                       int,
+                                       command_name='server',
+                                       default=6789)
 
-if os.getenv('QULAB_RECORD_PATH'):
-    datapath = Path(os.getenv('QULAB_RECORD_PATH'))
-else:
-    datapath = Path.home() / 'qulab' / 'data'
+datapath = get_config_value('data',
+                            Path,
+                            command_name='server',
+                            default=Path.home() / 'qulab' / 'data')
+
 datapath.mkdir(parents=True, exist_ok=True)
 
 namespace = uuid.uuid4()
@@ -376,6 +377,7 @@ async def serv(port,
                url='',
                buffer_size=1024 * 1024 * 1024,
                interval=60):
+    datapath.mkdir(parents=True, exist_ok=True)
     logger.debug('Creating socket...')
     async with ZMQContextManager(zmq.ROUTER, bind=f"tcp://*:{port}") as sock:
         logger.info(f'Server started at port {port}.')
