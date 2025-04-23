@@ -372,3 +372,16 @@ def lookup_list(*, full=False):
         return __query_state.table['body']
     else:
         return [r[0] for r in __query_state.table['body']]
+
+
+def ping(database=default_server, timeout=1, socket=None):
+    with ZMQContextManager(zmq.DEALER,
+                           connect=database,
+                           socket=socket,
+                           timeout=timeout) as socket:
+
+        socket.send_pyobj({'method': 'ping'})
+        try:
+            return socket.recv_pyobj()
+        except zmq.Again:
+            raise TimeoutError(f"No response from server within {timeout} s")
