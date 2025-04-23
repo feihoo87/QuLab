@@ -99,7 +99,8 @@ class ZMQContextManager:
                  secret_key: Optional[bytes] = None,
                  public_key: Optional[bytes] = None,
                  server_public_key: Optional[bytes] = None,
-                 socket: Optional[zmq.Socket] = None):
+                 socket: Optional[zmq.Socket] = None,
+                 timeout: Optional[float] = None):
         self.socket_type = socket_type
         if bind is None and connect is None:
             raise ValueError("Either 'bind' or 'connect' must be specified.")
@@ -110,6 +111,7 @@ class ZMQContextManager:
         self.secret_key = secret_key
         self.public_key = public_key
         self.server_public_key = server_public_key
+        self.timeout = timeout
 
         if secret_key_file:
             self.public_key, self.secret_key = zmq.auth.load_certificate(
@@ -150,7 +152,7 @@ class ZMQContextManager:
         if asyncio:
             self.context = zmq.asyncio.Context()
         else:
-            self.context = zmq.Context.instance()
+            self.context = zmq.Context()
 
         self.socket = self.context.socket(self.socket_type)
         self.auth = None
@@ -175,6 +177,11 @@ class ZMQContextManager:
             if self.server_public_key:
                 self.socket.curve_serverkey = self.server_public_key
             self.socket.connect(self.connect)
+        if self.timeout:
+            timeout_ms = int(self.timeout * 1000)
+            self.socket.setsockopt(zmq.RCVTIMEO, timeout_ms)
+            self.socket.setsockopt(zmq.SNDTIMEO, timeout_ms)
+        self.socket.setsockopt(zmq.LINGER, 0)
         return self.socket
 
     def reload_certificates(self):
