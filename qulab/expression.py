@@ -4,10 +4,11 @@ import operator
 
 import numpy as np
 from pyparsing import (CaselessKeyword, Combine, Forward, Group, Keyword,
-                       Literal, Optional, ParserElement, ParseResults,
-                       Suppress, Word, alphanums, alphas, delimitedList,
-                       infixNotation, nums, oneOf, opAssoc, pyparsing_common,
-                       restOfLine, srange, stringEnd, stringStart)
+                       Literal, MatchFirst, Optional, ParserElement,
+                       ParseResults, Regex, Suppress, Word, ZeroOrMore,
+                       alphanums, alphas, delimitedList, infixNotation, nums,
+                       oneOf, opAssoc, pyparsing_common, restOfLine, srange,
+                       stringEnd, stringStart)
 from scipy import special
 
 # 启用 Packrat 优化以提高解析效率
@@ -37,7 +38,23 @@ def symbol_parse_action(t):
     return Symbol(t[0])
 
 
-SYMBOL = Word(alphas, alphanums + "_").setParseAction(symbol_parse_action)
+SYMBOL = Word(alphas + "_",
+              alphanums + "_").setParseAction(symbol_parse_action)
+
+
+# 定义查询语法：$a.b.c 或 $a.b 或 $a
+def query_parse_action(t):
+    return Query(t[0])
+
+
+attr_chain = ZeroOrMore(Combine(Literal('.') + SYMBOL))
+dollar_named_chain = Combine(Literal('$') + SYMBOL + attr_chain)
+dollar_dotN_chain = Combine(
+    Literal('$') + Regex(r'\.{1,}') + SYMBOL + attr_chain)
+dollar_simple = Combine(Literal('$') + SYMBOL)
+
+QUERY = MatchFirst([dollar_dotN_chain, dollar_named_chain,
+                    dollar_simple]).setParseAction(lambda s, l, t: Query(t[0]))
 
 #------------------------------------------------------------------------------
 # 定义运算表达式的解析动作转换函数
@@ -97,7 +114,7 @@ expr = Forward()
 #------------------------------------------------------------------------------
 # 构造基元表达式：包括数值、标识符、括号内表达式
 atom = (
-    FLOAT | INT | OCT | HEX | SYMBOL |
+    FLOAT | INT | OCT | HEX | SYMBOL | QUERY |
     (LPAREN + expr + RPAREN)  # 注意：后面我们将使用递归定义 expr
 )
 
@@ -173,6 +190,7 @@ class Env():
         self.consts = {}
         self.variables = {}
         self.refs = {}
+        self.nested = {}
         self.functions = {
             'sin': np.sin,
             'cos': np.cos,
@@ -745,6 +763,15 @@ class Symbol(Expression):
         return self.name
 
 
+class Query(Symbol):
+
+    def derivative(self, x):
+        return 0
+
+    def eval(self, env):
+        return super().eval(env)
+
+
 sin = Symbol('sin')
 cos = Symbol('cos')
 tan = Symbol('tan')
@@ -773,7 +800,7 @@ erf = Symbol('erf')
 erfc = Symbol('erfc')
 
 
-def calc(exp: str | Expression, **kwargs) -> Expression:
+def calc(exp: str | Expression, env: Env = None, **kwargs) -> Expression:
     """
     Calculate the expression.
 
@@ -791,7 +818,8 @@ def calc(exp: str | Expression, **kwargs) -> Expression:
     Expression
         The calculated expression.
     """
-    env = Env()
+    if env is None:
+        env = Env()
     for k, v in kwargs.items():
         env[k] = v
     if isinstance(exp, str):
