@@ -91,3 +91,25 @@ def get_monitor(auto_open=True):
         _monitor = Monitor()
 
     return _monitor
+
+
+if __name__ == "__main__":
+    import time
+
+    import numpy as np
+
+    for i in range(3):
+        index = 0
+        while True:
+            if index >= 100:
+                break
+
+            m = get_monitor()
+
+            if index == 0:
+                m.set_column_names("index", "H", "S")
+                m.set_plots("(index,H);(index,S)")
+                m.roll()
+            m.add_point(index, np.random.randn(), np.sin(index / 20))
+            index += 1
+            time.sleep(0.2)
