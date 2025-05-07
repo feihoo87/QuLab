@@ -42,10 +42,13 @@ dependencies = [
     "ply>=3.11",
     "pyperclip>=1.8.2",
     "pyzmq>=25.1.0",
+    "qlisp>=1.1.3",
+    "qlispc>=1.1.8",
     "scipy>=1.0.0",
     "scikit-optimize>=0.9.0",
     "SQLAlchemy>=2.0.19",
     "watchdog>=4.0.0",
+    "wath>=1.1.5",
     "waveforms>=1.9.4"
 ]
 dynamic = ["version"]
