@@ -48,7 +48,7 @@ dependencies = [
     "scikit-optimize>=0.9.0",
     "SQLAlchemy>=2.0.19",
     "watchdog>=4.0.0",
-    "wath>=1.1.5",
+    "wath>=1.1.6",
     "waveforms>=1.9.4"
 ]
 dynamic = ["version"]
