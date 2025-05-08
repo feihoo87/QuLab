@@ -29,7 +29,7 @@ def _get_config_value(option_name,
         if type_cast is bool:
             return env_value.lower() in ("true", "1", "yes")
         if "path" in option_name or issubclass(type_cast, Path):
-            return os.path.expanduser(env_value)
+            return Path(os.path.expanduser(env_value))
         return type_cast(env_value)
 
     # 2. 检查配置文件
@@ -47,7 +47,7 @@ def _get_config_value(option_name,
             if type_cast is bool:
                 return config_value.lower() in ("true", "1", "yes")
             if "path" in option_name or issubclass(type_cast, Path):
-                return os.path.expanduser(config_value)
+                return Path(os.path.expanduser(config_value))
             return type_cast(config_value)
 
     return default  # 交给 Click 处理默认值
