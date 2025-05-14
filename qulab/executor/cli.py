@@ -20,7 +20,7 @@ from .utils import workflow_template
 
 
 @logger.catch(reraise=True)
-def boot(script_path):
+def run_script(script_path):
     """Run a script in a new terminal."""
     import subprocess
     import sys
@@ -81,7 +81,7 @@ def command_option(command_name):
                     sys.path.insert(0, code)
             bootstrap = kwargs.pop('bootstrap')
             if bootstrap is not None:
-                boot(bootstrap)
+                run_script(bootstrap)
             return func(*args, **kwargs)
 
         return wrapper
@@ -161,6 +161,19 @@ def get(key, api):
         set_config_api(api.query_config, api.update_config, api.delete_config,
                        api.export_config, api.clear_config)
     click.echo(reg.get(key))
+
+
+@click.command()
+@click.option('--bootstrap',
+              '-b',
+              default=lambda: get_config_value("bootstrap", Path),
+              help='The path of the bootstrap.')
+async def boot(bootstrap):
+    """
+    Run a bootstrap script.
+    """
+    if bootstrap is not None:
+        run_script(bootstrap)
 
 
 @click.command()

@@ -47,6 +47,7 @@ jobs:
         python setup.py sdist bdist_wheel
     - name: Repair package
       if: ${{ matrix.os == 'ubuntu-latest' }}
+      continue-on-error: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         pip install auditwheel
         wheel_file=dist/*.whl
@@ -57,6 +58,7 @@ jobs:
         ls -lh dist/
     - name: Publish package
       if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' }}
+      continue-on-error: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         twine upload --verbose --skip-existing dist/*
       env:
