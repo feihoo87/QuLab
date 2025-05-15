@@ -168,7 +168,7 @@ def get(key, api):
               '-b',
               default=lambda: get_config_value("bootstrap", Path),
               help='The path of the bootstrap.')
-async def boot(bootstrap):
+def boot(bootstrap):
     """
     Run a bootstrap script.
     """
