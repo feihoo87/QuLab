@@ -10,8 +10,7 @@ import warnings
 from typing import Any, Callable
 
 import dill
-
-from ..expression import Env, Expression
+from qlispreg.expression import Env, Expression
 
 
 class Unpicklable:

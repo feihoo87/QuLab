@@ -17,8 +17,8 @@ from typing import Any, Awaitable, Callable, Iterable
 import dill
 import numpy as np
 import zmq
+from qlispreg.expression import Env, Expression, Symbol
 
-from ..expression import Env, Expression, Symbol
 from ..sys.rpc.zmq_socket import ZMQContextManager
 from .optimize import NgOptimizer
 from .record import Record
