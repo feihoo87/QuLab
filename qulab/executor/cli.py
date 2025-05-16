@@ -172,7 +172,7 @@ def get(key, api):
               help='The modlule name of the api.')
 @click.option('--format',
               '-f',
-              default='json',
+              default='pickle',
               help='The format of the config.')
 @log_options('export')
 def export(file, api, format):
@@ -210,7 +210,7 @@ def export(file, api, format):
               help='The modlule name of the api.')
 @click.option('--format',
               '-f',
-              default='json',
+              default='pickle',
               help='The format of the config.')
 @log_options('load')
 def load(file, api, format):
