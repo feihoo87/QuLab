@@ -18,6 +18,12 @@ def hello():
     click.echo('hello, world')
 
 
+@cli.group()
+def reg():
+    """Regestry operations."""
+    pass
+
+
 cli.add_command(monitor)
 cli.add_command(plot)
 cli.add_command(dht)
@@ -26,6 +32,6 @@ cli.add_command(maintain)
 cli.add_command(run)
 cli.add_command(reproduce)
 cli.add_command(create)
-cli.add_command(set)
-cli.add_command(get)
+reg.add_command(set)
+reg.add_command(get)
 cli.add_command(boot)
