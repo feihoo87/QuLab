@@ -164,6 +164,83 @@ def get(key, api):
 
 
 @click.command()
+@click.argument('file')
+@click.option('--api',
+              '-a',
+              default=lambda: get_config_value("api", str, 'get'),
+              help='The modlule name of the api.')
+@click.option('--format',
+              '-f',
+              default='json',
+              help='The format of the config.')
+@log_options('export')
+def export(file, api, format):
+    """
+    Export a config.
+    """
+    logger.info(f'[CMD]: export {file} --api {api}')
+    reg = Registry()
+    if api is not None:
+        api = importlib.import_module(api)
+        set_config_api(api.query_config, api.update_config, api.delete_config,
+                       api.export_config, api.clear_config)
+    cfg = reg.export()
+    if format == 'json':
+        import json
+        with open(file, 'w') as f:
+            json.dump(cfg, f, indent=4)
+    elif format == 'yaml':
+        import yaml
+        with open(file, 'w') as f:
+            yaml.dump(cfg, f)
+    elif format == 'pickle':
+        import pickle
+        with open(file, 'wb') as f:
+            pickle.dump(cfg, f)
+    else:
+        raise ValueError(f'Unknown format: {format}')
+
+
+@click.command()
+@click.argument('file')
+@click.option('--api',
+              '-a',
+              default=lambda: get_config_value("api", str, 'get'),
+              help='The modlule name of the api.')
+@click.option('--format',
+              '-f',
+              default='json',
+              help='The format of the config.')
+@log_options('load')
+def load(file, api, format):
+    """
+    Load a config.
+    """
+    logger.info(f'[CMD]: load {file} --api {api}')
+    reg = Registry()
+    if api is not None:
+        api = importlib.import_module(api)
+        set_config_api(api.query_config, api.update_config, api.delete_config,
+                       api.export_config, api.clear_config)
+    if format == 'json':
+        import json
+        with open(file, 'r') as f:
+            cfg = json.load(f)
+    elif format == 'yaml':
+        import yaml
+        with open(file, 'r') as f:
+            cfg = yaml.load(f, Loader=yaml.FullLoader)
+    elif format == 'pickle':
+        import pickle
+        with open(file, 'rb') as f:
+            cfg = pickle.load(f)
+    else:
+        raise ValueError(f'Unknown format: {format}')
+    reg.clear()
+    reg.update(cfg)
+
+
+@click.command()
 @click.option('--bootstrap',
               '-b',
               default=lambda: get_config_value("bootstrap", Path),
