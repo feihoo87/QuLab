@@ -173,3 +173,6 @@ typings/
 package-lock.json
 
 tests/workflows/run
+
+uv.lock
+.DS_Store
