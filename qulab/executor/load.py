@@ -3,6 +3,7 @@ import inspect
 import os
 import pickle
 import shutil
+import sys
 import tempfile
 import time
 import warnings
@@ -322,6 +323,8 @@ def load_workflow_from_file(file_name: str,
     source_code = (base_path / path).read_text()
     module.__source__ = source_code
 
+    sys.modules[module_name] = module
+
     if hasattr(module, 'entries'):
         if veryfy_source_code:
             verify_entries(module, base_path)
@@ -356,6 +359,8 @@ def load_workflow_from_source_code(workflow_id: str,
     spec = spec_from_file_location(module_name, temp_file)
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
+
+    sys.modules[module_name] = module
 
     module.__source__ = source_code
     module.__mtime__ = 0
