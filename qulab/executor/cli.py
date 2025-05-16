@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import click
+import rich
 from loguru import logger
 
 from ..cli.config import get_config_value, log_options
@@ -160,7 +161,7 @@ def get(key, api):
         api = importlib.import_module(api)
         set_config_api(api.query_config, api.update_config, api.delete_config,
                        api.export_config, api.clear_config)
-    click.echo(reg.get(key))
+    rich.print(reg.get(key))
 
 
 @click.command()
