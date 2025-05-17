@@ -11,6 +11,7 @@ from loguru import logger
 
 from ..cli.config import get_config_value, log_options
 from ..cli.decorators import async_command
+from ..utils import combined_env
 from .load import (WorkflowType, find_unreferenced_workflows, get_entries,
                    load_workflow, make_graph)
 from .registry import Registry, set_config_api
@@ -21,12 +22,14 @@ from .utils import workflow_template
 
 
 @logger.catch(reraise=True)
-def run_script(script_path):
-    """Run a script in a new terminal."""
+def run_script(script_path, extra_paths=None):
+    """Run a script in a new process, inheriting current PYTHONPATH plus any extra paths."""
     import subprocess
     import sys
 
-    proc = subprocess.Popen([sys.executable, script_path])
+    # Launch the new process with the modified environment
+    proc = subprocess.Popen([sys.executable, script_path],
+                            env=combined_env(extra_paths))
     proc.communicate()
 
 
