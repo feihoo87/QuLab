@@ -176,7 +176,7 @@ def get(key, api):
 @log_options('delete')
 def delete(key, api):
     """
-    Get a config.
+    Delete a config key.
     """
     logger.info(f'[CMD]: reg delete {key} --api {api}')
     reg = Registry()
