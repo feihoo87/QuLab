@@ -258,6 +258,12 @@ def load(file, api, format):
         import pickle
         with open(file, 'rb') as f:
             cfg = pickle.load(f)
+    elif format == 'report':
+        from .storage import get_report_by_index
+        report = get_report_by_index(int(file))
+        cfg = report.config
+        if cfg is None:
+            raise ValueError(f'No config found for report {file}')
     else:
         raise ValueError(f'Unknown format: {format}')
     reg.clear()
