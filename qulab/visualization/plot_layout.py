@@ -118,6 +118,7 @@ def plot_range(ax,
                color=None,
                text_color='k',
                bounder_color='k',
+               rotation=0,
                lw=0.5,
                fontsize=9):
     x, y = path
@@ -138,6 +139,7 @@ def plot_range(ax,
                 text,
                 ha='center',
                 va='center',
+                rotation=rotation,
                 color=text_color,
                 fontsize=fontsize)
 
@@ -217,6 +219,7 @@ def draw(layout, ax=None, qubit_cbar=True, coupler_cbar=True, origin='upper'):
                    qubit.get('color', None),
                    lw=qubit.get('lw', 0.5),
                    fontsize=qubit.get('fontsize', 9),
+                   rotation=qubit.get('rotation', 0),
                    text_color=qubit.get('text_color', 'k'),
                    bounder_color=qubit.get('bounder_color', 'k'))
 
@@ -232,6 +235,9 @@ def draw(layout, ax=None, qubit_cbar=True, coupler_cbar=True, origin='upper'):
         width = coupler.get('width', 0.5)
         lw = coupler.get('lw', 0.5)
 
+        rotation = 180 * np.arctan2(pos2[1] - pos1[1],
+                                    pos2[0] - pos1[0]) / np.pi
+
         path = circle_link_path(pos1, pos2, r1, r2, width)
         plot_range(ax,
                    path,
@@ -239,6 +245,7 @@ def draw(layout, ax=None, qubit_cbar=True, coupler_cbar=True, origin='upper'):
                    color=coupler.get('color', None),
                    lw=0,
                    fontsize=coupler.get('fontsize', 9),
+                   rotation=coupler.get('rotation', rotation),
                    text_color=coupler.get('text_color', 'k'))
         if lw > 0:
             x, y = circle_link_path(pos1, pos2, r1, r2, width, n=2)
