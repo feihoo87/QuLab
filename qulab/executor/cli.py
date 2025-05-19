@@ -134,7 +134,7 @@ def set(key, value, api):
     """
     Set a config.
     """
-    logger.info(f'[CMD]: set {key} {value} --api {api}')
+    logger.info(f'[CMD]: reg set {key} {value} --api {api}')
     reg = Registry()
     if api is not None:
         api = importlib.import_module(api)
@@ -158,13 +158,33 @@ def get(key, api):
     """
     Get a config.
     """
-    logger.info(f'[CMD]: get {key} --api {api}')
+    logger.info(f'[CMD]: reg get {key} --api {api}')
     reg = Registry()
     if api is not None:
         api = importlib.import_module(api)
         set_config_api(api.query_config, api.update_config, api.delete_config,
                        api.export_config, api.clear_config)
     rich.print(reg.get(key))
+
+
+@click.command()
+@click.argument('key')
+@click.option('--api',
+              '-a',
+              default=lambda: get_config_value("api", str, 'get'),
+              help='The modlule name of the api.')
+@log_options('delete')
+def delete(key, api):
+    """
+    Get a config.
+    """
+    logger.info(f'[CMD]: reg delete {key} --api {api}')
+    reg = Registry()
+    if api is not None:
+        api = importlib.import_module(api)
+        set_config_api(api.query_config, api.update_config, api.delete_config,
+                       api.export_config, api.clear_config)
+    reg.delete(key)
 
 
 @click.command()
@@ -182,7 +202,7 @@ def export(file, api, format):
     """
     Export a config.
     """
-    logger.info(f'[CMD]: export {file} --api {api}')
+    logger.info(f'[CMD]: reg export {file} --api {api}')
     reg = Registry()
     if api is not None:
         api = importlib.import_module(api)
@@ -220,7 +240,7 @@ def load(file, api, format):
     """
     Load a config.
     """
-    logger.info(f'[CMD]: load {file} --api {api}')
+    logger.info(f'[CMD]: reg load {file} --api {api}')
     reg = Registry()
     if api is not None:
         api = importlib.import_module(api)

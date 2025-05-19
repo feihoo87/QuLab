@@ -1,6 +1,6 @@
 import click
 
-from ..executor.cli import (boot, create, export, get, load, maintain,
+from ..executor.cli import (boot, create, export, get, load, maintain, delete,
                             reproduce, run, set)
 from ..monitor.__main__ import main as monitor
 from ..scan.server import server
@@ -35,6 +35,7 @@ cli.add_command(reproduce)
 cli.add_command(create)
 reg.add_command(set)
 reg.add_command(get)
+reg.add_command(delete)
 reg.add_command(load)
 reg.add_command(export)
 cli.add_command(boot)
