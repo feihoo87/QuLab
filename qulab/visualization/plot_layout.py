@@ -6,6 +6,8 @@ import numpy as np
 from matplotlib import cm
 from matplotlib.colors import Normalize
 
+from .rot3d import projection, rot_round
+
 layout_example = {
     'qubits': {
         'Q0': {
@@ -152,7 +154,7 @@ def circle_path(pos, r, n=40):
     return xx, yy
 
 
-def circle_link_path(pos1, pos2, r1, r2, width, n=20):
+def circle_link_path(pos1, pos2, r1, r2, width, n=2):
     width = min(2 * max(r1, r2), width)
 
     x1, y1 = pos1
@@ -204,59 +206,185 @@ def circle_half_directed_link_path(pos1, pos2, r1, r2, width, n=20):
                       xx2[:-1]]), np.hstack([yy2[-1], yy1, a.imag, yy2[:-1]])
 
 
-def draw(layout, ax=None, qubit_cbar=True, coupler_cbar=True, origin='upper'):
+def project(pos, camera=(0, 0, 100), rotation=None):
+    if rotation is None:
+        rotation = {
+            'axis': (0, 0, 1),
+            'angle': 0,
+            'center': (0, 0, 0),
+        }
+    x0, y0, z0 = camera
+    if len(pos) == 2:
+        x, y, z = [*pos, 0]
+    else:
+        x, y, z = pos
+    x, y, z = rot_round(x, y, z, rotation['axis'], rotation['angle'],
+                        rotation['center'])
+    x, y, d = projection(x - x0, y - y0, z, d0=z0)
+    return x + x0, y + y0
+
+
+def _draw_qubit(ax, qubit, pos):
+    path = circle_path(pos, qubit.get('radius', 0.5))
+    plot_range(ax,
+               path,
+               qubit.get('text', ''),
+               qubit.get('color', None),
+               lw=qubit.get('lw', 0.5),
+               fontsize=qubit.get('fontsize', 9),
+               rotation=qubit.get('text_rotation', 0),
+               text_color=qubit.get('text_color', 'k'),
+               bounder_color=qubit.get('bounder_color', 'k'))
+
+
+def _draw_coupler(ax, coupler, layout, q1, q2, pos1, pos2):
+    r1 = layout['qubits'][q1].get('radius', 0.5)
+    r2 = layout['qubits'][q2].get('radius', 0.5)
+    width = coupler.get('width', 0.5)
+    lw = coupler.get('lw', 0.5)
+
+    text_rotation = 180 * np.arctan2(pos2[1] - pos1[1],
+                                     pos2[0] - pos1[0]) / np.pi
+
+    path = circle_link_path(pos1, pos2, r1, r2, width)
+    plot_range(ax,
+               path,
+               coupler.get('text', ''),
+               color=coupler.get('color', None),
+               lw=0,
+               fontsize=coupler.get('fontsize', 9),
+               rotation=coupler.get('text_rotation', text_rotation),
+               text_color=coupler.get('text_color', 'k'))
+    if lw > 0:
+        x, y = circle_link_path(pos1, pos2, r1, r2, width, n=2)
+        ax.plot(x[:2], y[:2], lw=lw, color=coupler.get('bounder_color', 'k'))
+        ax.plot(x[2:], y[2:], lw=lw, color=coupler.get('bounder_color', 'k'))
+
+
+def get_range(layout):
+    coods = []
+    for q in layout['qubits']:
+        pos = layout['qubits'][q]['pos']
+        if len(pos) == 2:
+            x, y, z = [*pos, 0]
+        else:
+            x, y, z = pos
+        coods.append([x, y, z])
+    coods = np.array(coods)
+
+    center = coods.mean(axis=0)
+    radius = np.max(np.sqrt(np.sum((coods - center)**2, axis=1)))
+
+    return center, radius
+
+
+def sorted_by_distance(layout, camera, rotation):
+    qubits = []
+    camera = np.array(camera)
+    for q in layout['qubits']:
+        pos = layout['qubits'][q]['pos']
+        if len(pos) == 2:
+            x, y, z = [*pos, 0]
+        else:
+            x, y, z = pos
+        x, y, z = rot_round(x, y, z, rotation['axis'], rotation['angle'],
+                            rotation['center'])
+        d = np.sqrt(np.sum((np.array([x, y, z]) - camera)**2))
+        qubits.append((d, q))
+    qubits = sorted(qubits, key=lambda x: x[0])
+
+    plot_order = []
+    for _, q in reversed(qubits):
+        for c in layout['qubits'][q]['couplers']:
+            if ('C', c) not in plot_order:
+                plot_order.append(('C', c))
+        plot_order.append(('Q', q))
+    return plot_order
+
+
+def draw(layout,
+         ax=None,
+         qubit_cbar=True,
+         coupler_cbar=True,
+         origin='upper',
+         camera=None,
+         rotation=None):
+    """
+    Draw a layout with qubits and couplers.
+
+    Parameters
+    ----------
+    layout: dict
+        A dictionary containing the layout of the qubits and couplers.
+        The dictionary should have the following structure:
+        {
+            'qubits': {
+                'Q0': {'pos': (x, y), 'radius': r, 'text': 'Q0'},
+                ...
+            },
+            'couplers': {
+                'C0': {'qubits': ['Q0', 'Q1'], 'width': w, 'text': 'C0'},
+                ...
+            }
+        }
+    ax: matplotlib.axes.Axes
+        The axes on which to draw the layout. If None, the current axes will be used.
+    qubit_cbar: bool
+        Whether to draw a colorbar for the qubits.
+    coupler_cbar: bool
+        Whether to draw a colorbar for the couplers.
+    origin: str
+        The origin of the layout. If 'upper', the y-coordinates will be inverted.
+    camera: tuple
+        The position of the camera in 3D space. Default is (0, 0, 1).
+    rotation: dict
+        The rotation of the layout. The dictionary should have the following structure:
+        {
+            'axis': (x, y, z),
+            'angle': angle,
+            'center': (x, y, z)
+        }
+        If None, no rotation will be applied.
+    """
     if ax is None:
         ax = plt.gca()
 
-    for qubit in layout['qubits'].values():
-        pos = qubit['pos']
-        if origin == 'upper':
-            pos = pos[0], -pos[1]
-        path = circle_path(pos, qubit.get('radius', 0.5))
-        plot_range(ax,
-                   path,
-                   qubit.get('text', ''),
-                   qubit.get('color', None),
-                   lw=qubit.get('lw', 0.5),
-                   fontsize=qubit.get('fontsize', 9),
-                   rotation=qubit.get('rotation', 0),
-                   text_color=qubit.get('text_color', 'k'),
-                   bounder_color=qubit.get('bounder_color', 'k'))
+    center, radius = get_range(layout)
 
-    for coupler in layout['couplers'].values():
-        q1, q2 = coupler['qubits']
-        pos1 = layout['qubits'][q1]['pos']
-        pos2 = layout['qubits'][q2]['pos']
-        if origin == 'upper':
-            pos1 = pos1[0], -pos1[1]
-            pos2 = pos2[0], -pos2[1]
-        r1 = layout['qubits'][q1].get('radius', 0.5)
-        r2 = layout['qubits'][q2].get('radius', 0.5)
-        width = coupler.get('width', 0.5)
-        lw = coupler.get('lw', 0.5)
+    if rotation is None:
+        rotation = {
+            'axis': (0, 0, 1),
+            'angle': 0,
+        }
+    if 'center' not in rotation:
+        rotation['center'] = center
+    if camera is None:
+        camera = (center[0], center[1], center[2] + radius * 5)
 
-        rotation = 180 * np.arctan2(pos2[1] - pos1[1],
-                                    pos2[0] - pos1[0]) / np.pi
+    plot_order = sorted_by_distance(layout, camera, rotation)
 
-        path = circle_link_path(pos1, pos2, r1, r2, width)
-        plot_range(ax,
-                   path,
-                   coupler.get('text', ''),
-                   color=coupler.get('color', None),
-                   lw=0,
-                   fontsize=coupler.get('fontsize', 9),
-                   rotation=coupler.get('rotation', rotation),
-                   text_color=coupler.get('text_color', 'k'))
-        if lw > 0:
-            x, y = circle_link_path(pos1, pos2, r1, r2, width, n=2)
-            ax.plot(x[:2],
-                    y[:2],
-                    lw=lw,
-                    color=coupler.get('bounder_color', 'k'))
-            ax.plot(x[2:],
-                    y[2:],
-                    lw=lw,
-                    color=coupler.get('bounder_color', 'k'))
+    if origin == 'upper':
+        camera = [camera[0], -camera[1], camera[2]]
+    for kind, name in plot_order:
+        if kind == 'Q':
+            pos = layout['qubits'][name]['pos']
+            if origin == 'upper':
+                pos = [pos[0], -pos[1], *pos[2:]]
+            pos = project(pos, camera, rotation)
+            _draw_qubit(ax, layout['qubits'][name], pos)
+        elif kind == 'C':
+            coupler = layout['couplers'][name]
+            q1, q2 = coupler['qubits']
+            pos1 = layout['qubits'][q1]['pos']
+            pos2 = layout['qubits'][q2]['pos']
+            if origin == 'upper':
+                pos1 = [pos1[0], -pos1[1], *pos1[2:]]
+                pos2 = [pos2[0], -pos2[1], *pos2[2:]]
+            pos1 = project(pos1, camera, rotation)
+            pos2 = project(pos2, camera, rotation)
+            _draw_coupler(ax, coupler, layout, q1, q2, pos1, pos2)
+        else:
+            pass
 
     ax.axis('equal')
     ax.set_axis_off()
