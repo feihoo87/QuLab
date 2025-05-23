@@ -1,7 +1,9 @@
+import ast
 import functools
 import graphlib
 import importlib
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -283,7 +285,49 @@ def boot(bootstrap):
         run_script(bootstrap)
 
 
-@click.command()
+def parse_dynamic_option_value(value):
+    """解析动态参数值"""
+    try:
+        parsed_value = ast.literal_eval(value)
+    except (ValueError, SyntaxError):
+        # 如果解析失败，返回原始字符串
+        parsed_value = value
+    return parsed_value
+
+
+def parse_dynamic_options(args):
+    """解析格式为 key=value 的未知参数列表"""
+    pattern = re.compile(r'^([a-zA-Z_][\w\-]*)=(.+)$')
+    result = {}
+    for arg in args:
+        match = pattern.match(arg)
+        if match:
+            key, value = match.groups()
+            result[key] = parse_dynamic_option_value(value)
+        else:
+            raise ValueError(
+                f"Invalid argument format: {arg}. Expected format is key=value."
+            )
+    return result
+
+
+help_doc = """
+Run a workflow.
+
+If the workflow has entries, run all entries.
+If `--no-dependents` is set, only run the workflow itself.
+If `--retry` is set, retry the workflow when calibration failed.
+If `--freeze` is set, freeze the config table.
+If `--plot` is set, plot the report.
+If `--api` is set, use the api to get and update the config table.
+If `--code` is not set, use the current working directory.
+If `--data` is not set, use the `logs` directory in the code path.
+"""
+
+
+@click.command(context_settings=dict(ignore_unknown_options=True,
+                                     allow_extra_args=True),
+               help=help_doc)
 @click.argument('workflow')
 @click.option('--plot', '-p', is_flag=True, help='Plot the report.')
 @click.option('--no-dependents',
@@ -301,8 +345,10 @@ def boot(bootstrap):
               help='Veryfy the source code.')
 @log_options('run')
 @command_option('run')
+@click.pass_context
 @async_command
-async def run(workflow,
+async def run(ctx,
+              workflow,
               code,
               data,
               api,
@@ -312,18 +358,6 @@ async def run(workflow,
               freeze,
               fail_fast,
               veryfy_source_code=True):
-    """
-    Run a workflow.
-
-    If the workflow has entries, run all entries.
-    If `--no-dependents` is set, only run the workflow itself.
-    If `--retry` is set, retry the workflow when calibration failed.
-    If `--freeze` is set, freeze the config table.
-    If `--plot` is set, plot the report.
-    If `--api` is set, use the api to get and update the config table.
-    If `--code` is not set, use the current working directory.
-    If `--data` is not set, use the `logs` directory in the code path.
-    """
     logger.info(
         f'[CMD]: run {workflow} --code {code} --data {data} --api {api}'
         f'{" --plot" if plot else ""}'
@@ -341,6 +375,13 @@ async def run(workflow,
 
     code = Path(os.path.expanduser(code))
     data = Path(os.path.expanduser(data))
+
+    extra_args = ctx.args
+    params = parse_dynamic_options(extra_args)
+
+    if params:
+        workflow = (workflow, params)
+        rich.print(workflow)
 
     wf = load_workflow(workflow, code, veryfy_source_code=veryfy_source_code)
     check_toplogy(wf, code, veryfy_source_code=veryfy_source_code)
