@@ -1,3 +1,14 @@
+"""
+QuLab Monitor Module
+
+This module provides real-time data visualization capabilities for QuLab.
+It implements a multiprocessing-based monitoring system that can display
+multiple data streams in a configurable grid layout.
+
+Classes:
+    Monitor: Main class for creating and managing the monitoring window
+"""
+
 import multiprocessing as mp
 import sys
 
@@ -7,19 +18,40 @@ import sys
 #     pass
 
 
-def main(queue: mp.Queue,
-         ncols: int = 4,
+def main(data_queue: mp.Queue,
+         num_columns: int = 4,
          minimum_height: int = 400,
-         colors: list[tuple[int, int, int]] = []):
+         plot_colors: list[tuple[int, int, int]] = []) -> None:
+    """
+    Initialize and run the main monitoring window.
+
+    Args:
+        data_queue: Multiprocessing queue for data communication
+        num_columns: Number of columns in the plot grid layout
+        minimum_height: Minimum height of each plot in pixels
+        plot_colors: List of RGB color tuples for plot lines
+    """
     from .mainwindow import MainWindow
     from .qt_compat import QtWidgets
 
     app = QtWidgets.QApplication(sys.argv)
-    main = MainWindow(queue, ncols, minimum_height, colors)
+    main_window = MainWindow(data_queue, num_columns, minimum_height, plot_colors)
     sys.exit(app.exec())
 
 
-class Monitor():
+class Monitor:
+    """
+    Real-time data monitoring interface.
+    
+    This class manages a separate process that displays real-time data plots
+    in a grid layout. Data can be added through various methods and will be
+    displayed immediately.
+
+    Args:
+        number_of_columns: Number of columns in the plot grid layout
+        minimum_height: Minimum height of each plot in pixels
+        colors: List of RGB color tuples for plot lines
+    """
 
     def __init__(self,
                  number_of_columns: int = 4,
@@ -32,59 +64,84 @@ class Monitor():
         self.process = None
         self.start()
 
-    def start(self):
+    def start(self) -> None:
+        """Start the monitoring process if not already running."""
         if self.process is not None and self.process.is_alive():
             return
         self.queue = mp.Queue(20)
         self.process = mp.Process(target=main,
-                                  args=(self.queue, self.number_of_columns,
-                                        self.minimum_height, self.colors))
+                                args=(self.queue, self.number_of_columns,
+                                     self.minimum_height, self.colors))
         self.process.start()
 
-    def _put(self, w: tuple):
-        self.queue.put(w)
+    def _put(self, message: tuple) -> None:
+        """Send a message to the monitoring process."""
+        self.queue.put(message)
 
-    def roll(self):
+    def roll(self) -> None:
+        """Clear and reset all plots."""
         self._put(("ROLL", None))
 
-    def set_column_names(self, *arg):
-        self._put(('PN', list(arg)))
+    def set_column_names(self, *column_names) -> None:
+        """Set the names of data columns for plotting."""
+        self._put(('PN', list(column_names)))
 
-    def add_point(self, *arg):
-        self._put(('PD', list(arg)))
+    def add_point(self, *values) -> None:
+        """Add a new data point to the plots."""
+        self._put(('PD', list(values)))
 
-    def set_plots(self, arg):
+    def set_plots(self, plot_config: str) -> None:
         """
-        arg: str, like "(x,y)" or "(x1,y1);(x2,y2);"
-        """
-        self._put(('PXY', str(arg)))
+        Configure which columns to plot against each other.
 
-    def set_trace_column_names(self, *arg):
-        self._put(('TN', list(arg)))
-
-    def add_trace(self, *arg):
-        self._put(('TD', list(arg)))
-
-    def set_trace_plots(self, arg):
+        Args:
+            plot_config: String specifying plot configurations, e.g. "(x,y)" or "(x1,y1);(x2,y2);"
         """
-        arg: str, like "(x,y)" or "(x1,y1);(x2,y2);"
+        self._put(('PXY', str(plot_config)))
+
+    def set_trace_column_names(self, *column_names) -> None:
+        """Set the names of trace data columns."""
+        self._put(('TN', list(column_names)))
+
+    def add_trace(self, *values) -> None:
+        """Add a new trace data point."""
+        self._put(('TD', list(values)))
+
+    def set_trace_plots(self, plot_config: str) -> None:
         """
-        self._put(('TXY', str(arg)))
+        Configure which columns to plot for traces.
+
+        Args:
+            plot_config: String specifying trace plot configurations, e.g. "(x,y)" or "(x1,y1);(x2,y2);"
+        """
+        self._put(('TXY', str(plot_config)))
+
+    def is_alive(self) -> bool:
+        """Check if the monitoring process is running."""
+        return self.process.is_alive()
 
     def __del__(self):
+        """Clean up resources when the Monitor object is deleted."""
         try:
             self.process.kill()
         except:
             pass
 
-    def is_alive(self):
-        return self.process.is_alive()
 
-
+# Global monitor instance
 _monitor = None
 
 
-def get_monitor(auto_open=True):
+def get_monitor(auto_open: bool = True) -> Monitor:
+    """
+    Get or create a global Monitor instance.
+
+    Args:
+        auto_open: If True, create a new Monitor if none exists or if existing one is not running
+
+    Returns:
+        Monitor instance
+    """
     global _monitor
 
     if auto_open and (_monitor is None or not _monitor.is_alive()):
@@ -94,8 +151,8 @@ def get_monitor(auto_open=True):
 
 
 if __name__ == "__main__":
+    # Example usage and testing code
     import time
-
     import numpy as np
 
     for i in range(3):
