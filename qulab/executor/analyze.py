@@ -4,6 +4,7 @@ import time
 
 import pyperclip
 import zmq
+from rich import print
 
 from .storage import Report
 
