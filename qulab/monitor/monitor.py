@@ -11,6 +11,7 @@ Classes:
 
 import multiprocessing as mp
 import sys
+import zmq
 
 # try:
 #     mp.set_start_method("spawn")
@@ -128,6 +129,111 @@ class Monitor:
             pass
 
 
+class MonitorClient:
+    def __init__(self, address: str="127.0.0.1", port: int=5555):
+        self.context = zmq.Context()
+        self.socket = self.context.socket(zmq.REQ)
+        self.socket.connect(f"tcp://{address}:{port}")
+
+    def _send_command(self, cmd: str, data=None) -> None:
+        try:
+            self.socket.send_pyobj((cmd, data))
+            response = self.socket.recv_string()
+            if response.startswith("Error"):
+                raise RuntimeError(response)
+        except Exception as e:
+            raise RuntimeError(f"Failed to send command: {str(e)}")
+
+    def roll(self) -> None:
+        self._send_command("ROLL", None)
+
+    def set_column_names(self, *column_names) -> None:
+        self._send_command("PN", list(column_names))
+
+    def add_point(self, *values) -> None:
+        self._send_command("PD", list(values))
+
+    def set_plots(self, plot_config: str) -> None:
+        self._send_command("PXY", plot_config)
+
+    def set_trace_column_names(self, *column_names) -> None:
+        self._send_command("TN", list(column_names))
+
+    def add_trace(self, *values) -> None:
+        self._send_command("TD", list(values))
+
+    def set_trace_plots(self, plot_config: str) -> None:
+        self._send_command("TXY", plot_config)
+
+    def __del__(self):
+        try:
+            self.socket.close()
+            self.context.term()
+        except:
+            pass
+
+
+class MonitorServer:
+    def __init__(self, address: str="*", port: int=5555, number_of_columns: int = 4,
+                 minimum_height: int = 400,
+                 colors: list[tuple[int, int, int]] = []):
+        self.address = address
+        self.port = port
+        self.number_of_columns = number_of_columns
+        self.minimum_height = minimum_height
+        self.colors = colors
+        self.running = True
+        self.process = mp.Process(target=self._run)
+        self.process.start()
+
+    def _run(self):
+        try:
+            # Create Monitor instance in the child process
+            self.monitor = Monitor(self.number_of_columns, self.minimum_height, self.colors)
+            
+            # Create ZMQ context and socket in the child process
+            self.context = zmq.Context()
+            self.socket = self.context.socket(zmq.REP)
+            self.socket.bind(f"tcp://{self.address}:{self.port}")
+
+            while self.running:
+                try:
+                    message = self.socket.recv_pyobj()
+                    cmd, data = message
+                    if cmd == 'ROLL':
+                        self.monitor.roll()
+                    elif cmd == 'PN':
+                        self.monitor.set_column_names(*data)
+                    elif cmd == 'PD':
+                        self.monitor.add_point(*data)
+                    elif cmd == 'PXY':
+                        self.monitor.set_plots(data)
+                    elif cmd == 'TN':
+                        self.monitor.set_trace_column_names(*data)
+                    elif cmd == 'TD':
+                        self.monitor.add_trace(*data)
+                    elif cmd == 'TXY':
+                        self.monitor.set_trace_plots(data)
+                    self.socket.send_string("OK")
+                except Exception as e:
+                    self.socket.send_string(f"Error: {str(e)}")
+        finally:
+            # Clean up resources in child process
+            try:
+                self.socket.close()
+                self.context.term()
+            except:
+                pass
+
+    def __del__(self):
+        self.running = False
+        try:
+            self.process.terminate()
+            self.process.join()
+        except:
+            pass
+
+
 # Global monitor instance
 _monitor = None
 
@@ -155,6 +261,7 @@ if __name__ == "__main__":
     import time
     import numpy as np
 
+    # Example 1: Using Monitor directly
     for i in range(3):
         index = 0
         while True:
@@ -170,3 +277,29 @@ if __name__ == "__main__":
             m.add_point(index, np.random.randn(), np.sin(index / 20))
             index += 1
             time.sleep(0.2)
+
+    # Example 2: Using MonitorServer and MonitorClient
+    def run_server():
+        server = MonitorServer("127.0.0.1", 5555)
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+
+    def run_client():
+        client = MonitorClient("127.0.0.1", 5555)
+        time.sleep(1)  # Wait for server to start
+        
+        client.set_column_names("index", "H", "S")
+        client.set_plots("(index,H);(index,S)")
+        client.roll()
+        
+        for i in range(100):
+            client.add_point(i, np.random.randn(), np.sin(i / 20))
+            time.sleep(0.2)
+
+    if len(sys.argv) > 1 and sys.argv[1] == "server":
+        run_server()
+    elif len(sys.argv) > 1 and sys.argv[1] == "client":
+        run_client()
