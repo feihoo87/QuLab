@@ -1,1 +1,1 @@
-from .monitor import Monitor, get_monitor
+from .monitor import MonitorUI, get_monitor

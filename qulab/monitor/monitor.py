@@ -40,7 +40,7 @@ def main(data_queue: mp.Queue,
     sys.exit(app.exec())
 
 
-class Monitor:
+class MonitorUI:
     """
     Real-time data monitoring interface.
     
@@ -129,7 +129,7 @@ class Monitor:
             pass
 
 
-class MonitorClient:
+class Monitor:
     def __init__(self, address: str="127.0.0.1", port: int=5555):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
@@ -189,7 +189,7 @@ class MonitorServer:
     def _run(self):
         try:
             # Create Monitor instance in the child process
-            self.monitor = Monitor(self.number_of_columns, self.minimum_height, self.colors)
+            self.monitor = MonitorUI(self.number_of_columns, self.minimum_height, self.colors)
             
             # Create ZMQ context and socket in the child process
             self.context = zmq.Context()
@@ -238,7 +238,7 @@ class MonitorServer:
 _monitor = None
 
 
-def get_monitor(auto_open: bool = True) -> Monitor:
+def get_monitor(auto_open: bool = True) -> MonitorUI:
     """
     Get or create a global Monitor instance.
 
@@ -251,7 +251,7 @@ def get_monitor(auto_open: bool = True) -> Monitor:
     global _monitor
 
     if auto_open and (_monitor is None or not _monitor.is_alive()):
-        _monitor = Monitor()
+        _monitor = MonitorUI()
 
     return _monitor
 
@@ -278,7 +278,7 @@ if __name__ == "__main__":
             index += 1
             time.sleep(0.2)
 
-    # Example 2: Using MonitorServer and MonitorClient
+    # Example 2: Using MonitorServer and Monitor
     def run_server():
         server = MonitorServer("127.0.0.1", 5555)
         try:
@@ -288,7 +288,7 @@ if __name__ == "__main__":
             pass
 
     def run_client():
-        client = MonitorClient("127.0.0.1", 5555)
+        client = Monitor("127.0.0.1", 5555)
         time.sleep(1)  # Wait for server to start
         
         client.set_column_names("index", "H", "S")
