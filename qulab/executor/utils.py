@@ -38,6 +38,7 @@ import numpy as np
 from loguru import logger
 
 from qulab import VAR
+from qulab import manual_analysis
 from qulab.typing import Report
 
 
@@ -73,7 +74,8 @@ async def analyze(report: Report, history: Report | None = None) -> Report:
     history: Report | None
         上次校准实验数据和分析结果，如果有的话。
     \"\"\"
-    import random
+    # 如果需要手动分析，请取消注释下面这行
+    # return manual_analysis(report, history)
 
     # 这里添加你的分析过程，运行 calibrate 得到的数据，在 report.data 里
     # 你可以得到校准的结果，然后根据这个结果进行分析。
@@ -82,6 +84,7 @@ async def analyze(report: Report, history: Report | None = None) -> Report:
     # 完整校准后的状态有两种：OK 和 Bad，分别对应校准成功和校准失败。
     # 校准失败是指出现坏数据，无法简单通过重新运行本次校准解决，需要
     # 检查前置步骤。
+    import random
     report.state = random.choice(['OK', 'Bad'])
 
     # 参数是一个字典，包含了本次校准得到的参数，后续会更新到config表中。
