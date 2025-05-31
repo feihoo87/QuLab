@@ -25,7 +25,12 @@ from .utils import workflow_template
 
 @logger.catch(reraise=True)
 def run_script(script_path, extra_paths=None):
-    """Run a script in a new process, inheriting current PYTHONPATH plus any extra paths."""
+    """Run a script in a new process, inheriting current PYTHONPATH plus any extra paths.
+    
+    Args:
+        script_path (str): Path to the script to be executed
+        extra_paths (list, optional): Additional paths to be added to PYTHONPATH
+    """
     import subprocess
     import sys
 
@@ -103,8 +108,17 @@ def command_option(command_name):
               help='The path of the code.')
 @log_options('create')
 def create(workflow, code):
-    """
-    Create a new workflow file.
+    """Create a new workflow file.
+    
+    This command creates a new workflow file with a template structure. The template includes
+    basic workflow setup and any unreferenced workflows as potential dependencies.
+    
+    Args:
+        workflow: Name of the workflow to create
+        code: Directory path where the workflow file will be created. Defaults to current directory.
+    
+    Example:
+        $ qulab create my_workflow --code ./workflows
     """
     logger.info(f'[CMD]: create {workflow} --code {code}')
     if code is None:
@@ -133,8 +147,19 @@ def create(workflow, code):
               help='The modlule name of the api.')
 @log_options('set')
 def set(key, value, api):
-    """
-    Set a config.
+    """Set a configuration value in the registry.
+    
+    This command allows you to set key-value pairs in the configuration registry.
+    The value can be any valid Python expression that can be evaluated.
+    
+    Args:
+        key: The configuration key to set
+        value: The value to set (can be a Python expression)
+        api: Optional API module for custom config handling
+    
+    Example:
+        $ qulab set Q1.channel.Z NS_DDS.CH1
+        $ qulab set gate.R.Q3.params.frequency 5.0e9
     """
     logger.info(f'[CMD]: reg set {key} {value} --api {api}')
     reg = Registry()
@@ -157,8 +182,17 @@ def set(key, value, api):
               help='The modlule name of the api.')
 @log_options('get')
 def get(key, api):
-    """
-    Get a config.
+    """Get a configuration value from the registry.
+    
+    Retrieves and displays the value associated with a given key from the configuration registry.
+    
+    Args:
+        key: The configuration key to retrieve
+        api: Optional API module for custom config handling
+    
+    Example:
+        $ qulab get Q1.channel
+        $ qulab get gate.R.Q3.params.frequency
     """
     logger.info(f'[CMD]: reg get {key} --api {api}')
     reg = Registry()
@@ -177,8 +211,16 @@ def get(key, api):
               help='The modlule name of the api.')
 @log_options('delete')
 def delete(key, api):
-    """
-    Delete a config key.
+    """Delete a configuration key from the registry.
+    
+    Removes a key and its associated value from the configuration registry.
+    
+    Args:
+        key: The configuration key to delete
+        api: Optional API module for custom config handling
+    
+    Example:
+        $ qulab delete gate.R.Q3.params.block_freq
     """
     logger.info(f'[CMD]: reg delete {key} --api {api}')
     reg = Registry()
@@ -201,8 +243,24 @@ def delete(key, api):
               help='The format of the config.')
 @log_options('export')
 def export(file, api, format):
-    """
-    Export a config.
+    """Export the configuration registry to a file.
+    
+    Exports all configuration settings to a file in the specified format.
+    
+    Args:
+        file: Path to the output file
+        api: Optional API module for custom config handling
+        format: Output format (pickle, json, or yaml)
+    
+    Supported formats:
+        - pickle: Binary format (default)
+        - json: JSON text format
+        - yaml: YAML text format
+    
+    Example:
+        $ qulab export config.pkl
+        $ qulab export config.json --format json
+        $ qulab export config.yaml --format yaml
     """
     logger.info(f'[CMD]: reg export {file} --api {api}')
     reg = Registry()
@@ -239,8 +297,27 @@ def export(file, api, format):
               help='The format of the config.')
 @log_options('load')
 def load(file, api, format):
-    """
-    Load a config.
+    """Load configuration settings from a file.
+    
+    Imports configuration settings from a file in the specified format.
+    Existing configuration will be cleared before loading the new settings.
+    
+    Args:
+        file: Path to the input file or report index number
+        api: Optional API module for custom config handling
+        format: Input format (pickle, json, yaml, or report)
+    
+    Supported formats:
+        - pickle: Binary format (default)
+        - json: JSON text format
+        - yaml: YAML text format
+        - report: Load from a saved report by index
+    
+    Example:
+        $ qulab load config.pkl
+        $ qulab load config.json --format json
+        $ qulab load config.yaml --format yaml
+        $ qulab load 123 --format report  # Load from report #123
     """
     logger.info(f'[CMD]: reg load {file} --api {api}')
     reg = Registry()
@@ -278,8 +355,16 @@ def load(file, api, format):
               default=lambda: get_config_value("bootstrap", Path),
               help='The path of the bootstrap.')
 def boot(bootstrap):
-    """
-    Run a bootstrap script.
+    """Run a bootstrap script.
+    
+    Executes a bootstrap script to set up the environment or perform initialization tasks.
+    The bootstrap script runs in a new process with the current Python environment.
+    
+    Args:
+        bootstrap: Path to the bootstrap script
+    
+    Example:
+        $ qulab boot --bootstrap setup.py
     """
     if bootstrap is not None:
         run_script(bootstrap)
@@ -311,17 +396,31 @@ def parse_dynamic_options(args):
     return result
 
 
-help_doc = """
-Run a workflow.
+help_doc = """Run a workflow with specified parameters and options.
 
-If the workflow has entries, run all entries.
-If `--no-dependents` is set, only run the workflow itself.
-If `--retry` is set, retry the workflow when calibration failed.
-If `--freeze` is set, freeze the config table.
-If `--plot` is set, plot the report.
-If `--api` is set, use the api to get and update the config table.
-If `--code` is not set, use the current working directory.
-If `--data` is not set, use the `logs` directory in the code path.
+This command executes a workflow and its dependencies based on the provided configuration.
+
+Arguments:
+    workflow: The name or path of the workflow to run
+
+Options:
+    --code, -c: The path containing the workflow code (default: current directory)
+    --data, -d: The path for storing logs and data (default: ./logs)
+    --api, -a: The module name of the API for configuration handling
+    --plot, -p: Generate plots after workflow execution
+    --no-dependents, -n: Run only the specified workflow without dependencies
+    --retry, -r: Number of retry attempts for failed calibrations (default: 1)
+    --freeze: Freeze the configuration table during execution
+    --fail-fast, -f: Stop execution on first error
+    --veryfy-source-code: Verify source code before execution
+
+Additional parameters can be passed as key=value pairs and will be available to the workflow.
+
+Examples:
+    $ qulab run my_workflow
+    $ qulab run my_workflow --plot --retry 3
+    $ qulab run my_workflow param1=value1 param2=value2
+    $ qulab run my_workflow --no-dependents --freeze
 """
 
 
@@ -478,15 +577,30 @@ async def maintain(workflow,
                    plot,
                    fail_fast,
                    veryfy_source_code=True):
-    """
-    Maintain a workflow.
-
-    If the workflow has entries, run all entries.
-    If `--retry` is set, retry the workflow when calibration failed.
-    If `--plot` is set, plot the report.
-    If `--api` is set, use the api to get and update the config table.
-    If `--code` is not set, use the current working directory.
-    If `--data` is not set, use the `logs` directory in the code path.
+    """Maintain a workflow and its dependencies.
+    
+    This command checks and maintains the workflow and its dependencies without executing them.
+    It verifies configurations, dependencies, and can generate plots from existing data.
+    
+    Args:
+        workflow: Name or path of the workflow to maintain
+        code: Directory containing the workflow code
+        data: Directory for logs and data
+        api: Module name for configuration API
+        retry: Number of retry attempts for failed calibrations
+        plot: Generate plots from existing data
+        fail_fast: Stop on first error
+        veryfy_source_code: Verify source code integrity
+    
+    The maintenance process includes:
+        1. Verifying workflow dependencies
+        2. Checking configuration consistency
+        3. Validating source code (if enabled)
+        4. Generating plots (if enabled)
+    
+    Example:
+        $ qulab maintain my_workflow --retry 3 --plot
+        $ qulab maintain my_workflow --fail-fast
     """
     logger.info(
         f'[CMD]: maintain {workflow} --code {code} --data {data} --api {api}'
@@ -556,13 +670,28 @@ async def maintain(workflow,
 @command_option('reproduce')
 @async_command
 async def reproduce(report_id, code, data, api, plot):
-    """
-    Reproduce a report.
-
-    If `--plot` is set, plot the report.
-    If `--api` is set, use the api to get and update the config table.
-    If `--code` is not set, use the current working directory.
-    If `--data` is not set, use the `logs` directory in the code path.
+    """Reproduce a workflow execution from a saved report.
+    
+    This command loads a previous execution report and attempts to reproduce the workflow
+    with the exact same configuration and conditions.
+    
+    Args:
+        report_id: The ID number of the report to reproduce
+        code: Directory containing the workflow code
+        data: Directory for logs and data
+        api: Module name for configuration API
+        plot: Generate plots after reproduction
+    
+    The reproduction process:
+        1. Loads the original report by ID
+        2. Restores the exact configuration state
+        3. Executes the workflow with frozen configuration
+        4. Optionally generates plots
+        5. Restores the previous configuration state
+    
+    Example:
+        $ qulab reproduce 123 --plot
+        $ qulab reproduce 456 --code ./workflows --data ./results
     """
     logger.info(
         f'[CMD]: reproduce {report_id} --code {code} --data {data} --api {api}'
