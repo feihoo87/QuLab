@@ -147,7 +147,7 @@ async def oracle(report: Report,
     
     当校准失败时，根据 analyze 的结果，尝试改变某些配置再重新校准整个系统。
     比如通常我们在死活测不到 rabi 或能谱时，会换一个 idle bias 再试试。这
-    里我们凭直觉设的那个 bias 值，就是一个谕示，可以通过 oracle 来设定。
+    里我们凭直觉设的那个 bias 值，就称作一个谕示，可以通过 oracle 来设定。
 
     该函数代入的参数 report 是 analyze 函数的返回值。
     \"\"\"
@@ -164,6 +164,17 @@ async def debug_analyze(
         code_path: str | Path = get_config_value('code', Path),
         data_path: str | Path = get_config_value('data', Path),
 ) -> None:
+    """
+    调试 workflow 的分析过程。
+
+    该函数会从 data_path 中读取报告，并重新加载对应的 workflow 代码，然后
+    运行 analyze 函数，如果有 plot 函数，还会运行 plot 函数。最后返回包含
+    分析结果的 report 对象。
+
+    当你完成一个 workflow 的 calibrate 开发后，可以现运行该 workflow 采
+    集一组数据，然后通过反复修改 analyze 函数，运行该函数，并查看分析结果，
+    来调试 analyze 函数，以期达到满意的效果。
+    """
     from .storage import get_report_by_index
 
     report = get_report_by_index(report_index, data_path)
