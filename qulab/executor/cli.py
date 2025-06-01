@@ -377,7 +377,13 @@ def parse_dynamic_option_value(value):
     except (ValueError, SyntaxError):
         # 如果解析失败，返回原始字符串
         if ',' in value:
-            parsed_value = tuple(value.split(','))
+            parsed_value = []
+            for item in value.split(','):
+                try:
+                    parsed_value.append(ast.literal_eval(item))
+                except (ValueError, SyntaxError):
+                    parsed_value.append(item)
+            parsed_value = tuple(parsed_value)
         else:
             parsed_value = value
     return parsed_value
