@@ -127,12 +127,23 @@ def check_state(workflow: WorkflowType, code_path: str | Path,
 
 
 @logger.catch(reraise=False)
-async def call_plot(node: WorkflowType, report: Report, check=False):
-    if hasattr(node, 'plot') and callable(node.plot):
-        if inspect.iscoroutinefunction(node.plot):
-            await node.plot(report, check=check)
-        else:
-            node.plot(report)
+async def call_plot(node: WorkflowType, report: Report):
+    if not hasattr(node, 'plot') or not callable(node.plot):
+        return
+    
+    if inspect.iscoroutinefunction(node.plot):
+        figs = await node.plot(report)
+    else:
+        figs = node.plot(report)
+    if figs is None:
+        return
+    elif isinstance(figs, (list, tuple)):
+        for fig in figs:
+            # fig.savefig(report.base_path / f'{node.__workflow_id__}.png')
+            fig.close()
+    else:
+        # figs.savefig(report.base_path / f'{node.__workflow_id__}.png')
+        figs.close()
 
 
 async def call_check(workflow: WorkflowType, session_id: str,
