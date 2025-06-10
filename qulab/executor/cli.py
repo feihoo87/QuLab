@@ -383,7 +383,11 @@ def parse_dynamic_option_value(value):
                     parsed_value.append(ast.literal_eval(item))
                 except (ValueError, SyntaxError):
                     parsed_value.append(item)
-            parsed_value = tuple(parsed_value)
+            if len(parsed_value) > 1 and isinstance(
+                    parsed_value[-1], str) and parsed_value[-1] == "":
+                parsed_value = tuple(parsed_value[:-1])
+            else:
+                parsed_value = tuple(parsed_value)
         else:
             parsed_value = value
     return parsed_value
