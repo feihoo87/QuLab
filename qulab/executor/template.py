@@ -12,7 +12,12 @@ _notset = object()
 
 
 def VAR(name: str, /, *, default: Any = _notset) -> Any:
-    return name
+    if default is _notset:
+        raise TemplateKeyError(
+            f"The variable '{name}' is not provided in mapping."
+        )
+    else:
+        return default
 
 
 def encode_mapping(mapping):
