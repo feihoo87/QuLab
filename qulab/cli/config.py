@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 from loguru import logger
 
-CONFIG_PATH = os.path.expanduser("~/.qulab.ini")
+DEFAULT_CONFIG_PATH = os.path.expanduser("~/.qulab.ini")
 ENV_PREFIX = "QULAB_"
 
 
@@ -36,8 +36,12 @@ def _get_config_value(option_name,
     config = configparser.ConfigParser()
     # 先加载默认配置防止段不存在
     config.read_dict({config_section: {}})
-    if Path(CONFIG_PATH).exists():
-        config.read(CONFIG_PATH)
+
+    config_path = Path.cwd() / "qulab.ini"
+    if config_path.exists():
+        config.read(config_path)
+    elif DEFAULT_CONFIG_PATH.exists():
+        config.read(DEFAULT_CONFIG_PATH)
 
     # 从对应配置段读取
     if config.has_section(config_section):
