@@ -1,3 +1,4 @@
+import copy
 import importlib
 import os
 import sys
@@ -157,6 +158,128 @@ def _init():
 _init()
 
 
+class RegistrySnapshot:
+
+    def __init__(self, data: dict[str, Any]):
+        self.data = copy.deepcopy(data)
+
+    def query(self, key: str, default=...) -> Any:
+        """
+        Query a value from the nested dictionary using dot-separated keys.
+        
+        Args:
+            key: Dot-separated key path (e.g., 'level1.level2.level3')
+            default: Default value to return if key not found.
+                     If not provided and key is missing, raises KeyError.
+            
+        Returns:
+            The value at the specified path, default value, or raises KeyError
+        """
+        keys = key.split('.')
+        current = self.data
+
+        # Track which level we're at for error reporting
+        for i, k in enumerate(keys):
+            if isinstance(current, dict) and k in current:
+                current = current[k]
+            else:
+                # Key not found at this level
+                missing_path = '.'.join(keys[:i + 1])
+                if default is ...:
+                    raise KeyError(
+                        f"Key '{missing_path}' not found in registry (failed at level {i+1})"
+                    )
+                return default
+
+        return current
+
+    def get(self, key: str, default=...) -> Any:
+        """
+        Query a value from the nested dictionary using dot-separated keys.
+        
+        Args:
+            key: Dot-separated key path (e.g., 'level1.level2.level3')
+            default: Default value to return if key not found.
+                     If not provided and key is missing, raises KeyError.
+            
+        Returns:
+            The value at the specified path, default value, or raises KeyError
+        """
+        return self.query(key, default)
+
+    def export(self) -> dict[str, Any]:
+        return self.data
+
+    def set(self, key: str, value: Any):
+        """
+        Set a value in the nested dictionary using dot-separated keys.
+        Creates intermediate dictionaries if they don't exist.
+        
+        Args:
+            key: Dot-separated key path (e.g., 'level1.level2.level3')
+            value: Value to set
+        """
+        keys = key.split('.')
+        current = self.data
+
+        # Navigate to the parent of the target key, creating dicts as needed
+        for k in keys[:-1]:
+            if k not in current:
+                current[k] = {}
+            elif not isinstance(current[k], dict):
+                # If existing value is not a dict, replace it with a dict
+                current[k] = {}
+            current = current[k]
+
+        # Set the final value
+        current[keys[-1]] = value
+
+    def delete(self, key: str):
+        """
+        Delete a value from the nested dictionary using dot-separated keys.
+        Also cleans up empty parent dictionaries after deletion.
+        
+        Args:
+            key: Dot-separated key path (e.g., 'level1.level2.level3')
+        """
+        keys = key.split('.')
+
+        # First check if the path exists
+        try:
+            self.query(key)
+        except KeyError:
+            return  # Path doesn't exist, nothing to delete
+
+        # Navigate and collect references to all parent dictionaries
+        path_refs = []
+        current = self.data
+
+        for k in keys[:-1]:
+            path_refs.append((current, k))
+            current = current[k]
+
+        # Delete the final key
+        if isinstance(current, dict) and keys[-1] in current:
+            del current[keys[-1]]
+
+            # Clean up empty dictionaries from leaf to root
+            for parent_dict, parent_key in reversed(path_refs):
+                # Check if the current dictionary is empty
+                if isinstance(current, dict) and len(current) == 0:
+                    del parent_dict[parent_key]
+                    current = parent_dict
+                else:
+                    # Stop if we encounter a non-empty dictionary
+                    break
+
+    def clear(self):
+        self.data.clear()
+
+    def update(self, parameters: dict[str, Any]):
+        for k, v in parameters.items():
+            self.set(k, v)
+
+
 class Registry():
 
     def __init__(self):
@@ -183,3 +306,6 @@ class Registry():
 
     def update(self, parameters: dict[str, Any]):
         return self.api[1](parameters)
+
+    def snapshot(self) -> RegistrySnapshot:
+        return RegistrySnapshot(self.export())
