@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 from loguru import logger
 
-DEFAULT_CONFIG_PATH = os.path.expanduser("~/.qulab.ini")
+DEFAULT_CONFIG_PATH = Path(os.path.expanduser("~/.qulab.ini"))
 ENV_PREFIX = "QULAB_"
 
 
