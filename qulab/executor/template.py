@@ -236,6 +236,8 @@ def inject_mapping(source: str, mapping: dict[str, Any],
                 if default_value is not None:
                     # 清除 default 值前后的空格
                     clean_value = default_value.strip()
+                    if var_name not in mapping:
+                        return clean_value
                     return f'{base}.get({quote}{var_name}{quote}, {clean_value})'
                 else:
                     return f'{base}[{quote}{var_name}{quote}]'
