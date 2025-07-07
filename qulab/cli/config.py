@@ -3,12 +3,41 @@ import functools
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 from loguru import logger
 
 DEFAULT_CONFIG_PATH = Path(os.path.expanduser("~/.qulab.ini"))
 ENV_PREFIX = "QULAB_"
+
+
+def find_config_file() -> Path | None:
+    """
+    查找配置文件
+    """
+    # 环境变量
+    if config_path := os.getenv("QULAB_CONFIG_PATH"):
+        return Path(config_path)
+
+    # 先查找当前目录下的配置文件
+    config_path = Path.cwd() / "qulab.ini"
+    if config_path.exists():
+        return config_path
+
+    # 向上级目录查找，直到找到 uv 项目根目录
+    current_dir = Path.cwd()
+    while not (current_dir / "uv.lock").exists():
+        current_dir = current_dir.parent
+        if current_dir == Path("/"):
+            break
+    config_path = current_dir / "qulab.ini"
+    if config_path.exists():
+        return config_path
+
+    if DEFAULT_CONFIG_PATH.exists():
+        return DEFAULT_CONFIG_PATH
+    return None
 
 
 def _get_config_value(option_name,
@@ -37,11 +66,9 @@ def _get_config_value(option_name,
     # 先加载默认配置防止段不存在
     config.read_dict({config_section: {}})
 
-    config_path = Path.cwd() / "qulab.ini"
-    if config_path.exists():
+    config_path = find_config_file()
+    if config_path is not None:
         config.read(config_path)
-    elif DEFAULT_CONFIG_PATH.exists():
-        config.read(DEFAULT_CONFIG_PATH)
 
     # 从对应配置段读取
     if config.has_section(config_section):
@@ -57,10 +84,10 @@ def _get_config_value(option_name,
     return default  # 交给 Click 处理默认值
 
 
-def get_config_value(option_name,
-                     type_cast=str,
-                     command_name=None,
-                     default=None):
+def get_config_value(option_name: str,
+                     type_cast: type = str,
+                     command_name: str | None = None,
+                     default: Any = None):
     """
     获取配置值，支持命令专属配置的优先级获取
 
