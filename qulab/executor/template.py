@@ -6,7 +6,7 @@ import pickle
 import re
 import string
 import textwrap
-from typing import Any
+from typing import Any, cast
 
 _notset = object()
 
@@ -14,8 +14,7 @@ _notset = object()
 def VAR(name: str, /, *, default: Any = _notset) -> Any:
     if default is _notset:
         raise TemplateKeyError(
-            f"The variable '{name}' is not provided in mapping."
-        )
+            f"The variable '{name}' is not provided in mapping.")
     else:
         return default
 
@@ -60,20 +59,22 @@ class TemplateVarExtractor(ast.NodeVisitor):
     def visit_Constant(self, node):
         if isinstance(node.value, str):
             self._process_string(node.value, node.lineno, node.col_offset,
-                                 node.end_lineno, node.end_col_offset)
+                                 cast(int, node.end_lineno),
+                                 cast(int, node.end_col_offset))
 
     def visit_JoinedStr(self, node):
         for value in node.values:
             if isinstance(value, ast.Constant) and isinstance(
                     value.value, str):
                 self._process_string(value.value, value.lineno,
-                                     value.col_offset, value.end_lineno,
-                                     value.end_col_offset)
+                                     value.col_offset,
+                                     cast(int, value.end_lineno),
+                                     cast(int, value.end_col_offset))
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node):
         if node.name == 'VAR':
-            self.var_func_def = (node.lineno, node.end_lineno)
+            self.var_func_def = (node.lineno, cast(int, node.end_lineno))
         self.generic_visit(node)
 
     def visit_Call(self, node):
@@ -81,15 +82,11 @@ class TemplateVarExtractor(ast.NodeVisitor):
             arg = node.args[0]
             if not isinstance(arg, ast.Constant) or not isinstance(
                     arg.value, str):
-                raise SyntaxError(
-                    f"Argument of VAR function must be a string."
-                    f" {self.fname}:{node.lineno}"
-                )
+                raise SyntaxError(f"Argument of VAR function must be a string."
+                                  f" {self.fname}:{node.lineno}")
             if len(node.args) != 1:
-                raise SyntaxError(
-                    f"VAR function only accept one argument."
-                    f" {self.fname}:{node.lineno}"
-                )
+                raise SyntaxError(f"VAR function only accept one argument."
+                                  f" {self.fname}:{node.lineno}")
             default = _notset
             for k in node.keywords:
                 if k.arg == 'default':
@@ -105,8 +102,7 @@ class TemplateVarExtractor(ast.NodeVisitor):
                 else:
                     raise SyntaxError(
                         f"VAR function only accept keyword argument 'default'."
-                        f" {self.fname}:{node.lineno}"
-                    )
+                        f" {self.fname}:{node.lineno}")
 
             if default is _notset:
                 # new_node = ast.Subscript(value=ast.Name(id="__VAR",
@@ -116,8 +112,7 @@ class TemplateVarExtractor(ast.NodeVisitor):
                 if arg.value not in self.mapping:
                     raise TemplateKeyError(
                         f"The variable '{arg.value}' is not provided in mapping."
-                        f" {self.fname}:{node.lineno}"
-                    )
+                        f" {self.fname}:{node.lineno}")
                 self.replacements[(node.lineno, node.end_lineno,
                                    node.col_offset,
                                    node.end_col_offset)] = ('VAR', arg.value,
@@ -174,7 +169,7 @@ class TemplateVarExtractor(ast.NodeVisitor):
 
 
 def inject_mapping(source: str, mapping: dict[str, Any],
-                   fname: str) -> list[tuple[str, int]]:
+                   fname: str) -> tuple[str, str]:
     hash_str, mapping_code = encode_mapping(mapping)
 
     tree = ast.parse(source)
