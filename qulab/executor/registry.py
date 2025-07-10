@@ -2,7 +2,7 @@ import copy
 import importlib
 import os
 import sys
-from typing import Any
+from typing import Any, Callable, cast
 
 from ..cli.config import get_config_value
 from .storage import Report, save_item
@@ -66,7 +66,7 @@ def _export_config() -> dict:
     return parameters
 
 
-def _clear_config():
+def _clear_config() -> None:
     import pickle
 
     try:
@@ -142,13 +142,13 @@ def set_config_api(query_method,
 
 
 def _init():
-    code = get_config_value("code", str, default=None)
+    code = cast(str, get_config_value("code", str, default=None))
     if code is not None:
         code = os.path.expanduser(code)
         if code not in sys.path:
             sys.path.insert(0, code)
 
-    api = get_config_value('api', str, None)
+    api = cast(str, get_config_value('api', str, None))
     if api is not None:
         api = importlib.import_module(api)
         set_config_api(api.query_config, api.update_config, api.delete_config,
@@ -283,29 +283,34 @@ class RegistrySnapshot:
 class Registry():
 
     def __init__(self):
-        self.api = (query_config, update_config, delete_config, export_config,
-                    clear_config)
+        self.api: dict[str, Callable] = {
+            'query': query_config,
+            'update': update_config,
+            'delete': delete_config,
+            'export': export_config,
+            'clear': clear_config,  # type: ignore
+        }
 
     def query(self, key: str) -> Any:
-        return self.api[0](key)
+        return self.api['query'](key)
 
     def get(self, key: str) -> Any:
         return self.query(key)
 
     def export(self) -> dict[str, dict[str, Any]]:
-        return self.api[3]()
+        return self.api['export']()
 
     def set(self, key: str, value: Any):
-        return self.api[1]({key: value})
+        return self.api['update']({key: value})
 
     def delete(self, key: str):
-        return self.api[2](key)
+        return self.api['delete'](key)
 
-    def clear(self):
-        return self.api[4]()
+    def clear(self) -> None:
+        return self.api['clear']()
 
     def update(self, parameters: dict[str, Any]):
-        return self.api[1](parameters)
+        return self.api['update'](parameters)
 
     def snapshot(self) -> RegistrySnapshot:
         return RegistrySnapshot(self.export())
