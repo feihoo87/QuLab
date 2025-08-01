@@ -1,10 +1,11 @@
 from qlisp import (CR, CX, CZ, SWAP, A, B, BellPhiM, BellPhiP, BellPsiM,
                    BellPsiP, H, S, Sdag, SQiSWAP, T, Tdag, U, Unitary2Angles,
-                   applySeq, draw, fSim, iSWAP, kak_decomposition, kak_vector,
-                   make_immutable, measure, phiminus, phiplus, psiminus,
-                   psiplus, regesterGateMatrix, rfUnitary, seq2mat, sigmaI,
-                   sigmaM, sigmaP, sigmaX, sigmaY, sigmaZ,
-                   synchronize_global_phase)
+                   applySeq)
+from qlisp import draw as draw_qlisp
+from qlisp import (fSim, iSWAP, kak_decomposition, kak_vector, make_immutable,
+                   measure, phiminus, phiplus, psiminus, psiplus,
+                   regesterGateMatrix, rfUnitary, seq2mat, sigmaI, sigmaM,
+                   sigmaP, sigmaX, sigmaY, sigmaZ, synchronize_global_phase)
 from qlispc import (COMMAND, FREE, NOTSET, PUSH, READ, SYNC, TRIG, WRITE,
                     compile, get_arch, libraries, mapping_qubits,
                     register_arch)
@@ -30,4 +31,6 @@ from .executor.template import VAR
 from .executor.utils import debug_analyze
 from .scan import Scan, get_record, load_record, lookup, lookup_list
 from .version import __version__
-from .visualization import autoplot
+from .visualization import autoplot, plot_mat
+from .visualization.plot_layout import draw as draw_layout
+from .visualization.plot_layout import fill_layout
