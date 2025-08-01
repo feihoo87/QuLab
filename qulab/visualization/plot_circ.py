@@ -33,13 +33,13 @@ def make_path(fx, fy, dfx, dfy, t):
 
 
 def plot_square(ax,
-                x=0,
-                y=0,
-                width=1,
-                hight=1,
+                x=0.0,
+                y=0.0,
+                width=1.0,
+                hight=1.0,
                 radius=0.2,
                 ls='-',
-                lw=2,
+                lw=2.0,
                 fc='none',
                 ec='black'):
     r = radius
