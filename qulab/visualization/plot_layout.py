@@ -1,5 +1,6 @@
 import functools
 import operator
+from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -452,15 +453,19 @@ def fill_layout(layout,
     coupler_cmap = plt.get_cmap(coupler_cmap)
 
     if qubit_norm is None:
-        qubit_norm = get_norm(params,
-                              layout['qubits'].keys(),
-                              vmin=qubit_vmin,
-                              vmax=qubit_vmax)
+        qubit_norm = cast(
+            Normalize,
+            get_norm(params,
+                     layout['qubits'].keys(),
+                     vmin=qubit_vmin,
+                     vmax=qubit_vmax))
     if coupler_norm is None:
-        coupler_norm = get_norm(params,
-                                layout['couplers'].keys(),
-                                vmin=coupler_vmin,
-                                vmax=coupler_vmax)
+        coupler_norm = cast(
+            Normalize,
+            get_norm(params,
+                     layout['couplers'].keys(),
+                     vmin=coupler_vmin,
+                     vmax=coupler_vmax))
     layout['__colorbar__'] = {
         'coupler': {
             'cmap': coupler_cmap,
