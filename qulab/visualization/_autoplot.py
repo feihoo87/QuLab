@@ -114,7 +114,7 @@ class MyLogFormatter(EngFormatter):
             return super().format_eng(10.0**x)
 
 
-def imshow_logx(x, y, z, x_unit=None, ax=None, **kwargs):
+def imshow_logx(x, y, z, x_unit: str | None = None, ax=None, **kwargs):
     if ax is None:
         ax = plt.gca()
 
@@ -127,13 +127,13 @@ def imshow_logx(x, y, z, x_unit=None, ax=None, **kwargs):
     img = ax.imshow(z, extent=extent, **kwargs)
 
     ax.set_xticks(major_ticks, minor=False)
-    ax.xaxis.set_major_formatter(MyLogFormatter(x_unit))
+    ax.xaxis.set_major_formatter(MyLogFormatter(x_unit))  # type: ignore
     ax.set_xticks(minor_ticks, minor=True)
 
     return img
 
 
-def imshow_logy(x, y, z, y_unit=None, ax=None, **kwargs):
+def imshow_logy(x, y, z, y_unit: str | None = None, ax=None, **kwargs):
     if ax is None:
         ax = plt.gca()
 
@@ -146,13 +146,13 @@ def imshow_logy(x, y, z, y_unit=None, ax=None, **kwargs):
     img = ax.imshow(z, extent=extent, **kwargs)
 
     ax.set_yticks(major_ticks, minor=False)
-    ax.yaxis.set_major_formatter(MyLogFormatter(y_unit))
+    ax.yaxis.set_major_formatter(MyLogFormatter(y_unit))  # type: ignore
     ax.set_yticks(minor_ticks, minor=True)
 
     return img
 
 
-def imshow_loglog(x, y, z, x_unit=None, y_unit=None, ax=None, **kwargs):
+def imshow_loglog(x, y, z, x_unit: str | None = None, y_unit: str | None = None, ax=None, **kwargs):
     if ax is None:
         ax = plt.gca()
 
@@ -166,11 +166,11 @@ def imshow_loglog(x, y, z, x_unit=None, y_unit=None, ax=None, **kwargs):
     img = ax.imshow(z, extent=extent, **kwargs)
 
     ax.set_xticks(x_major_ticks, minor=False)
-    ax.xaxis.set_major_formatter(MyLogFormatter(x_unit))
+    ax.xaxis.set_major_formatter(MyLogFormatter(x_unit))  # type: ignore
     ax.set_xticks(x_minor_ticks, minor=True)
 
     ax.set_yticks(y_major_ticks, minor=False)
-    ax.yaxis.set_major_formatter(MyLogFormatter(y_unit))
+    ax.yaxis.set_major_formatter(MyLogFormatter(y_unit))  # type: ignore
     ax.set_yticks(y_minor_ticks, minor=True)
 
     return img
@@ -186,9 +186,9 @@ def plot_lines(x,
                y_unit,
                z_unit,
                ax,
-               xscale='linear',
-               yscale='linear',
-               zscale='linear',
+               xscale: str = 'linear',
+               yscale: str = 'linear',
+               zscale: str = 'linear',
                index=None,
                **kwds):
     z = np.asarray(z)
@@ -230,9 +230,9 @@ def plot_img(x,
              z_unit,
              fig,
              ax,
-             xscale='linear',
-             yscale='linear',
-             zscale='linear',
+             xscale: str = 'linear',
+             yscale: str = 'linear',
+             zscale: str = 'linear',
              resolution=None,
              **kwds):
     kwds.setdefault('origin', 'lower')
@@ -325,9 +325,9 @@ def plot_scatter(x,
                  z_unit,
                  fig,
                  ax,
-                 xscale='linear',
-                 yscale='linear',
-                 zscale='linear',
+                 xscale: str = 'linear',
+                 yscale: str = 'linear',
+                 zscale: str = 'linear',
                  **kwds):
     if np.any(np.iscomplex(z)):
         s = np.abs(z)
@@ -356,9 +356,9 @@ def autoplot(x,
              fig=None,
              ax=None,
              index=None,
-             xscale='auto',
-             yscale='auto',
-             zscale='auto',
+             xscale: str = 'auto',
+             yscale: str = 'auto',
+             zscale: str = 'auto',
              max_lines=3,
              scatter_lim=1000,
              resolution=None,
