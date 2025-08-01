@@ -6,18 +6,18 @@ data visualization. It includes features like auto-ranging, mouse interaction
 for data selection, and clipboard integration.
 """
 
-from .config import (COLOR_SELECTED, COLOR_UNSELECTED, SYMBOL_SIZES,
-                    DEFAULT_COLORS, ROLL_INDICES, LINE_WIDTHS)
-from .qt_compat import QtWidgets
+from .config import (COLOR_SELECTED, COLOR_UNSELECTED, DEFAULT_COLORS,
+                     LINE_WIDTHS, ROLL_INDICES, SYMBOL_SIZES)
+from .qt_compat import QtWidgets  # type: ignore
 
 # the plotting widget
 try:
-    import pyqtgraph as pg
+    import pyqtgraph as pg  # type: ignore
 except ImportError:
     raise ImportError("Please install pyqtgraph first")
 
 try:
-    import pyperclip as pc
+    import pyperclip as pc  # type: ignore
     HAS_CLIPBOARD = True
 except ImportError:
     HAS_CLIPBOARD = False
@@ -122,14 +122,16 @@ class PlotWidget(pg.PlotWidget):
     def mousePressEvent(self, event):
         """Handle mouse press events for data selection."""
         if event.button() == 4 and HAS_CLIPBOARD:
-            self.clip_pos_start = self.plotItem.vb.mapSceneToView(event.pos()).x()
+            self.clip_pos_start = self.plotItem.vb.mapSceneToView(
+                event.pos()).x()
         else:
             super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         """Handle mouse release events and copy selected data to clipboard."""
         if event.button() == 4 and HAS_CLIPBOARD:
-            self.clip_pos_end = self.plotItem.vb.mapSceneToView(event.pos()).x()
+            self.clip_pos_end = self.plotItem.vb.mapSceneToView(
+                event.pos()).x()
             if self.range_select:
                 pc.copy(f"{self.clip_pos_start},{self.clip_pos_end}")
             else:

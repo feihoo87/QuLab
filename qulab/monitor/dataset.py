@@ -10,7 +10,7 @@ contain multiple named columns of numerical data.
 """
 
 from collections import defaultdict, deque
-from typing import Union, Sequence
+from typing import Union, Sequence, cast
 
 from .config import ROLL_BUFFER_SIZE
 
@@ -126,10 +126,10 @@ class Dataset:
             return
         try:
             # Test if dataframe is a list of lists (trace data)
-            iter(dataframe[0])
-            self._append_traces(dataframe)
+            iter(dataframe[0])  # type: ignore
+            self._append_traces(cast(Sequence[Sequence[Number]], dataframe))
         except TypeError:
-            self._append_points(dataframe)
+            self._append_points(cast(Sequence[Number], dataframe))
 
     def roll(self) -> None:
         """

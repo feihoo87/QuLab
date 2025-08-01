@@ -70,14 +70,16 @@ class EventQueue:
                 if not isinstance(event, tuple):
                     raise ValueError("Queue event must be a tuple")
                 if len(event) != 2:
-                    raise ValueError("Queue event must contain exactly two elements (command, data)")
-                
+                    raise ValueError(
+                        "Queue event must contain exactly two elements (command, data)"
+                    )
+
                 command, data = event
                 if not isinstance(command, str):
                     raise ValueError("Command must be a string")
-                
+
                 self.handle(command, data)
-                
+
             except (ValueError, AssertionError) as error:
                 warnings.warn(f"Invalid event format: {error}")
                 continue
@@ -103,25 +105,25 @@ class EventQueue:
             case "PN":  # Set point data column names
                 self.point_dataset.set_column_names(data)
                 self.toolbar.refresh_comb()
-                
+
             case "TN":  # Set trace data column names
                 self.trace_dataset.set_column_names(data)
                 self.toolbar.refresh_comb()
-                
+
             case "PD":  # Append point data
                 self.point_dataset.append(data)
-                
+
             case "TD":  # Append trace data
                 self.trace_dataset.append(data)
-                
+
             case "ROLL":  # Create new data frame
                 self.point_dataset.roll()
-                
+
             case "PXY":  # Update point plot configuration
                 self.toolbar.set_point_text(data)
-                
+
             case "TXY":  # Update trace plot configuration
                 self.toolbar.set_trace_text(data)
-                
+
             case _:
                 warnings.warn(f"Unknown command: {command}")

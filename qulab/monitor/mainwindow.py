@@ -7,15 +7,16 @@ interactive features like axis linking and data transformation.
 """
 
 from multiprocessing import Queue
-from typing import Literal
+from typing import Literal, cast
 
-from .config import TRANSFORMS, ROLL_INDICES, STYLE
+from .config import ROLL_INDICES, STYLE, TRANSFORMS
 from .dataset import Dataset
 from .event_queue import EventQueue
 from .ploter import PlotWidget
-from .qt_compat import (BottomDockWidgetArea, QtCore, QtWidgets,
-                        ScrollBarAlwaysOff, ScrollBarAlwaysOn,
-                        TopDockWidgetArea)
+from .qt_compat import QtCore  # type: ignore
+from .qt_compat import QtWidgets  # type: ignore
+from .qt_compat import (BottomDockWidgetArea, ScrollBarAlwaysOff,
+                        ScrollBarAlwaysOn, TopDockWidgetArea)
 from .toolbar import ToolBar
 
 
@@ -50,13 +51,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plot_minimum_height = plot_minimum_height
         self.plot_widgets: list[PlotWidget] = []
         self.plot_colors = plot_colors
-        
+
         # Initialize components
         self.toolbar = ToolBar()
         self.trace_data_box = Dataset()
         self.point_data_box = Dataset()
         self.queue = EventQueue(queue, self.toolbar, self.point_data_box,
-                              self.trace_data_box)
+                                self.trace_data_box)
 
         self.init_ui()
 
@@ -70,7 +71,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStyleSheet(STYLE)
         self.setMinimumHeight(500)
         self.setMinimumWidth(700)
-        
+
         # Create scroll area
         self.scroll = QtWidgets.QScrollArea()
         self.widget = QtWidgets.QWidget()
@@ -100,7 +101,7 @@ class MainWindow(QtWidgets.QMainWindow):
     @property
     def mode(self) -> Literal["P", "T"]:
         """Current plotting mode (Points or Traces)."""
-        return self.toolbar.mode
+        return cast(Literal["P", "T"], self.toolbar.mode)
 
     @property
     def dataset(self) -> Dataset:
@@ -119,7 +120,7 @@ class MainWindow(QtWidgets.QMainWindow):
         plot_count = len(self.plot_widgets)
         plot_widget = PlotWidget(self.plot_minimum_height, self.plot_colors)
         self.plot_widgets.append(plot_widget)
-        
+
         grid_row = plot_count // self.num_columns
         grid_col = plot_count % self.num_columns
         self.layout.addWidget(plot_widget, grid_row + 1, grid_col)
@@ -175,9 +176,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def do_link(self):
         """Link plots that share the same X or Y axis."""
-        same_x_axis = {}
+        same_x_axis: dict[str, list[int]] = {}
         xy_pairs = self.toolbar.xypairs
-        
+
         # Group plots by X axis
         for idx, (x_name, y_name) in enumerate(xy_pairs):
             if x_name not in same_x_axis:
@@ -250,19 +251,20 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.dataset.dirty or self.toolbar.xyfm_dirty or needs_rescale:
             self.dataset.dirty = False
             self.toolbar.xyfm_dirty = False
-            
+
             # Update plot data
             for plot_widget in self.plot_widgets:
-                x_transform = TRANSFORMS[self.toolbar.fx]
-                y_transform = TRANSFORMS[self.toolbar.fy]
-                
+                x_transform = TRANSFORMS[cast(str, self.toolbar.fx)]
+                y_transform = TRANSFORMS[cast(str, self.toolbar.fy)]
+
                 for idx in ROLL_INDICES:
-                    x_data, y_data = self.dataset.get_data(idx, plot_widget.x_name, plot_widget.y_name)
+                    x_data, y_data = self.dataset.get_data(
+                        idx, plot_widget.x_name, plot_widget.y_name)
                     data_length = min(len(x_data), len(y_data))
                     x_data = x_transform(x_data[:data_length], 0)
                     y_data = y_transform(y_data[:data_length], 0)
                     plot_widget.set_data(idx, x_data, y_data)
-                    
+
                 plot_widget.update()
                 if needs_rescale:
                     plot_widget.auto_range()

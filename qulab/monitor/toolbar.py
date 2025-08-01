@@ -14,7 +14,7 @@ import re
 from typing import Callable, List, Tuple
 
 from .config import STYLE, TRANSFORM_NAMES
-from .qt_compat import AlignRight, QtWidgets
+from .qt_compat import AlignRight, QtWidgets  # type: ignore
 
 
 def matched_xy_pairs(patterns: str, column_names: list[str]) -> list[tuple[str, str]]:
@@ -28,11 +28,11 @@ def matched_xy_pairs(patterns: str, column_names: list[str]) -> list[tuple[str, 
     Returns:
         List of matched (x, y) column name pairs
     """
-    patterns = patterns.replace(" ", "").split(";")
+    pattern_list = patterns.replace(" ", "").split(";")
     pairs = []
     for x, y in itertools.product(column_names, repeat=2):
         test = f"{x},{y}"
-        for pattern in patterns:
+        for pattern in pattern_list:
             r = re.match(pattern, test)
             if r and r.group(0) == test:
                 pairs.append((x, y))
