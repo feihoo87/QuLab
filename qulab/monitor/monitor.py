@@ -11,6 +11,8 @@ Classes:
 
 import multiprocessing as mp
 import sys
+from typing import cast
+
 import zmq
 
 # try:
@@ -33,10 +35,11 @@ def main(data_queue: mp.Queue,
         plot_colors: List of RGB color tuples for plot lines
     """
     from .mainwindow import MainWindow
-    from .qt_compat import QtWidgets
+    from .qt_compat import QtWidgets  # type: ignore
 
     app = QtWidgets.QApplication(sys.argv)
-    main_window = MainWindow(data_queue, num_columns, minimum_height, plot_colors)
+    main_window = MainWindow(data_queue, num_columns, minimum_height,
+                             plot_colors)
     sys.exit(app.exec())
 
 
@@ -71,8 +74,8 @@ class MonitorUI:
             return
         self.queue = mp.Queue(20)
         self.process = mp.Process(target=main,
-                                args=(self.queue, self.number_of_columns,
-                                     self.minimum_height, self.colors))
+                                  args=(self.queue, self.number_of_columns,
+                                        self.minimum_height, self.colors))
         self.process.start()
 
     def _put(self, message: tuple) -> None:
@@ -119,18 +122,19 @@ class MonitorUI:
 
     def is_alive(self) -> bool:
         """Check if the monitoring process is running."""
-        return self.process.is_alive()
+        return self.process is not None and self.process.is_alive()
 
     def __del__(self):
         """Clean up resources when the Monitor object is deleted."""
         try:
-            self.process.kill()
+            cast(mp.Process, self.process).kill()
         except:
             pass
 
 
 class Monitor:
-    def __init__(self, address: str="127.0.0.1", port: int=5555):
+
+    def __init__(self, address: str = "127.0.0.1", port: int = 5555):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{address}:{port}")
@@ -174,7 +178,11 @@ class Monitor:
 
 
 class MonitorServer:
-    def __init__(self, address: str="*", port: int=5555, number_of_columns: int = 4,
+
+    def __init__(self,
+                 address: str = "*",
+                 port: int = 5555,
+                 number_of_columns: int = 4,
                  minimum_height: int = 400,
                  colors: list[tuple[int, int, int]] = []):
         self.address = address
@@ -189,8 +197,9 @@ class MonitorServer:
     def _run(self):
         try:
             # Create Monitor instance in the child process
-            self.monitor = MonitorUI(self.number_of_columns, self.minimum_height, self.colors)
-            
+            self.monitor = MonitorUI(self.number_of_columns,
+                                     self.minimum_height, self.colors)
+
             # Create ZMQ context and socket in the child process
             self.context = zmq.Context()
             self.socket = self.context.socket(zmq.REP)
@@ -253,12 +262,13 @@ def get_monitor(auto_open: bool = True) -> MonitorUI:
     if auto_open and (_monitor is None or not _monitor.is_alive()):
         _monitor = MonitorUI()
 
-    return _monitor
+    return cast(MonitorUI, _monitor)
 
 
 if __name__ == "__main__":
     # Example usage and testing code
     import time
+
     import numpy as np
 
     # Example 1: Using Monitor directly
@@ -290,11 +300,11 @@ if __name__ == "__main__":
     def run_client():
         client = Monitor("127.0.0.1", 5555)
         time.sleep(1)  # Wait for server to start
-        
+
         client.set_column_names("index", "H", "S")
         client.set_plots("(index,H);(index,S)")
         client.roll()
-        
+
         for i in range(100):
             client.add_point(i, np.random.randn(), np.sin(i / 20))
             time.sleep(0.2)

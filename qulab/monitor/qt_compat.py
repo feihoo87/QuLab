@@ -13,7 +13,8 @@ The module exports the following constants:
 - TopDockWidgetArea: Top dock widget area constant
 """
 
-from matplotlib.backends.qt_compat import QT_API, QtCore, QtWidgets
+from matplotlib.backends.qt_compat import (QT_API, QtCore,  # type: ignore
+                                           QtWidgets)       # type: ignore
 
 # Define Qt constants based on the Qt binding being used
 if QT_API in ['PySide6', 'PyQt6']:
