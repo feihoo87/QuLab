@@ -246,6 +246,10 @@ def _draw_coupler(ax, coupler, layout, q1, q2, pos1, pos2):
 
     text_rotation = 180 * np.arctan2(pos2[1] - pos1[1],
                                      pos2[0] - pos1[0]) / np.pi
+    if text_rotation > 90:
+        text_rotation -= 180
+    elif text_rotation < -90:
+        text_rotation += 180
 
     path = circle_link_path(pos1, pos2, r1, r2, width)
     plot_range(ax,
