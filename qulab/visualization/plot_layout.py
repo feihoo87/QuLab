@@ -54,6 +54,85 @@ def complete_layout(layout):
     return layout
 
 
+def read_xlsx_to_dict(filepath: str,
+                      key_col: int = 0,
+                      value_col: int = 4,
+                      sheet_name: str = 0) -> dict:
+    """
+    读取 .xlsx 文件，将第 key_col 列和第 value_col 列的值分别作为 key、value，返回一个字典。
+
+    :param filepath: Excel 文件路径
+    :param key_col: 用作字典键的列索引（0 表示第一列）
+    :param value_col: 用作字典值的列索引（0 表示第一列）
+    :param sheet_name: 要读取的 sheet 名称或索引，默认第一个 sheet
+    :return: { key: value, ... } 形式的字典
+    """
+    import pandas as pd
+
+    # 读取整个表格
+    # df = pd.read_excel(filepath, sheet_name=sheet_name, header=None)
+    df = pd.read_excel(filepath, sheet_name=sheet_name)
+
+    # 提取指定列，生成键值对并返回字典
+    keys = df.iloc[:, key_col]
+    values = df.iloc[:, value_col]
+    return dict(zip(keys, values))
+
+
+def load_layout_from_xlsx(qubit_info, coupler_info, pad_info):
+    """
+    从 .xlsx 文件中加载布局信息。
+
+    :param qubit_info: 量子比特信息文件路径
+    :param coupler_info: 耦合器信息文件路径
+    :param pad_info: 垫片信息文件路径
+    :return: 布局信息
+    """
+    import pandas as pd
+
+    _qubits = {}
+
+    qubit_pad = read_xlsx_to_dict(qubit_info, value_col=4)
+    coupler_pad = read_xlsx_to_dict(coupler_info, value_col=3)
+    pads = {
+        v: k
+        for k, v in qubit_pad.items()
+    } | {
+        v: k
+        for k, v in coupler_pad.items()
+    }
+    pad_info = read_xlsx_to_dict(pad_info, value_col=2)
+
+    lyt = {'qubits': {}, 'couplers': {}, 'feedlines': {}}
+
+    for pad, script in pad_info.items():
+        info = eval(script)
+        match info['style']:
+            case 'Q':
+                qubit = pads[pad]
+                lyt['qubits'][qubit] = {'pos': info['qb'], 'pad': pad}
+                _qubits[info['qb']] = qubit
+            case 'C':
+                coupler = pads[pad]
+                if 'cpl' in info:
+                    pos = tuple(info['cpl'])
+                else:
+                    pos = tuple(info['qb'])
+                lyt['couplers'][coupler] = {'qubits': pos, 'pad': pad}
+            case 'TL':
+                l = info['tl']
+                if f"T{l}" in lyt['feedlines']:
+                    lyt['feedlines'][f"T{l}"]['pads'].append(pad)
+                else:
+                    lyt['feedlines'][f"T{l}"] = {'pads': [pad]}
+
+    for coupler in lyt['couplers']:
+        qubits = lyt['couplers'][coupler]['qubits']
+        lyt['couplers'][coupler]['qubits'] = [_qubits[p] for p in qubits]
+
+    return complete_layout(lyt)
+
+
 def get_shared_coupler(layout, q1, q2):
     for c in layout['qubits'][q1]['couplers']:
         if q2 in layout['couplers'][c]['qubits']:
