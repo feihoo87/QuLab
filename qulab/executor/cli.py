@@ -24,7 +24,7 @@ from .utils import workflow_template
 
 
 @logger.catch(reraise=True)
-def run_script(script_path, extra_paths=None):
+def run_script(script_path, args=(), extra_paths=None):
     """Run a script in a new process, inheriting current PYTHONPATH plus any extra paths.
     
     Args:
@@ -35,7 +35,7 @@ def run_script(script_path, extra_paths=None):
     import sys
 
     # Launch the new process with the modified environment
-    proc = subprocess.Popen([sys.executable, script_path],
+    proc = subprocess.Popen([sys.executable, script_path, *args],
                             env=combined_env(extra_paths))
     proc.communicate()
 
@@ -368,6 +368,23 @@ def boot(bootstrap):
     """
     if bootstrap is not None:
         run_script(bootstrap)
+
+
+@click.command()
+@click.option('--bootstrap',
+              '-b',
+              default=lambda: get_config_value("bootstrap", Path),
+              help='The path of the bootstrap.')
+def reboot(bootstrap):
+    """Reboot the executor.
+    
+    Reboots the executor to reset the state and start fresh.
+    
+    Args:
+        bootstrap: Path to the bootstrap script
+    """
+    if bootstrap is not None:
+        run_script(bootstrap, args=('--reboot',))
 
 
 def parse_dynamic_option_value(value):

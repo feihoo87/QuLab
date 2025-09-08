@@ -1,7 +1,7 @@
 import click
 
-from ..executor.cli import (boot, create, export, get, load, maintain, delete,
-                            reproduce, run, set)
+from ..executor.cli import (boot, create, delete, export, get, load, maintain,
+                            reboot, reproduce, run, set)
 from ..monitor.__main__ import main as monitor
 from ..scan.server import server
 from ..sys.net.cli import dht
@@ -39,3 +39,4 @@ reg.add_command(delete)
 reg.add_command(load)
 reg.add_command(export)
 cli.add_command(boot)
+cli.add_command(reboot)
