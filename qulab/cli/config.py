@@ -29,7 +29,8 @@ def find_config_file() -> Path | None:
     current_dir = Path.cwd()
     while not (current_dir / "uv.lock").exists():
         current_dir = current_dir.parent
-        if current_dir == Path("/"):
+        # 到达文件系统根目录，停止
+        if current_dir == current_dir.parent:
             break
     config_path = current_dir / "qulab.ini"
     if config_path.exists():
