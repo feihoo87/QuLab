@@ -17,7 +17,7 @@ def find_config_file() -> Path | None:
     查找配置文件
     """
     # 环境变量
-    if config_path := os.getenv("QULAB_CONFIG_PATH"):
+    if config_path := os.getenv(f"{ENV_PREFIX}CONFIG_PATH"):
         return Path(config_path)
 
     # 先查找当前目录下的配置文件
