@@ -52,6 +52,8 @@ dependencies = [
     "wath>=1.1.6",
     "waveforms>=1.9.4",
     "rich>=14.0.0",
+    "pydantic>=2.12.5",
+    "openpyxl>=3.1.5",
 ]
 dynamic = ["version"]
 
