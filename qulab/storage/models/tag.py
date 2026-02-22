@@ -47,13 +47,17 @@ def has_tags(cls: Type[Base]) -> Type[Base]:
     return cls
 
 
-def tag(session: Session, tag_text: str) -> Tag:
+def get_or_create_tag(session: Session, tag_name: str) -> Tag:
     """Get a tag from the database or create a new if not exists."""
-    try:
-        return session.query(Tag).filter(Tag.text == tag_text).one()
-    except NoResultFound:
-        tag = Tag(text=tag_text)
-        return tag
+    tag = session.query(Tag).filter(Tag.name == tag_name).first()
+    if tag is None:
+        tag = Tag(name=tag_name)
+        session.add(tag)
+    return tag
+
+
+# Backwards compatibility alias
+tag = get_or_create_tag
 
 
 def get_object_with_tags(session: Session, cls: Type[Base],
@@ -84,10 +88,10 @@ def get_object_with_tags(session: Session, cls: Type[Base],
 
     aliase = {tag: aliased(Tag) for tag in tags}
 
-    for tag, a in aliase.items():
+    for tag_name, a in aliase.items():
         q = q.join(a, cls.tags)
-        if '*' in tag:
-            q = q.filter(a.text.like(tag.replace('*', '%')))
+        if '*' in tag_name:
+            q = q.filter(a.name.like(tag_name.replace('*', '%')))
         else:
-            q = q.filter(a.text == tag)
+            q = q.filter(a.name == tag_name)
     return q
