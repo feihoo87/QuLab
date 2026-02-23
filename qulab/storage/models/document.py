@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String, Table
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, JSON, String, Table
 from sqlalchemy.orm import Session, relationship
 
 from .base import Base
@@ -34,6 +34,11 @@ class Document(Base):
     """
 
     __tablename__ = "documents"
+
+    # Composite index for efficient "find latest by name" queries
+    __table_args__ = (
+        Index('ix_documents_name_ctime', 'name', 'ctime'),
+    )
 
     id = Column(Integer, primary_key=True)
     name = Column(String, index=True)
@@ -190,3 +195,29 @@ def count_documents(
             query = query.filter(Document.tags.any(Tag.name == tag_name))
 
     return query.count()
+
+
+def get_latest_document(
+    session: Session,
+    name: str,
+    state: Optional[str] = None,
+) -> Optional[Document]:
+    """Get the latest document by name.
+
+    This is the most common query pattern for documents - finding
+    the most recent document with a given name.
+
+    Args:
+        session: Database session
+        name: Document name (exact match)
+        state: Optional state filter
+
+    Returns:
+        The most recent Document or None if not found
+    """
+    query = session.query(Document).filter(Document.name == name)
+
+    if state is not None:
+        query = query.filter(Document.state == state)
+
+    return query.order_by(Document.ctime.desc()).first()

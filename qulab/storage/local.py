@@ -121,6 +121,31 @@ class LocalStorage(Storage):
                 session, name=name, tags=tags, state=state, before=before, after=after
             )
 
+    def get_latest_document(
+        self,
+        name: str,
+        state: Optional[str] = None,
+    ) -> Optional["DocumentRef"]:
+        """Get the latest document by name.
+
+        This is the most common query pattern - finding the most
+        recent document with a given name.
+
+        Args:
+            name: Document name (exact match)
+            state: Optional state filter
+
+        Returns:
+            DocumentRef to the most recent document, or None if not found
+        """
+        from .models import get_latest_document
+
+        with self._get_session() as session:
+            doc = get_latest_document(session, name=name, state=state)
+            if doc is None:
+                return None
+            return DocumentRef(doc.id, self, name=doc.name)
+
     # Dataset API
     def create_dataset(
         self,

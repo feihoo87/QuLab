@@ -162,6 +162,15 @@ results = list(storage.query_documents(tags=["calibration", "qubit"]))
 # 按状态查询
 results = list(storage.query_documents(state="ok"))
 
+# 获取最新的文档（最常用的查询场景）
+latest = storage.get_latest_document(name="calibration")
+if latest:
+    doc = latest.get()
+    print(f"Latest calibration: {doc.data}")
+
+# 获取指定状态的最新文档
+latest_ok = storage.get_latest_document(name="calibration", state="ok")
+
 # 按时间范围查询
 from datetime import datetime, timedelta
 results = list(storage.query_documents(
@@ -803,6 +812,7 @@ except Exception as e:
 |------|------|
 | `create_document(name, data, state, tags, script, **meta)` | 创建文档 |
 | `get_document(id)` | 获取文档 |
+| `get_latest_document(name, state)` | 获取指定名称的最新文档 |
 | `query_documents(**filters)` | 查询文档 |
 | `count_documents(**filters)` | 计数文档 |
 | `create_dataset(name, description, config, script)` | 创建数据集 |

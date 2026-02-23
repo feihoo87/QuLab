@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, JSON, String
 from sqlalchemy.orm import Session, relationship
 
 from .base import Base
@@ -23,6 +23,11 @@ class Dataset(Base):
     """
 
     __tablename__ = "datasets"
+
+    # Composite index for efficient "find latest by name" queries
+    __table_args__ = (
+        Index('ix_datasets_name_ctime', 'name', 'ctime'),
+    )
 
     id = Column(Integer, primary_key=True)
     name = Column(String, index=True)

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from .base import Base, SessionManager
 from .config import Config, get_or_create_config, load_config, save_config
 from .dataset import Array, Dataset, count_datasets, get_array, query_datasets
-from .document import Document, count_documents, query_documents
+from .document import Document, count_documents, get_latest_document, query_documents
 from .script import Script, get_or_create_script, load_script, save_script
 from .tag import Tag, get_or_create_tag, has_tags
 
@@ -54,6 +54,7 @@ __all__ = [
     # Query functions
     "query_documents",
     "count_documents",
+    "get_latest_document",
     "query_datasets",
     "count_datasets",
     "get_array",

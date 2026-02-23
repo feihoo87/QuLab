@@ -82,6 +82,8 @@ class Storage(ABC):
     @abstractmethod
     def get_document(self, id: int) -> Document: ...
     @abstractmethod
+    def get_latest_document(self, name: str, state: Optional[str] = None) -> Optional[DocumentRef]: ...
+    @abstractmethod
     def query_documents(self, **filters) -> Iterator[DocumentRef]: ...
     @abstractmethod
     def count_documents(self, **filters) -> int: ...
@@ -282,6 +284,9 @@ CREATE TABLE documents (
     atime DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 复合索引：优化"查找给定 name 的最新 Document"查询
+CREATE INDEX ix_documents_name_ctime ON documents(name, ctime);
+
 CREATE TABLE document_tags (
     item_id INTEGER REFERENCES documents(id),
     tag_id INTEGER REFERENCES tags(id),
@@ -291,6 +296,8 @@ CREATE TABLE document_tags (
 
 **更新说明：**
 - 新增 `script_id` 字段，关联 Script 模型，用于存储生成此文档的分析代码
+- 新增复合索引 `ix_documents_name_ctime`，优化"查找给定 name 的最新 Document"查询性能
+- 查询默认按 `ctime DESC` 排序，返回最新的文档优先
 
 #### Dataset 模型
 
@@ -306,6 +313,9 @@ CREATE TABLE datasets (
     atime DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 复合索引：优化"查找给定 name 的最新 Dataset"查询
+CREATE INDEX ix_datasets_name_ctime ON datasets(name, ctime);
+
 CREATE TABLE arrays (
     id INTEGER PRIMARY KEY,
     dataset_id INTEGER REFERENCES datasets(id),
@@ -320,6 +330,8 @@ CREATE TABLE arrays (
 **更新说明：**
 - 新增 `config_id` 字段，关联 Config 模型，用于存储实验配置参数
 - 新增 `script_id` 字段，关联 Script 模型，用于存储数据采集代码
+- 新增复合索引 `ix_datasets_name_ctime`，与 Document 保持一致，优化查询性能
+- 查询默认按 `ctime DESC` 排序，返回最新的数据集优先
 
 ### 内容寻址存储
 
@@ -425,6 +437,7 @@ script.ref_count -= 1
 
 - `document.create` - 创建文档（支持 script 参数）
 - `document.get` - 获取文档
+- `document.get_latest` - 获取指定名称的最新文档
 - `document.query` - 查询文档
 - `document.count` - 计数文档
 - `document.delete` - 删除文档
@@ -476,9 +489,30 @@ port = 6789
 ### 读取优化
 
 - 数据库索引支持快速查询
+- 复合索引 `ix_documents_name_ctime` 和 `ix_datasets_name_ctime` 优化"查找最新"查询
 - 惰性加载数组数据
 - 惰性加载文档数据 (`Document.data`)
 - 支持切片操作避免全量加载
+
+### 查询优化
+
+**最常用的查询模式 - 获取最新文档：**
+
+```python
+# 获取指定名称的最新文档（使用复合索引优化）
+latest = storage.get_latest_document(name="calibration")
+
+# 等效的 SQL 查询（使用复合索引 ix_documents_name_ctime）
+SELECT * FROM documents
+WHERE name = 'calibration'
+ORDER BY ctime DESC
+LIMIT 1;
+```
+
+**复合索引设计：**
+- `ix_documents_name_ctime(name, ctime)`: 优化 Document 的"按名称查找最新"查询
+- `ix_datasets_name_ctime(name, ctime)`: 优化 Dataset 的"按名称查找最新"查询
+- 两个查询都默认按 `ctime DESC` 排序，返回最新的记录优先
 
 ### 存储优化
 

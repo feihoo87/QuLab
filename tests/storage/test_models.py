@@ -269,6 +269,43 @@ class TestModels:
         assert count_documents(db_session, state="error") == 1
         assert count_documents(db_session, state="unknown") == 0
 
+    def test_get_latest_document(self, db_session: Session, temp_storage_path: Path):
+        """Test get_latest_document function."""
+        from qulab.storage.models.document import get_latest_document
+
+        # Create documents with the same name at different times
+        doc1 = Document(name="test_doc", state="ok", chunk_hash="h1", chunk_size=10)
+        db_session.add(doc1)
+        db_session.commit()
+
+        doc2 = Document(name="test_doc", state="ok", chunk_hash="h2", chunk_size=20)
+        db_session.add(doc2)
+        db_session.commit()
+
+        doc3 = Document(name="test_doc", state="error", chunk_hash="h3", chunk_size=30)
+        db_session.add(doc3)
+        db_session.commit()
+
+        # Get latest without state filter
+        latest = get_latest_document(db_session, name="test_doc")
+        assert latest is not None
+        assert latest.name == "test_doc"
+        assert latest.chunk_hash == "h3"  # Most recent
+
+        # Get latest with state filter
+        latest_ok = get_latest_document(db_session, name="test_doc", state="ok")
+        assert latest_ok is not None
+        assert latest_ok.state == "ok"
+        assert latest_ok.chunk_hash == "h2"  # Most recent with state="ok"
+
+        # Get latest for non-existent name
+        not_found = get_latest_document(db_session, name="nonexistent")
+        assert not_found is None
+
+        # Get latest with state filter that matches nothing
+        not_found_state = get_latest_document(db_session, name="test_doc", state="unknown")
+        assert not_found_state is None
+
     def test_query_datasets(self, db_session: Session):
         """Test query_datasets function."""
         from qulab.storage.models.dataset import query_datasets

@@ -369,3 +369,38 @@ class TestLocalStorage:
         assert local_storage.get_document(ref2.id).state == "error"
         assert local_storage.get_document(ref3.id).state == "warning"
         assert local_storage.get_document(ref4.id).state == "unknown"
+
+    def test_get_latest_document(self, local_storage: LocalStorage):
+        """Test get_latest_document method."""
+        from qulab.storage.local import DocumentRef
+
+        # Create documents with the same name
+        ref1 = local_storage.create_document(name="versioned_doc", data={"v": 1}, state="ok")
+        ref2 = local_storage.create_document(name="versioned_doc", data={"v": 2}, state="ok")
+        ref3 = local_storage.create_document(name="versioned_doc", data={"v": 3}, state="error")
+
+        # Get latest without state filter
+        latest = local_storage.get_latest_document(name="versioned_doc")
+        assert latest is not None
+        assert isinstance(latest, DocumentRef)
+        assert latest.name == "versioned_doc"
+
+        # Load the document and verify it's the latest
+        doc = latest.get()
+        assert doc.data == {"v": 3}
+        assert doc.state == "error"
+
+        # Get latest with state filter
+        latest_ok = local_storage.get_latest_document(name="versioned_doc", state="ok")
+        assert latest_ok is not None
+        doc_ok = latest_ok.get()
+        assert doc_ok.data == {"v": 2}
+        assert doc_ok.state == "ok"
+
+        # Get latest for non-existent name
+        not_found = local_storage.get_latest_document(name="nonexistent")
+        assert not_found is None
+
+        # Get latest with state filter that matches nothing
+        not_found_state = local_storage.get_latest_document(name="versioned_doc", state="unknown")
+        assert not_found_state is None
