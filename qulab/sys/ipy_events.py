@@ -1,6 +1,9 @@
 import contextlib
 import time
-from datetime import datetime
+from datetime import datetime, timezone
+
+def utcnow():
+    return datetime.now(timezone.utc)
 
 from .storage.crud import create_cell, create_notebook
 from .storage.models import Notebook
@@ -39,7 +42,7 @@ def _save_inputCells(session, inputCells=None):
 def _update_inputCells(session):
     cell = _get_current_cell(session)
     if cell:
-        cell.ftime = datetime.utcnow()
+        cell.ftime = utcnow()
         session.add(cell)
 
 

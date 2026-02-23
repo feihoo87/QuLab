@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, JSON, String, Table
 from sqlalchemy.orm import Session, relationship
 
-from .base import Base
+from .base import Base, utcnow
 from .tag import has_tags
 
 if TYPE_CHECKING:
@@ -57,9 +57,9 @@ class Document(Base):
     meta = Column(JSON, default=dict)
 
     # Timestamps
-    ctime = Column(DateTime, default=datetime.utcnow)
-    mtime = Column(DateTime, default=datetime.utcnow)
-    atime = Column(DateTime, default=datetime.utcnow)
+    ctime = Column(DateTime, default=utcnow)
+    mtime = Column(DateTime, default=utcnow)
+    atime = Column(DateTime, default=utcnow)
 
     # Self-referential relationship for version chain
     parent = relationship("Document", remote_side=[id], backref="children")
@@ -82,7 +82,7 @@ class Document(Base):
 
     def touch(self):
         """Update access time."""
-        self.atime = datetime.utcnow()
+        self.atime = utcnow()
 
 
 def get_or_create_tag(session: Session, tag_name: str) -> "Tag":

@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import Session
 
-from .base import Base
+from .base import Base, utcnow
 
 
 class Config(Base):
@@ -24,15 +24,15 @@ class Config(Base):
     config_hash = Column(String(40), unique=True, index=True, nullable=False)  # SHA1 hash
     size = Column(Integer, nullable=False)
     ref_count = Column(Integer, default=0)  # Reference count for cleanup
-    ctime = Column(DateTime, default=datetime.utcnow)
-    atime = Column(DateTime, default=datetime.utcnow)
+    ctime = Column(DateTime, default=utcnow)
+    atime = Column(DateTime, default=utcnow)
 
     def __repr__(self) -> str:
         return f"Config(id={self.id}, hash={self.config_hash[:8]}..., refs={self.ref_count})"
 
     def touch(self):
         """Update access time."""
-        self.atime = datetime.utcnow()
+        self.atime = utcnow()
 
 
 def compute_config_hash(config_dict: dict) -> str:

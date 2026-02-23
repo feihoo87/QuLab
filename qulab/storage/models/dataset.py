@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, JSON, String
 from sqlalchemy.orm import Session, relationship
 
-from .base import Base
+from .base import Base, utcnow
 from .tag import has_tags
 
 if TYPE_CHECKING:
@@ -38,9 +38,9 @@ class Dataset(Base):
     script_id = Column(Integer, ForeignKey("scripts.id"), nullable=True)
 
     # Timestamps
-    ctime = Column(DateTime, default=datetime.utcnow)
-    mtime = Column(DateTime, default=datetime.utcnow)
-    atime = Column(DateTime, default=datetime.utcnow)
+    ctime = Column(DateTime, default=utcnow)
+    mtime = Column(DateTime, default=utcnow)
+    atime = Column(DateTime, default=utcnow)
 
     # Relationships
     config = relationship("Config", foreign_keys=[config_id])
@@ -66,7 +66,7 @@ class Dataset(Base):
 
     def touch(self):
         """Update access time."""
-        self.atime = datetime.utcnow()
+        self.atime = utcnow()
 
 
 class Array(Base):

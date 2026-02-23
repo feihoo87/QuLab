@@ -81,3 +81,8 @@ include-package-data = true
 
 [tool.setuptools.dynamic]
 version = {attr = "qulab.version.__version__"}
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

@@ -1,10 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 Base = declarative_base()
+
+
+def utcnow() -> datetime:
+    """Return timezone-aware UTC datetime."""
+    return datetime.now(timezone.utc)
 
 
 class SessionManager:
@@ -34,4 +39,4 @@ class SessionManager:
 def update_mtime(mapper, connection, target):
     """Automatically update mtime before any update."""
     if hasattr(target, "mtime"):
-        target.mtime = datetime.utcnow()
+        target.mtime = utcnow()

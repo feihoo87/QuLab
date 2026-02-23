@@ -7,7 +7,7 @@ from typing import Optional
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import Session
 
-from .base import Base
+from .base import Base, utcnow
 
 
 class Script(Base):
@@ -24,15 +24,15 @@ class Script(Base):
     size = Column(Integer, nullable=False)
     language = Column(String, default="python")  # python, javascript, etc.
     ref_count = Column(Integer, default=0)  # Reference count for cleanup
-    ctime = Column(DateTime, default=datetime.utcnow)
-    atime = Column(DateTime, default=datetime.utcnow)
+    ctime = Column(DateTime, default=utcnow)
+    atime = Column(DateTime, default=utcnow)
 
     def __repr__(self) -> str:
         return f"Script(id={self.id}, hash={self.script_hash[:8]}..., lang={self.language}, refs={self.ref_count})"
 
     def touch(self):
         """Update access time."""
-        self.atime = datetime.utcnow()
+        self.atime = utcnow()
 
 
 def compute_script_hash(code: str) -> str:

@@ -167,37 +167,37 @@ class TestLocalStorage:
 
     def test_query_documents_by_time(self, local_storage: LocalStorage):
         """Test querying documents by time range."""
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         # Create documents
         ref1 = local_storage.create_document(name="doc1", data={})
         ref2 = local_storage.create_document(name="doc2", data={})
 
         # Query by time range (using after/before parameters)
-        start_time = datetime.utcnow() - timedelta(hours=1)
+        start_time = datetime.now(timezone.utc) - timedelta(hours=1)
         docs = list(local_storage.query_documents(after=start_time))
         assert len(docs) == 2
 
         # Query by end time
-        end_time = datetime.utcnow() + timedelta(hours=1)
+        end_time = datetime.now(timezone.utc) + timedelta(hours=1)
         docs = list(local_storage.query_documents(before=end_time))
         assert len(docs) == 2
 
     def test_query_datasets_by_time(self, local_storage: LocalStorage):
         """Test querying datasets by time range."""
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         # Create datasets
         ref1 = local_storage.create_dataset(name="ds1", description={})
         ref2 = local_storage.create_dataset(name="ds2", description={})
 
         # Query by time range (using after/before parameters)
-        start_time = datetime.utcnow() - timedelta(hours=1)
+        start_time = datetime.now(timezone.utc) - timedelta(hours=1)
         datasets = list(local_storage.query_datasets(after=start_time))
         assert len(datasets) == 2
 
         # Query by end time
-        end_time = datetime.utcnow() + timedelta(hours=1)
+        end_time = datetime.now(timezone.utc) + timedelta(hours=1)
         datasets = list(local_storage.query_datasets(before=end_time))
         assert len(datasets) == 2
 
