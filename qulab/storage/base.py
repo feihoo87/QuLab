@@ -198,3 +198,65 @@ class Storage(ABC):
             Number of matching datasets
         """
         pass
+
+    # Tag editing API for Documents
+    @abstractmethod
+    def document_add_tags(self, id: int, tags: List[str]) -> None:
+        """Add tags to a document.
+
+        Args:
+            id: Document ID
+            tags: List of tag names to add
+        """
+        pass
+
+    @abstractmethod
+    def document_remove_tags(self, id: int, tags: List[str]) -> None:
+        """Remove tags from a document.
+
+        Args:
+            id: Document ID
+            tags: List of tag names to remove
+        """
+        pass
+
+    @abstractmethod
+    def document_set_tags(self, id: int, tags: List[str]) -> None:
+        """Set tags for a document (replace all existing tags).
+
+        Args:
+            id: Document ID
+            tags: List of tag names
+        """
+        pass
+
+    # Tag editing API for Datasets
+    @abstractmethod
+    def dataset_add_tags(self, id: int, tags: List[str]) -> None:
+        """Add tags to a dataset.
+
+        Args:
+            id: Dataset ID
+            tags: List of tag names to add
+        """
+        pass
+
+    @abstractmethod
+    def dataset_remove_tags(self, id: int, tags: List[str]) -> None:
+        """Remove tags from a dataset.
+
+        Args:
+            id: Dataset ID
+            tags: List of tag names to remove
+        """
+        pass
+
+    @abstractmethod
+    def dataset_set_tags(self, id: int, tags: List[str]) -> None:
+        """Set tags for a dataset (replace all existing tags).
+
+        Args:
+            id: Dataset ID
+            tags: List of tag names
+        """
+        pass

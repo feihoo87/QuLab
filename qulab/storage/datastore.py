@@ -221,6 +221,17 @@ class Dataset:
                     self._atime = ds_model.atime
         return self._atime
 
+    @property
+    def tags(self) -> list[str]:
+        """Get dataset tags."""
+        from .models import Dataset as DatasetModel
+
+        with self.storage._get_session() as session:
+            ds_model = session.get(DatasetModel, self.id)
+            if ds_model is None:
+                return []
+            return [t.name for t in ds_model.tags]
+
     def keys(self) -> list[str]:
         """Get all array keys in this dataset."""
         from .models import Array as ArrayModel
@@ -407,6 +418,78 @@ class Dataset:
                 for doc in ds_model.documents
             ]
 
+    def _get_tags_from_db(self) -> list[str]:
+        """Get tags from database (internal use)."""
+        from .models import Dataset as DatasetModel
+
+        with self.storage._get_session() as session:
+            ds_model = session.get(DatasetModel, self.id)
+            if ds_model is None:
+                return []
+            return [t.name for t in ds_model.tags]
+
+    def add_tag(self, tag: str) -> None:
+        """Add a tag to this dataset.
+
+        Args:
+            tag: Tag name to add
+        """
+        from .models import Dataset as DatasetModel
+        from .models import get_or_create_tag
+
+        with self.storage._get_session() as session:
+            ds_model = session.get(DatasetModel, self.id)
+            if ds_model is None:
+                raise KeyError(f"Dataset {self.id} not found")
+
+            tag_model = get_or_create_tag(session, tag)
+            ds_model.add_tag(tag_model)
+            session.commit()
+
+    def remove_tag(self, tag: str) -> None:
+        """Remove a tag from this dataset.
+
+        Args:
+            tag: Tag name to remove
+        """
+        from .models import Dataset as DatasetModel
+        from .models import Tag
+
+        with self.storage._get_session() as session:
+            ds_model = session.get(DatasetModel, self.id)
+            if ds_model is None:
+                raise KeyError(f"Dataset {self.id} not found")
+
+            # Find and remove the tag
+            tag_model = session.query(Tag).filter_by(name=tag).first()
+            if tag_model:
+                ds_model.remove_tag(tag_model)
+                session.commit()
+
+    def set_tags(self, tags: list[str]) -> None:
+        """Set tags for this dataset (replace all existing tags).
+
+        Args:
+            tags: List of tag names
+        """
+        from .models import Dataset as DatasetModel
+        from .models import get_or_create_tag
+
+        with self.storage._get_session() as session:
+            ds_model = session.get(DatasetModel, self.id)
+            if ds_model is None:
+                raise KeyError(f"Dataset {self.id} not found")
+
+            # Clear existing tags
+            ds_model.tags.clear()
+
+            # Add new tags
+            for tag_name in tags:
+                tag_model = get_or_create_tag(session, tag_name)
+                ds_model.tags.append(tag_model)
+
+            session.commit()
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
@@ -414,6 +497,7 @@ class Dataset:
             "name": self.name,
             "description": self.description,
             "keys": self.keys(),
+            "tags": self.tags,
             "config_hash": self._config_hash,
             "script_hash": self._script_hash,
             "ctime": self.ctime.isoformat() if self.ctime else None,

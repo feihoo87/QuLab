@@ -227,6 +227,27 @@ from qulab.storage.local import DocumentRef
 DocumentRef(123, storage).delete()
 ```
 
+### 编辑文档标签
+
+```python
+# 获取文档
+doc = storage.get_document(123)
+
+# 添加单个标签
+doc.add_tag("important")
+
+# 移除单个标签
+doc.remove_tag("old_tag")
+
+# 设置所有标签（替换现有标签）
+doc.set_tags(["tag1", "tag2", "tag3"])
+
+# 通过 storage API 编辑标签（无需加载完整文档）
+storage.document_add_tags(123, ["tag1", "tag2"])
+storage.document_remove_tags(123, ["old_tag"])
+storage.document_set_tags(123, ["new_tag1", "new_tag2"])
+```
+
 ### 文档与数据集关联
 
 一个 Document 可以关联多个 Dataset（表示由这些数据集分析得来），一个 Dataset 也可以关联多个 Document（表示被多次分析）。
@@ -444,6 +465,30 @@ from qulab.storage.local import DatasetRef
 DatasetRef(123, storage).delete()
 ```
 
+### 编辑数据集标签
+
+```python
+# 获取数据集
+ds = storage.get_dataset(123)
+
+# 添加单个标签
+ds.add_tag("experiment")
+
+# 移除单个标签
+ds.remove_tag("old_tag")
+
+# 设置所有标签（替换现有标签）
+ds.set_tags(["tag1", "tag2", "tag3"])
+
+# 访问标签
+print(ds.tags)  # ['tag1', 'tag2', 'tag3']
+
+# 通过 storage API 编辑标签（无需加载完整数据集）
+storage.dataset_add_tags(123, ["tag1", "tag2"])
+storage.dataset_remove_tags(123, ["old_tag"])
+storage.dataset_set_tags(123, ["new_tag1", "new_tag2"])
+```
+
 ## CLI 使用
 
 ### 启动存储服务器
@@ -612,7 +657,26 @@ doc_ref = storage.create_document(
 
 # 获取文档（从远程服务器获取）
 doc_data = doc_ref.get()
+
+# 远程标签编辑（与本地存储相同的API）
+storage.document_add_tags(doc_id, ["new_tag"])
+storage.document_remove_tags(doc_id, ["old_tag"])
+storage.document_set_tags(doc_id, ["tag1", "tag2"])
+
+# 远程文档对象的标签编辑
+doc = storage.get_document(doc_id)
+doc.add_tag("important")
+doc.remove_tag("draft")
+doc.set_tags(["final", "reviewed"])
+
+# 远程数据集的标签编辑
+ds = storage.get_dataset(ds_id)
+ds.add_tag("experiment")
+ds.remove_tag("test")
+ds.set_tags(["production", "verified"])
 ```
+
+**注意：** RemoteStorage 和 LocalStorage 的标签编辑 API 完全一致，应用程序可以无缝切换存储后端而无需修改代码。
 
 ## 配置
 
@@ -831,10 +895,16 @@ except Exception as e:
 | `get_latest_document(name, state)` | 获取指定名称的最新文档 |
 | `query_documents(**filters)` | 查询文档 |
 | `count_documents(**filters)` | 计数文档 |
+| `document_add_tags(id, tags)` | 为文档添加标签 |
+| `document_remove_tags(id, tags)` | 移除文档标签 |
+| `document_set_tags(id, tags)` | 设置文档标签（替换） |
 | `create_dataset(name, description, config, script, tags)` | 创建数据集 |
 | `get_dataset(id)` | 获取数据集 |
 | `query_datasets(**filters)` | 查询数据集 |
 | `count_datasets(**filters)` | 计数数据集 |
+| `dataset_add_tags(id, tags)` | 为数据集添加标签 |
+| `dataset_remove_tags(id, tags)` | 移除数据集标签 |
+| `dataset_set_tags(id, tags)` | 设置数据集标签（替换） |
 
 **新增参数说明：**
 - `create_dataset(config, script)`: 支持传入实验配置和采集代码
@@ -845,7 +915,7 @@ except Exception as e:
 
 ### Document 类
 
-| 属性 | 说明 |
+| 属性/方法 | 说明 |
 |------|------|
 | `id` | 文档 ID |
 | `name` | 文档名称 |
@@ -858,6 +928,9 @@ except Exception as e:
 | `ctime` | 创建时间 |
 | `mtime` | 修改时间 |
 | `atime` | 访问时间 |
+| `add_tag(tag)` | 添加标签 |
+| `remove_tag(tag)` | 移除标签 |
+| `set_tags(tags)` | 设置标签（替换） |
 
 **延迟加载属性说明：**
 - `data`: 文档数据，仅在首次访问时从 chunk 存储读取
@@ -876,6 +949,10 @@ except Exception as e:
 | `create_array(key, inner_shape)` | 创建数组 |
 | `append(position, data)` | 追加数据 |
 | `flush()` | 刷新到磁盘 |
+| `tags` | 标签列表 |
+| `add_tag(tag)` | 添加标签 |
+| `remove_tag(tag)` | 移除标签 |
+| `set_tags(tags)` | 设置标签（替换） |
 | `config` | 实验配置字典（延迟加载） |
 | `config_hash` | 配置的 SHA1 哈希值 |
 | `script` | 采集代码字符串（延迟加载） |
@@ -897,3 +974,48 @@ except Exception as e:
 | `items()` | 获取位置和值 |
 | `toarray()` | 转换为 numpy 数组 |
 | `__getitem__()` | 切片访问 |
+
+### RemoteStorage 类
+
+| 方法 | 说明 |
+|------|------|
+| `create_document(name, data, state, tags, script, **meta)` | 在远程服务器创建文档 |
+| `get_document(id)` | 获取远程文档代理 |
+| `query_documents(**filters)` | 查询远程文档 |
+| `count_documents(**filters)` | 计数远程文档 |
+| `document_add_tags(id, tags)` | 为远程文档添加标签 |
+| `document_remove_tags(id, tags)` | 移除远程文档标签 |
+| `document_set_tags(id, tags)` | 设置远程文档标签 |
+| `create_dataset(name, description, config, script, tags)` | 在远程服务器创建数据集 |
+| `get_dataset(id)` | 获取远程数据集代理 |
+| `query_datasets(**filters)` | 查询远程数据集 |
+| `count_datasets(**filters)` | 计数远程数据集 |
+| `dataset_add_tags(id, tags)` | 为远程数据集添加标签 |
+| `dataset_remove_tags(id, tags)` | 移除远程数据集标签 |
+| `dataset_set_tags(id, tags)` | 设置远程数据集标签 |
+
+**说明：** RemoteStorage 提供与 LocalStorage 完全一致的 API，可用于远程存储服务器的访问。
+
+### RemoteDocument 类
+
+| 属性/方法 | 说明 |
+|------|------|
+| `id` | 文档 ID |
+| `tags` | 标签列表（从远程获取） |
+| `get_data()` | 获取文档数据 |
+| `add_tag(tag)` | 添加标签到远程文档 |
+| `remove_tag(tag)` | 从远程文档移除标签 |
+| `set_tags(tags)` | 设置远程文档标签 |
+
+### RemoteDataset 类
+
+| 属性/方法 | 说明 |
+|------|------|
+| `id` | 数据集 ID |
+| `tags` | 标签列表（从远程获取） |
+| `keys()` | 获取数组键列表 |
+| `get_info()` | 获取数据集信息 |
+| `get_array(key)` | 获取数组代理 |
+| `add_tag(tag)` | 添加标签到远程数据集 |
+| `remove_tag(tag)` | 从远程数据集移除标签 |
+| `set_tags(tags)` | 设置远程数据集标签 |

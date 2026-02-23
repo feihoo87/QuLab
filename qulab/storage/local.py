@@ -206,6 +206,144 @@ class LocalStorage(Storage):
                 session, name=name, tags=tags, before=before, after=after
             )
 
+    # Tag editing API for Documents
+    def document_add_tags(self, id: int, tags: List[str]) -> None:
+        """Add tags to a document.
+
+        Args:
+            id: Document ID
+            tags: List of tag names to add
+        """
+        from .models import Document as DocumentModel
+        from .models import get_or_create_tag
+
+        with self._get_session() as session:
+            doc = session.get(DocumentModel, id)
+            if doc is None:
+                raise KeyError(f"Document {id} not found")
+
+            for tag_name in tags:
+                tag = get_or_create_tag(session, tag_name)
+                doc.add_tag(tag)
+
+            session.commit()
+
+    def document_remove_tags(self, id: int, tags: List[str]) -> None:
+        """Remove tags from a document.
+
+        Args:
+            id: Document ID
+            tags: List of tag names to remove
+        """
+        from .models import Document as DocumentModel
+        from .models import Tag
+
+        with self._get_session() as session:
+            doc = session.get(DocumentModel, id)
+            if doc is None:
+                raise KeyError(f"Document {id} not found")
+
+            for tag_name in tags:
+                tag = session.query(Tag).filter_by(name=tag_name).first()
+                if tag:
+                    doc.remove_tag(tag)
+
+            session.commit()
+
+    def document_set_tags(self, id: int, tags: List[str]) -> None:
+        """Set tags for a document (replace all existing tags).
+
+        Args:
+            id: Document ID
+            tags: List of tag names
+        """
+        from .models import Document as DocumentModel
+        from .models import get_or_create_tag
+
+        with self._get_session() as session:
+            doc = session.get(DocumentModel, id)
+            if doc is None:
+                raise KeyError(f"Document {id} not found")
+
+            # Clear existing tags
+            doc.tags.clear()
+
+            # Add new tags
+            for tag_name in tags:
+                tag = get_or_create_tag(session, tag_name)
+                doc.tags.append(tag)
+
+            session.commit()
+
+    # Tag editing API for Datasets
+    def dataset_add_tags(self, id: int, tags: List[str]) -> None:
+        """Add tags to a dataset.
+
+        Args:
+            id: Dataset ID
+            tags: List of tag names to add
+        """
+        from .models import Dataset as DatasetModel
+        from .models import get_or_create_tag
+
+        with self._get_session() as session:
+            ds = session.get(DatasetModel, id)
+            if ds is None:
+                raise KeyError(f"Dataset {id} not found")
+
+            for tag_name in tags:
+                tag = get_or_create_tag(session, tag_name)
+                ds.add_tag(tag)
+
+            session.commit()
+
+    def dataset_remove_tags(self, id: int, tags: List[str]) -> None:
+        """Remove tags from a dataset.
+
+        Args:
+            id: Dataset ID
+            tags: List of tag names to remove
+        """
+        from .models import Dataset as DatasetModel
+        from .models import Tag
+
+        with self._get_session() as session:
+            ds = session.get(DatasetModel, id)
+            if ds is None:
+                raise KeyError(f"Dataset {id} not found")
+
+            for tag_name in tags:
+                tag = session.query(Tag).filter_by(name=tag_name).first()
+                if tag:
+                    ds.remove_tag(tag)
+
+            session.commit()
+
+    def dataset_set_tags(self, id: int, tags: List[str]) -> None:
+        """Set tags for a dataset (replace all existing tags).
+
+        Args:
+            id: Dataset ID
+            tags: List of tag names
+        """
+        from .models import Dataset as DatasetModel
+        from .models import get_or_create_tag
+
+        with self._get_session() as session:
+            ds = session.get(DatasetModel, id)
+            if ds is None:
+                raise KeyError(f"Dataset {id} not found")
+
+            # Clear existing tags
+            ds.tags.clear()
+
+            # Add new tags
+            for tag_name in tags:
+                tag = get_or_create_tag(session, tag_name)
+                ds.tags.append(tag)
+
+            session.commit()
+
 
 class DocumentRef:
     """Lightweight reference to a document in local storage."""

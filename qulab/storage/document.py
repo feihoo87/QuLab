@@ -251,6 +251,88 @@ class Document:
             **self.meta,
         )
 
+    def add_tag(self, tag: str) -> None:
+        """Add a tag to this document.
+
+        Args:
+            tag: Tag name to add
+        """
+        if self._storage is None:
+            raise RuntimeError("Document is not associated with a storage")
+
+        from .models import Document as DocumentModel
+        from .models import get_or_create_tag
+
+        with self._storage._get_session() as session:
+            doc_model = session.get(DocumentModel, self.id)
+            if doc_model is None:
+                raise KeyError(f"Document {self.id} not found")
+
+            tag_model = get_or_create_tag(session, tag)
+            doc_model.add_tag(tag_model)
+            session.commit()
+
+            # Update local cache
+            if tag not in self.tags:
+                self.tags.append(tag)
+
+    def remove_tag(self, tag: str) -> None:
+        """Remove a tag from this document.
+
+        Args:
+            tag: Tag name to remove
+        """
+        if self._storage is None:
+            raise RuntimeError("Document is not associated with a storage")
+
+        from .models import Document as DocumentModel
+        from .models import Tag
+
+        with self._storage._get_session() as session:
+            doc_model = session.get(DocumentModel, self.id)
+            if doc_model is None:
+                raise KeyError(f"Document {self.id} not found")
+
+            # Find and remove the tag
+            tag_model = session.query(Tag).filter_by(name=tag).first()
+            if tag_model:
+                doc_model.remove_tag(tag_model)
+                session.commit()
+
+            # Update local cache
+            if tag in self.tags:
+                self.tags.remove(tag)
+
+    def set_tags(self, tags: List[str]) -> None:
+        """Set tags for this document (replace all existing tags).
+
+        Args:
+            tags: List of tag names
+        """
+        if self._storage is None:
+            raise RuntimeError("Document is not associated with a storage")
+
+        from .models import Document as DocumentModel
+        from .models import get_or_create_tag
+
+        with self._storage._get_session() as session:
+            doc_model = session.get(DocumentModel, self.id)
+            if doc_model is None:
+                raise KeyError(f"Document {self.id} not found")
+
+            # Clear existing tags
+            doc_model.tags.clear()
+
+            # Add new tags
+            for tag_name in tags:
+                tag_model = get_or_create_tag(session, tag_name)
+                doc_model.tags.append(tag_model)
+
+            session.commit()
+
+            # Update local cache
+            self.tags = list(tags)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {

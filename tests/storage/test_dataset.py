@@ -360,3 +360,215 @@ class TestDataset:
         assert isinstance(dataset.ctime, datetime)
         assert isinstance(dataset.mtime, datetime)
         assert isinstance(dataset.atime, datetime)
+
+
+class TestDatasetTags:
+    """Test Dataset tag editing functionality."""
+
+    def test_create_with_tags(self, local_storage: LocalStorage):
+        """Test creating a dataset with tags."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={"app": "test"},
+            tags=["tag1", "tag2"],
+        )
+
+        dataset = ref.get()
+        assert "tag1" in dataset.tags
+        assert "tag2" in dataset.tags
+
+    def test_add_tag(self, local_storage: LocalStorage):
+        """Test adding a tag to a dataset."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={},
+            tags=["initial"],
+        )
+        dataset = ref.get()
+
+        # Add a new tag
+        dataset.add_tag("new_tag")
+
+        # Verify tag was added
+        assert "new_tag" in dataset.tags
+        assert "initial" in dataset.tags
+
+        # Reload and verify
+        reloaded = Dataset.load(local_storage, dataset.id)
+        assert "new_tag" in reloaded.tags
+        assert "initial" in reloaded.tags
+
+    def test_add_duplicate_tag(self, local_storage: LocalStorage):
+        """Test adding a duplicate tag is handled gracefully."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={},
+            tags=["tag1"],
+        )
+        dataset = ref.get()
+
+        # Add the same tag again
+        dataset.add_tag("tag1")
+
+        # Should not have duplicates
+        assert dataset.tags.count("tag1") == 1
+
+    def test_remove_tag(self, local_storage: LocalStorage):
+        """Test removing a tag from a dataset."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={},
+            tags=["tag1", "tag2", "tag3"],
+        )
+        dataset = ref.get()
+
+        # Remove a tag
+        dataset.remove_tag("tag2")
+
+        # Verify tag was removed
+        assert "tag2" not in dataset.tags
+        assert "tag1" in dataset.tags
+        assert "tag3" in dataset.tags
+
+        # Reload and verify
+        reloaded = Dataset.load(local_storage, dataset.id)
+        assert "tag2" not in reloaded.tags
+        assert "tag1" in reloaded.tags
+        assert "tag3" in reloaded.tags
+
+    def test_remove_nonexistent_tag(self, local_storage: LocalStorage):
+        """Test removing a tag that doesn't exist."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={},
+            tags=["tag1"],
+        )
+        dataset = ref.get()
+
+        # Remove a non-existent tag (should not raise)
+        dataset.remove_tag("nonexistent")
+
+        # Original tags should remain
+        assert "tag1" in dataset.tags
+
+    def test_set_tags(self, local_storage: LocalStorage):
+        """Test setting tags (replace all)."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={},
+            tags=["old1", "old2"],
+        )
+        dataset = ref.get()
+
+        # Set new tags
+        dataset.set_tags(["new1", "new2", "new3"])
+
+        # Verify tags were replaced
+        assert set(dataset.tags) == {"new1", "new2", "new3"}
+
+        # Reload and verify
+        reloaded = Dataset.load(local_storage, dataset.id)
+        assert set(reloaded.tags) == {"new1", "new2", "new3"}
+
+    def test_set_tags_empty(self, local_storage: LocalStorage):
+        """Test setting empty tags list."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={},
+            tags=["tag1", "tag2"],
+        )
+        dataset = ref.get()
+
+        # Clear all tags
+        dataset.set_tags([])
+
+        # Verify tags were cleared
+        assert dataset.tags == []
+
+        # Reload and verify
+        reloaded = Dataset.load(local_storage, dataset.id)
+        assert reloaded.tags == []
+
+    def test_storage_dataset_add_tags(self, local_storage: LocalStorage):
+        """Test LocalStorage.dataset_add_tags()."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={},
+            tags=["initial"],
+        )
+
+        # Add tags via storage
+        local_storage.dataset_add_tags(ref.id, ["tag1", "tag2"])
+
+        # Verify
+        dataset = ref.get()
+        assert "initial" in dataset.tags
+        assert "tag1" in dataset.tags
+        assert "tag2" in dataset.tags
+
+    def test_storage_dataset_remove_tags(self, local_storage: LocalStorage):
+        """Test LocalStorage.dataset_remove_tags()."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={},
+            tags=["tag1", "tag2", "tag3"],
+        )
+
+        # Remove tags via storage
+        local_storage.dataset_remove_tags(ref.id, ["tag2"])
+
+        # Verify
+        dataset = ref.get()
+        assert "tag1" in dataset.tags
+        assert "tag2" not in dataset.tags
+        assert "tag3" in dataset.tags
+
+    def test_storage_dataset_set_tags(self, local_storage: LocalStorage):
+        """Test LocalStorage.dataset_set_tags()."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={},
+            tags=["old1", "old2"],
+        )
+
+        # Set tags via storage
+        local_storage.dataset_set_tags(ref.id, ["new1", "new2"])
+
+        # Verify
+        dataset = ref.get()
+        assert set(dataset.tags) == {"new1", "new2"}
+
+    def test_tag_query_after_edit(self, local_storage: LocalStorage):
+        """Test that query by tag works after editing tags."""
+        ref = Dataset.create(
+            local_storage,
+            name="test_dataset",
+            description={},
+            tags=["initial"],
+        )
+
+        # Add tag
+        dataset = ref.get()
+        dataset.add_tag("searchable")
+
+        # Query by new tag
+        results = list(local_storage.query_datasets(tags=["searchable"]))
+        assert len(results) == 1
+        assert results[0].id == ref.id
+
+        # Remove tag
+        dataset.remove_tag("searchable")
+
+        # Query again
+        results = list(local_storage.query_datasets(tags=["searchable"]))
+        assert len(results) == 0

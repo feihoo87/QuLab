@@ -154,6 +154,22 @@ class StorageServer:
         ref = DocumentRef(id, self.storage)
         return ref.delete()
 
+    # Document tag editing handlers
+    async def handle_document_add_tags(self, id: int, tags: list) -> bool:
+        """Add tags to a document."""
+        self.storage.document_add_tags(id, tags)
+        return True
+
+    async def handle_document_remove_tags(self, id: int, tags: list) -> bool:
+        """Remove tags from a document."""
+        self.storage.document_remove_tags(id, tags)
+        return True
+
+    async def handle_document_set_tags(self, id: int, tags: list) -> bool:
+        """Set tags for a document (replace all)."""
+        self.storage.document_set_tags(id, tags)
+        return True
+
     # Dataset handlers
     async def handle_dataset_create(
         self,
@@ -234,6 +250,22 @@ class StorageServer:
 
         ref = DatasetRef(id, self.storage)
         return ref.delete()
+
+    # Dataset tag editing handlers
+    async def handle_dataset_add_tags(self, id: int, tags: list) -> bool:
+        """Add tags to a dataset."""
+        self.storage.dataset_add_tags(id, tags)
+        return True
+
+    async def handle_dataset_remove_tags(self, id: int, tags: list) -> bool:
+        """Remove tags from a dataset."""
+        self.storage.dataset_remove_tags(id, tags)
+        return True
+
+    async def handle_dataset_set_tags(self, id: int, tags: list) -> bool:
+        """Set tags for a dataset (replace all)."""
+        self.storage.dataset_set_tags(id, tags)
+        return True
 
     # Array handlers
     async def handle_array_getitem(

@@ -191,6 +191,62 @@ class RemoteStorage(Storage):
             after=after,
         )
 
+    # Document tag editing API
+    def document_add_tags(self, id: int, tags: List[str]) -> None:
+        """Add tags to a document on the remote server.
+
+        Args:
+            id: Document ID
+            tags: List of tag names to add
+        """
+        self._call("document_add_tags", id=id, tags=tags)
+
+    def document_remove_tags(self, id: int, tags: List[str]) -> None:
+        """Remove tags from a document on the remote server.
+
+        Args:
+            id: Document ID
+            tags: List of tag names to remove
+        """
+        self._call("document_remove_tags", id=id, tags=tags)
+
+    def document_set_tags(self, id: int, tags: List[str]) -> None:
+        """Set tags for a document on the remote server (replace all).
+
+        Args:
+            id: Document ID
+            tags: List of tag names
+        """
+        self._call("document_set_tags", id=id, tags=tags)
+
+    # Dataset tag editing API
+    def dataset_add_tags(self, id: int, tags: List[str]) -> None:
+        """Add tags to a dataset on the remote server.
+
+        Args:
+            id: Dataset ID
+            tags: List of tag names to add
+        """
+        self._call("dataset_add_tags", id=id, tags=tags)
+
+    def dataset_remove_tags(self, id: int, tags: List[str]) -> None:
+        """Remove tags from a dataset on the remote server.
+
+        Args:
+            id: Dataset ID
+            tags: List of tag names to remove
+        """
+        self._call("dataset_remove_tags", id=id, tags=tags)
+
+    def dataset_set_tags(self, id: int, tags: List[str]) -> None:
+        """Set tags for a dataset on the remote server (replace all).
+
+        Args:
+            id: Dataset ID
+            tags: List of tag names
+        """
+        self._call("dataset_set_tags", id=id, tags=tags)
+
 
 class RemoteDocumentRef:
     """Reference to a remote document."""
@@ -218,10 +274,42 @@ class RemoteDocument:
     def __init__(self, id: int, storage: RemoteStorage):
         self.id = id
         self.storage = storage
+        self._info: Optional[dict] = None
+
+    def _get_info(self) -> dict:
+        """Get document info (cached)."""
+        if self._info is None:
+            self._info = self.storage._call("document_get", id=self.id)
+        return self._info
 
     def get_data(self) -> dict:
         """Get document data."""
         return self.storage._call("document_get_data", id=self.id)
+
+    @property
+    def tags(self) -> list[str]:
+        """Get document tags."""
+        return self._get_info().get("tags", [])
+
+    def add_tag(self, tag: str) -> None:
+        """Add a tag to this document."""
+        self.storage.document_add_tags(self.id, [tag])
+        if self._info is not None:
+            if tag not in self._info.get("tags", []):
+                self._info.setdefault("tags", []).append(tag)
+
+    def remove_tag(self, tag: str) -> None:
+        """Remove a tag from this document."""
+        self.storage.document_remove_tags(self.id, [tag])
+        if self._info is not None:
+            if tag in self._info.get("tags", []):
+                self._info["tags"].remove(tag)
+
+    def set_tags(self, tags: list[str]) -> None:
+        """Set tags for this document (replace all)."""
+        self.storage.document_set_tags(self.id, tags)
+        if self._info is not None:
+            self._info["tags"] = list(tags)
 
     def __repr__(self) -> str:
         return f"RemoteDocument(id={self.id})"
@@ -253,10 +341,17 @@ class RemoteDataset:
     def __init__(self, id: int, storage: RemoteStorage):
         self.id = id
         self.storage = storage
+        self._info: Optional[dict] = None
+
+    def _get_info(self) -> dict:
+        """Get dataset info (cached)."""
+        if self._info is None:
+            self._info = self.storage._call("dataset_get", id=self.id)
+        return self._info
 
     def get_info(self) -> dict:
         """Get dataset information."""
-        return self.storage._call("dataset_get", id=self.id)
+        return self._get_info()
 
     def keys(self) -> list[str]:
         """Get array keys."""
@@ -272,6 +367,31 @@ class RemoteDataset:
     def get_array(self, key: str) -> "RemoteArray":
         """Get a remote array proxy."""
         return RemoteArray(self.id, key, self.storage)
+
+    @property
+    def tags(self) -> list[str]:
+        """Get dataset tags."""
+        return self._get_info().get("tags", [])
+
+    def add_tag(self, tag: str) -> None:
+        """Add a tag to this dataset."""
+        self.storage.dataset_add_tags(self.id, [tag])
+        if self._info is not None:
+            if tag not in self._info.get("tags", []):
+                self._info.setdefault("tags", []).append(tag)
+
+    def remove_tag(self, tag: str) -> None:
+        """Remove a tag from this dataset."""
+        self.storage.dataset_remove_tags(self.id, [tag])
+        if self._info is not None:
+            if tag in self._info.get("tags", []):
+                self._info["tags"].remove(tag)
+
+    def set_tags(self, tags: list[str]) -> None:
+        """Set tags for this dataset (replace all)."""
+        self.storage.dataset_set_tags(self.id, tags)
+        if self._info is not None:
+            self._info["tags"] = list(tags)
 
     def __repr__(self) -> str:
         return f"RemoteDataset(id={self.id})"

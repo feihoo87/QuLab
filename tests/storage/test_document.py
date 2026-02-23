@@ -368,3 +368,202 @@ class TestDocument:
         assert v3.version == 3
         assert v2.parent_id == v1.id
         assert v3.parent_id == v2.id
+
+
+class TestDocumentTags:
+    """Test Document tag editing functionality."""
+
+    def test_add_tag(self, local_storage: LocalStorage):
+        """Test adding a tag to a document."""
+        ref = Document.create(
+            local_storage,
+            name="test_doc",
+            data={"key": "value"},
+            tags=["initial"],
+        )
+        doc = ref.get()
+
+        # Add a new tag
+        doc.add_tag("new_tag")
+
+        # Verify tag was added
+        assert "new_tag" in doc.tags
+        assert "initial" in doc.tags
+
+        # Reload and verify
+        reloaded = Document.load(local_storage, doc.id)
+        assert "new_tag" in reloaded.tags
+        assert "initial" in reloaded.tags
+
+    def test_add_duplicate_tag(self, local_storage: LocalStorage):
+        """Test adding a duplicate tag is handled gracefully."""
+        ref = Document.create(
+            local_storage,
+            name="test_doc",
+            data={"key": "value"},
+            tags=["tag1"],
+        )
+        doc = ref.get()
+
+        # Add the same tag again
+        doc.add_tag("tag1")
+
+        # Should not have duplicates
+        assert doc.tags.count("tag1") == 1
+
+    def test_remove_tag(self, local_storage: LocalStorage):
+        """Test removing a tag from a document."""
+        ref = Document.create(
+            local_storage,
+            name="test_doc",
+            data={"key": "value"},
+            tags=["tag1", "tag2", "tag3"],
+        )
+        doc = ref.get()
+
+        # Remove a tag
+        doc.remove_tag("tag2")
+
+        # Verify tag was removed
+        assert "tag2" not in doc.tags
+        assert "tag1" in doc.tags
+        assert "tag3" in doc.tags
+
+        # Reload and verify
+        reloaded = Document.load(local_storage, doc.id)
+        assert "tag2" not in reloaded.tags
+        assert "tag1" in reloaded.tags
+        assert "tag3" in reloaded.tags
+
+    def test_remove_nonexistent_tag(self, local_storage: LocalStorage):
+        """Test removing a tag that doesn't exist."""
+        ref = Document.create(
+            local_storage,
+            name="test_doc",
+            data={"key": "value"},
+            tags=["tag1"],
+        )
+        doc = ref.get()
+
+        # Remove a non-existent tag (should not raise)
+        doc.remove_tag("nonexistent")
+
+        # Original tags should remain
+        assert "tag1" in doc.tags
+
+    def test_set_tags(self, local_storage: LocalStorage):
+        """Test setting tags (replace all)."""
+        ref = Document.create(
+            local_storage,
+            name="test_doc",
+            data={"key": "value"},
+            tags=["old1", "old2"],
+        )
+        doc = ref.get()
+
+        # Set new tags
+        doc.set_tags(["new1", "new2", "new3"])
+
+        # Verify tags were replaced
+        assert doc.tags == ["new1", "new2", "new3"]
+
+        # Reload and verify
+        reloaded = Document.load(local_storage, doc.id)
+        assert set(reloaded.tags) == {"new1", "new2", "new3"}
+
+    def test_set_tags_empty(self, local_storage: LocalStorage):
+        """Test setting empty tags list."""
+        ref = Document.create(
+            local_storage,
+            name="test_doc",
+            data={"key": "value"},
+            tags=["tag1", "tag2"],
+        )
+        doc = ref.get()
+
+        # Clear all tags
+        doc.set_tags([])
+
+        # Verify tags were cleared
+        assert doc.tags == []
+
+        # Reload and verify
+        reloaded = Document.load(local_storage, doc.id)
+        assert reloaded.tags == []
+
+    def test_storage_document_add_tags(self, local_storage: LocalStorage):
+        """Test LocalStorage.document_add_tags()."""
+        ref = Document.create(
+            local_storage,
+            name="test_doc",
+            data={"key": "value"},
+            tags=["initial"],
+        )
+
+        # Add tags via storage
+        local_storage.document_add_tags(ref.id, ["tag1", "tag2"])
+
+        # Verify
+        doc = ref.get()
+        assert "initial" in doc.tags
+        assert "tag1" in doc.tags
+        assert "tag2" in doc.tags
+
+    def test_storage_document_remove_tags(self, local_storage: LocalStorage):
+        """Test LocalStorage.document_remove_tags()."""
+        ref = Document.create(
+            local_storage,
+            name="test_doc",
+            data={"key": "value"},
+            tags=["tag1", "tag2", "tag3"],
+        )
+
+        # Remove tags via storage
+        local_storage.document_remove_tags(ref.id, ["tag2"])
+
+        # Verify
+        doc = ref.get()
+        assert "tag1" in doc.tags
+        assert "tag2" not in doc.tags
+        assert "tag3" in doc.tags
+
+    def test_storage_document_set_tags(self, local_storage: LocalStorage):
+        """Test LocalStorage.document_set_tags()."""
+        ref = Document.create(
+            local_storage,
+            name="test_doc",
+            data={"key": "value"},
+            tags=["old1", "old2"],
+        )
+
+        # Set tags via storage
+        local_storage.document_set_tags(ref.id, ["new1", "new2"])
+
+        # Verify
+        doc = ref.get()
+        assert set(doc.tags) == {"new1", "new2"}
+
+    def test_tag_query_after_edit(self, local_storage: LocalStorage):
+        """Test that query by tag works after editing tags."""
+        ref = Document.create(
+            local_storage,
+            name="test_doc",
+            data={"key": "value"},
+            tags=["initial"],
+        )
+
+        # Add tag
+        doc = ref.get()
+        doc.add_tag("searchable")
+
+        # Query by new tag
+        results = list(local_storage.query_documents(tags=["searchable"]))
+        assert len(results) == 1
+        assert results[0].id == ref.id
+
+        # Remove tag
+        doc.remove_tag("searchable")
+
+        # Query again
+        results = list(local_storage.query_documents(tags=["searchable"]))
+        assert len(results) == 0
