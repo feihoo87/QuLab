@@ -275,6 +275,21 @@ ds_ref = storage.create_dataset(
 ds = ds_ref.get()
 ```
 
+### 创建带标签的数据集
+
+```python
+# 创建带标签的数据集
+ds_ref = storage.create_dataset(
+    name="qubit_sweep",
+    description={"type": "resonator_scan", "qubit": "Q1"},
+    tags=["experiment", "qubit1", "2024"]
+)
+
+# 通过标签查询数据集
+results = list(storage.query_datasets(tags=["experiment"]))
+results = list(storage.query_datasets(tags=["experiment", "qubit1"]))
+```
+
 ### 创建带配置和代码的数据集
 
 ```python
@@ -306,12 +321,13 @@ def measure(freq, power_drive, power_readout, averages):
     return np.mean(data), np.std(data)
 '''
 
-# 创建带配置和代码的数据集
+# 创建带配置、代码和标签的数据集
 ds_ref = storage.create_dataset(
     name="qubit_resonator_scan",
     description={"type": "resonator_scan", "qubit": "Q1"},
     config=config,      # 实验配置（内容寻址去重存储）
-    script=measurement_script  # 采集代码（内容寻址去重存储）
+    script=measurement_script,  # 采集代码（内容寻址去重存储）
+    tags=["experiment", "qubit01", "resonator"]  # 标签
 )
 
 # 获取数据集
@@ -815,7 +831,7 @@ except Exception as e:
 | `get_latest_document(name, state)` | 获取指定名称的最新文档 |
 | `query_documents(**filters)` | 查询文档 |
 | `count_documents(**filters)` | 计数文档 |
-| `create_dataset(name, description, config, script)` | 创建数据集 |
+| `create_dataset(name, description, config, script, tags)` | 创建数据集 |
 | `get_dataset(id)` | 获取数据集 |
 | `query_datasets(**filters)` | 查询数据集 |
 | `count_datasets(**filters)` | 计数数据集 |

@@ -53,6 +53,7 @@ class Dataset:
         description: dict,
         config: Optional[dict] = None,
         script: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> "DatasetRef":
         """Create a new dataset in storage.
 
@@ -62,13 +63,14 @@ class Dataset:
             description: Dataset description dictionary
             config: Optional configuration dictionary
             script: Optional script code string
+            tags: Optional list of tags
 
         Returns:
             DatasetRef for the created dataset
         """
         from .local import DatasetRef
         from .models import Dataset as DatasetModel
-        from .models import get_or_create_config, get_or_create_script
+        from .models import get_or_create_config, get_or_create_script, get_or_create_tag
 
         with storage._get_session() as session:
             ds = DatasetModel(name=name, description=description)
@@ -88,6 +90,14 @@ class Dataset:
                 script_model.ref_count += 1
 
             session.add(ds)
+            session.flush()  # Flush to get the dataset ID
+
+            # Add tags
+            if tags:
+                for tag_name in tags:
+                    tag = get_or_create_tag(session, tag_name)
+                    ds.tags.append(tag)
+
             session.commit()
             return DatasetRef(ds.id, storage, name=name)
 

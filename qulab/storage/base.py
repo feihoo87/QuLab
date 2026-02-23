@@ -122,6 +122,7 @@ class Storage(ABC):
         description: dict,
         config: Optional[dict] = None,
         script: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> "DatasetRef":
         """Create a new dataset.
 
@@ -130,6 +131,7 @@ class Storage(ABC):
             description: Dataset description dictionary
             config: Optional configuration dictionary
             script: Optional script code string
+            tags: Optional list of tags
 
         Returns:
             DatasetRef for the created dataset

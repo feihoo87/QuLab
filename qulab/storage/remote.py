@@ -135,6 +135,7 @@ class RemoteStorage(Storage):
         description: dict,
         config: Optional[dict] = None,
         script: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> "RemoteDatasetRef":
         """Create a new dataset on the remote server."""
         ds_id = self._call(
@@ -143,6 +144,7 @@ class RemoteStorage(Storage):
             description=description,
             config=config,
             script=script,
+            tags=tags,
         )
         return RemoteDatasetRef(ds_id, self, name=name)
 

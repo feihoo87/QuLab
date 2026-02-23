@@ -294,17 +294,24 @@ class TestLocalStorage:
         assert len(docs) == 0
 
     def test_dataset_with_tags(self, local_storage: LocalStorage):
-        """Test dataset creation with tags - SKIPPED: tags not supported in create_dataset."""
-        pytest.skip("Dataset tags not yet supported in create_dataset")
-        # ref = local_storage.create_dataset(
-        #     name="tagged_dataset",
-        #     description={},
-        #     tags=["experimental", "qubit1"],
-        # )
-        #
-        # # Query by tags
-        # datasets = list(local_storage.query_datasets(tags=["experimental"]))
-        # assert len(datasets) == 1
+        """Test dataset creation with tags."""
+        ref = local_storage.create_dataset(
+            name="tagged_dataset",
+            description={},
+            tags=["experimental", "qubit1"],
+        )
+
+        # Query by single tag
+        datasets = list(local_storage.query_datasets(tags=["experimental"]))
+        assert len(datasets) == 1
+
+        # Query by multiple tags
+        datasets = list(local_storage.query_datasets(tags=["experimental", "qubit1"]))
+        assert len(datasets) == 1
+
+        # Query by non-existent tag
+        datasets = list(local_storage.query_datasets(tags=["nonexistent"]))
+        assert len(datasets) == 0
 
     def test_multiple_document_versions(self, local_storage: LocalStorage):
         """Test creating multiple document versions."""

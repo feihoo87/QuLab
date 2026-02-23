@@ -161,9 +161,10 @@ class StorageServer:
         description: dict,
         config: Optional[dict] = None,
         script: Optional[str] = None,
+        tags: Optional[list] = None,
     ) -> int:
         """Create a new dataset."""
-        ref = self.storage.create_dataset(name, description, config=config, script=script)
+        ref = self.storage.create_dataset(name, description, config=config, script=script, tags=tags)
         return ref.id
 
     async def handle_dataset_get(self, id: int) -> dict:
