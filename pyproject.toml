@@ -84,5 +84,6 @@ version = {attr = "qulab.version.__version__"}
 
 [dependency-groups]
 dev = [
+    "pylint[spelling]>=4.0.5",
     "pytest>=9.0.2",
 ]
