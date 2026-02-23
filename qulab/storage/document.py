@@ -17,11 +17,12 @@ class Document:
 
     This class replaces the previous Report concept from executor.storage
     with a more general document storage system.
+
+    The `data` attribute is lazy-loaded from chunk storage on first access.
     """
 
     id: Optional[int] = None
     name: str = ""
-    data: dict = field(default_factory=dict)
     meta: dict = field(default_factory=dict)
     ctime: datetime = field(default_factory=datetime.now)
     mtime: datetime = field(default_factory=datetime.now)
@@ -40,11 +41,30 @@ class Document:
     _script: Optional[str] = field(default=None, repr=False)
     _script_hash: Optional[str] = field(default=None, repr=False)
 
+    # Data cache (lazy loaded from chunk storage)
+    _data: Optional[dict] = field(default=None, repr=False)
+    _chunk_hash: Optional[str] = field(default=None, repr=False)
+
     # Storage reference (needed for lazy loading)
     _storage: Optional["LocalStorage"] = field(default=None, repr=False)
 
     def __repr__(self) -> str:
         return f"Document(id={self.id}, name={self.name!r}, state={self.state})"
+
+    @property
+    def data(self) -> dict:
+        """Get document data (lazy loaded from chunk storage)."""
+        if self._data is None and self._chunk_hash is not None and self._storage is not None:
+            from .chunk import load_chunk
+
+            data_bytes = load_chunk(self._chunk_hash, base_path=self._storage.base_path)
+            self._data = pickle.loads(lzma.decompress(data_bytes))
+        return self._data if self._data is not None else {}
+
+    @data.setter
+    def data(self, value: dict):
+        """Set document data."""
+        self._data = value
 
     @property
     def dataset_ids(self) -> List[int]:
@@ -79,7 +99,6 @@ class Document:
         if self._dataset_ids is None:
             return []
         return [storage.get_dataset(ds_id) for ds_id in self._dataset_ids]
-        return f"Document(id={self.id}, name={self.name!r}, state={self.state})"
 
     @classmethod
     def create(
@@ -183,7 +202,6 @@ class Document:
         Raises:
             KeyError: If document not found
         """
-        from .chunk import load_chunk
         from .models import Document as DocumentModel
 
         with storage._get_session() as session:
@@ -195,19 +213,12 @@ class Document:
             doc_model.atime = datetime.now()
             session.commit()
 
-            # Load data from chunk
-            data_bytes = load_chunk(
-                doc_model.chunk_hash, base_path=storage.base_path
-            )
-            data = pickle.loads(lzma.decompress(data_bytes))
-
             # Get script hash if available
             script_hash = doc_model.script.script_hash if doc_model.script else None
 
             return cls(
                 id=doc_model.id,
                 name=doc_model.name,
-                data=data,
                 meta=doc_model.meta,
                 ctime=doc_model.ctime,
                 mtime=doc_model.mtime,
@@ -218,6 +229,7 @@ class Document:
                 parent_id=doc_model.parent_id,
                 _dataset_ids=[ds.id for ds in doc_model.datasets],
                 _script_hash=script_hash,
+                _chunk_hash=doc_model.chunk_hash,
                 _storage=storage,
             )
 
@@ -262,7 +274,6 @@ class Document:
         return cls(
             id=data.get("id"),
             name=data.get("name", ""),
-            data=data.get("data", {}),
             meta=data.get("meta", {}),
             ctime=datetime.fromisoformat(data["ctime"]),
             mtime=datetime.fromisoformat(data["mtime"]),
@@ -271,6 +282,7 @@ class Document:
             state=data.get("state", "unknown"),
             version=data.get("version", 1),
             parent_id=data.get("parent_id"),
+            _data=data.get("data", {}),
             _script_hash=data.get("script_hash") or data.get("_script_hash"),
             _dataset_ids=data.get("dataset_ids") or data.get("_dataset_ids"),
             _script=data.get("script") or data.get("_script"),

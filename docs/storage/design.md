@@ -120,7 +120,6 @@ class LocalStorage(Storage):
 class Document:
     id: Optional[int]
     name: str
-    data: dict
     meta: dict
     ctime: datetime
     mtime: datetime
@@ -129,9 +128,15 @@ class Document:
     state: str  # 'ok', 'error', 'warning', 'unknown'
     version: int
     parent_id: Optional[int]  # 版本链
+    _data: Optional[dict] = None  # 延迟加载的文档数据
+    _chunk_hash: Optional[str] = None
     _script: Optional[str] = None  # 延迟加载的分析代码
     _script_hash: Optional[str] = None
     _storage: Optional[LocalStorage] = None  # 用于延迟加载
+
+    # 数据访问（延迟加载）
+    @property
+    def data(self) -> dict: ...
 
     # 代码访问（延迟加载）
     @property
@@ -141,8 +146,10 @@ class Document:
 ```
 
 **设计说明：**
+- `data`: 文档数据，内容寻址存储，延迟加载
 - `script` / `script_hash`: 分析代码，内容寻址存储，延迟加载
-- `_storage` 引用用于延迟加载时访问 chunk 存储
+- `_storage` 和 `_chunk_hash` 引用用于延迟加载时访问 chunk 存储
+- 延迟加载优点：访问文档元数据时不会加载大量数据
 - 适合存储生成此文档的分析/处理代码
 
 #### Dataset (datastore.py)
@@ -470,6 +477,7 @@ port = 6789
 
 - 数据库索引支持快速查询
 - 惰性加载数组数据
+- 惰性加载文档数据 (`Document.data`)
 - 支持切片操作避免全量加载
 
 ### 存储优化
@@ -487,9 +495,10 @@ port = 6789
 - 引用计数跟踪使用情况，支持清理未引用的 chunk
 
 **延迟加载：**
-- 配置和代码按需加载，减少内存占用
+- 文档数据 (`data`)、配置 (`config`) 和代码 (`script`) 按需加载，减少内存占用
 - 数据库只存储哈希值，查询效率高
-- 适合存储大型配置和代码文件
+- 适合存储大型数据、配置和代码文件
+- 访问文档元数据（如 `name`, `tags`, `state`）时不会触发数据加载
 
 ## 安全考虑
 
