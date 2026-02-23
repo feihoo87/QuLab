@@ -26,7 +26,7 @@ Example:
 
 from .array import Array
 from .base import Storage
-from .datastore import Dataset
+from .dataset import Dataset
 from .document import Document
 from .local import DatasetRef, DocumentRef, LocalStorage
 

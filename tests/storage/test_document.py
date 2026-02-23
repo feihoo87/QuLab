@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from qulab.storage.datastore import Dataset
+from qulab.storage.dataset import Dataset
 from qulab.storage.document import Document
 from qulab.storage.local import LocalStorage
 

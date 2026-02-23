@@ -5,7 +5,7 @@ import pytest
 
 from qulab.storage.local import LocalStorage
 from qulab.storage.document import Document
-from qulab.storage.datastore import Dataset
+from qulab.storage.dataset import Dataset
 from qulab.storage.models.config import Config
 from qulab.storage.models.script import Script
 

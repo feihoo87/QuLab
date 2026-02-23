@@ -9,7 +9,7 @@ from .base import Storage
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from .datastore import Dataset
+    from .dataset import Dataset
     from .document import Document
 
 

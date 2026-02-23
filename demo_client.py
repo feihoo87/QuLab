@@ -134,14 +134,19 @@ def demo_remote_dataset():
     print("\n创建远程数据集...")
     config = {
         "qubit": "Q1",
-        "frequency": {"start": 5.0e9, "stop": 5.1e9, "points": 101},
+        "frequency": {
+            "start": 5.0e9,
+            "stop": 5.1e9,
+            "points": 101
+        },
     }
 
-    ds_ref = storage.create_dataset(
-        name="remote_resonator_scan",
-        description={"type": "resonator_scan", "qubit": "Q1"},
-        config=config
-    )
+    ds_ref = storage.create_dataset(name="remote_resonator_scan",
+                                    description={
+                                        "type": "resonator_scan",
+                                        "qubit": "Q1"
+                                    },
+                                    config=config)
     print(f"创建数据集: ID={ds_ref.id}, Name={ds_ref.name}")
 
     # 获取数据集信息
@@ -152,11 +157,13 @@ def demo_remote_dataset():
 
     # 追加数据
     print("\n追加数据...")
-    for i in range(10):
-        ds.append(
-            position=(0, i),
-            data={"frequency": 5.0e9 + i * 10e6, "amplitude": np.random.rand(1024, 64)}
-        )
+    for j in range(5):
+        for i in range(10):
+            ds.append(position=(j, i),
+                    data={
+                        "frequency": 5.0e9 + i * 10e6,
+                        "amplitude": np.random.rand(1024, 64)
+                    })
     print("数据追加完成")
 
     # 查看数组

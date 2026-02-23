@@ -162,13 +162,13 @@ class LocalStorage(Storage):
         tags: Optional[List[str]] = None,
     ) -> "DatasetRef":
         """Create a new dataset."""
-        from .datastore import Dataset
+        from .dataset import Dataset
 
         return Dataset.create(self, name, description, config=config, script=script, tags=tags)
 
     def get_dataset(self, id: int) -> "Dataset":
         """Get a dataset by ID."""
-        from .datastore import Dataset
+        from .dataset import Dataset
 
         return Dataset.load(self, id)
 
@@ -395,7 +395,7 @@ class DatasetRef:
 
     def get(self) -> "Dataset":
         """Load the full dataset."""
-        from .datastore import Dataset
+        from .dataset import Dataset
 
         return Dataset.load(self.storage, self.id)
 

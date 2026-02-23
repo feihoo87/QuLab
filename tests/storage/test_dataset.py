@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from qulab.storage.array import Array
-from qulab.storage.datastore import Dataset
+from qulab.storage.dataset import Dataset
 from qulab.storage.local import LocalStorage
 
 

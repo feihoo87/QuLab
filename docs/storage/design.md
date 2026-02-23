@@ -48,7 +48,7 @@ qulab/storage/
 ├── remote.py                # RemoteStorage 实现 (ZMQ client)
 ├── server.py                # StorageServer 实现 (ZMQ server)
 ├── document.py              # Document 类 (原 Report)
-├── datastore.py             # Dataset 类 (扩展原 scan.record)
+├── dataset.py               # Dataset 类 (扩展原 scan.record)
 ├── array.py                 # Array 类 (原 BufferList)
 ├── chunk.py                 # 内容寻址块存储
 ├── file.py                  # 文件格式 (已有)
@@ -154,7 +154,7 @@ class Document:
 - 延迟加载优点：访问文档元数据时不会加载大量数据
 - 适合存储生成此文档的分析/处理代码
 
-#### Dataset (datastore.py)
+#### Dataset (dataset.py)
 
 数据集存储类：
 

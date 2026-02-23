@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from qulab.storage.local import LocalStorage, DocumentRef, DatasetRef
 from qulab.storage.document import Document
-from qulab.storage.datastore import Dataset
+from qulab.storage.dataset import Dataset
 
 
 class TestLocalStorage:
