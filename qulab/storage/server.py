@@ -276,6 +276,46 @@ class StorageServer:
         arr = ds.get_array(key)
         return arr[index]
 
+    async def handle_array_getitem_slice(
+        self, dataset_id: int, key: str, slices: list
+    ) -> Any:
+        """Get a sliced array.
+
+        Args:
+            dataset_id: Dataset ID
+            key: Array key
+            slices: Serialized slice parameters from client
+
+        Returns:
+            Sliced array data
+        """
+        import numpy as np
+
+        # Deserialize slice parameters
+        slice_tuple = []
+        for s in slices:
+            if s.get("type") == "slice":
+                slice_tuple.append(slice(s.get("start"), s.get("stop"), s.get("step")))
+            elif s.get("type") == "int":
+                slice_tuple.append(s.get("value"))
+            elif s.get("type") == "ellipsis":
+                slice_tuple.append(...)
+            else:
+                slice_tuple.append(s.get("value"))
+
+        slice_tuple = tuple(slice_tuple)
+
+        ds = self.storage.get_dataset(dataset_id)
+        arr = ds.get_array(key)
+
+        # Apply slicing on server side - only transfer the sliced data
+        result = arr[slice_tuple]
+
+        # Convert numpy arrays to lists for serialization
+        if isinstance(result, np.ndarray):
+            return result.tolist()
+        return result
+
     async def handle_array_iter(
         self, dataset_id: int, key: str, start: int = 0, count: int = 100
     ) -> list:

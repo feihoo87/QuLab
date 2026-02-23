@@ -271,23 +271,9 @@ class Array:
         """Convert to numpy array (dense representation)."""
         pos, data = self.items()
 
-        if self._slice:
-            # Handle sliced array
-            pos = np.asarray(pos)
-            lu = tuple(np.min(pos, axis=0))
-            rd = tuple(np.max(pos, axis=0) + 1)
-            pos = pos - np.asarray(lu)
-            shape = []
-            for k, (s, i, j) in enumerate(zip(self._slice, rd, lu)):
-                if s.step is not None:
-                    pos[:, k] = pos[:, k] / s.step
-                    shape.append(round(np.ceil((i - j) / s.step)))
-                else:
-                    shape.append(i - j)
-            shape = tuple(shape)
-        else:
-            shape = tuple(r - l for l, r in zip(self.lu, self.rd))
-            pos = np.asarray(pos) - np.asarray(self.lu)
+        # Always return full array, ignore self._slice
+        shape = tuple(r - l for l, r in zip(self.lu, self.rd))
+        pos = np.asarray(pos) - np.asarray(self.lu)
 
         data = np.asarray(data)
         if data.size == 0:
@@ -396,19 +382,41 @@ class Array:
         # Convert single index to tuple
         if not isinstance(slice_tuple, tuple):
             slice_tuple = (slice_tuple,)
-        self._slice, contract, reversed_dims = self._full_slice(slice_tuple)
+
+        full_slice, contract, reversed_dims = self._full_slice(slice_tuple)
+
+        # Get full array
         ret = self.toarray()
 
+        if ret.size == 0:
+            return ret
+
+        ndim = len(ret.shape)
+
+        # Build slice tuple for the result
         slices = []
-        for i, s in enumerate(self._slice):
+        for i in range(ndim):
+            s = full_slice[i] if i < len(full_slice) else slice(None)
             if i in contract:
-                slices.append(0)
+                # Use integer index for contracted dimensions
+                slices.append(s.start if isinstance(s, slice) else 0)
             elif isinstance(s, slice):
+                # Normalize slice bounds relative to array bounds
+                start = s.start if s.start is not None else 0
+                stop = s.stop if s.stop is not None else ret.shape[i]
+                # Clamp to valid range
+                start = max(0, min(start, ret.shape[i]))
+                stop = max(0, min(stop, ret.shape[i]))
                 if i in reversed_dims:
-                    slices.append(slice(None, None, -1))
+                    # For reversed dims, swap start/stop and use negative step
+                    # Use None instead of -1 for stop to include index 0
+                    rev_start = stop - 1 if stop > 0 else None
+                    rev_stop = start - 1 if start > 0 else None
+                    slices.append(slice(rev_start, rev_stop, -1))
                 else:
-                    slices.append(slice(None, None, 1))
+                    slices.append(slice(start, stop, s.step))
+            else:
+                slices.append(s)
 
         ret = ret.__getitem__(tuple(slices))
-        self._slice = None
         return ret

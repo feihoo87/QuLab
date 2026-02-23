@@ -1021,3 +1021,31 @@ except Exception as e:
 | `add_tag(tag)` | 添加标签到远程数据集 |
 | `remove_tag(tag)` | 从远程数据集移除标签 |
 | `set_tags(tags)` | 设置远程数据集标签 |
+
+### RemoteArray 类
+
+| 属性/方法 | 说明 |
+|------|------|
+| `getitem(index)` | 通过索引获取单个元素 |
+| `__getitem__(slice)` | 支持 NumPy 风格切片访问（服务端切片，只传输所需数据） |
+| `iter(start, count)` | 迭代数据点（分页） |
+| `toarray()` | 转换为 numpy 数组（分批传输） |
+
+**远程切片优化：**
+- `__getitem__` 支持 NumPy 风格切片（如 `[0:10]`, `[..., 0]`, `[::-1]` 等）
+- 切片在服务端执行，只传输用户需要的数据，减少网络传输
+- 示例：
+  ```python
+  storage = RemoteStorage("tcp://server:6789")
+  ds = storage.get_dataset(123)
+  arr = ds.get_array("amplitude")
+
+  # 只获取前10行数据（服务端切片后只传输10行）
+  subset = arr[0:10]
+
+  # 获取所有数据的第0列（服务端切片后只传输1列）
+  col0 = arr[..., 0]
+
+  # 反转数据顺序
+  reversed_data = arr[::-1]
+  ```

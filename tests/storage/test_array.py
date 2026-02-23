@@ -181,7 +181,6 @@ class TestArray:
         assert np_array[0, 0] == 1.0
         assert np_array[2, 1] == 6.0
 
-    @pytest.mark.skip(reason="Array slicing needs complex fixes")
     def test_getitem(self, local_storage: LocalStorage):
         """Test NumPy-style slicing."""
         array = Array.create(local_storage, 1, "test", inner_shape=(2,))
@@ -203,7 +202,6 @@ class TestArray:
         assert row.shape == (2,)
         assert np.allclose(row, [2.0, 3.0])
 
-    @pytest.mark.skip(reason="Array slicing needs complex fixes")
     def test_getitem_ellipsis(self, local_storage: LocalStorage):
         """Test using Ellipsis in slicing."""
         array = Array.create(local_storage, 1, "test", inner_shape=(2,))
@@ -216,6 +214,92 @@ class TestArray:
         val = array[..., 0]
         assert val.shape == (3,)
         assert np.allclose(val, [0.0, 2.0, 4.0])
+
+    def test_getitem_negative_index(self, local_storage: LocalStorage):
+        """Test negative indexing."""
+        array = Array.create(local_storage, 1, "test", inner_shape=(2,))
+
+        # Create data with 1D positions
+        for i in range(4):
+            array.append((i,), [float(i * 2), float(i * 2 + 1)])
+
+        # Test negative index
+        val = array[-1]
+        assert np.allclose(val, [6.0, 7.0])
+
+        # Test negative slice
+        slice_val = array[-2:]
+        assert slice_val.shape == (2, 2)
+        assert np.allclose(slice_val[0], [4.0, 5.0])
+
+    def test_getitem_step(self, local_storage: LocalStorage):
+        """Test step slicing."""
+        array = Array.create(local_storage, 1, "test", inner_shape=(2,))
+
+        # Create data with 1D positions
+        for i in range(5):
+            array.append((i,), [float(i * 2), float(i * 2 + 1)])
+
+        # Test positive step
+        val = array[::2]
+        assert val.shape == (3, 2)
+        assert np.allclose(val[0], [0.0, 1.0])
+        assert np.allclose(val[1], [4.0, 5.0])
+        assert np.allclose(val[2], [8.0, 9.0])
+
+    def test_getitem_negative_step(self, local_storage: LocalStorage):
+        """Test negative step slicing (reversal)."""
+        array = Array.create(local_storage, 1, "test", inner_shape=(2,))
+
+        # Create data with 1D positions
+        for i in range(4):
+            array.append((i,), [float(i * 2), float(i * 2 + 1)])
+
+        # Test negative step
+        val = array[::-1]
+        assert val.shape == (4, 2)
+        assert np.allclose(val[0], [6.0, 7.0])
+        assert np.allclose(val[-1], [0.0, 1.0])
+
+    def test_getitem_multidim(self, local_storage: LocalStorage):
+        """Test multidimensional slicing."""
+        array = Array.create(local_storage, 1, "test", inner_shape=())
+
+        # Create a 3x3 sparse array
+        for i in range(3):
+            for j in range(3):
+                array.append((i, j), float(i * 3 + j))
+
+        # Test row slice
+        row = array[1, :]
+        assert np.allclose(row, [3.0, 4.0, 5.0])
+
+        # Test column slice
+        col = array[:, 1]
+        assert np.allclose(col, [1.0, 4.0, 7.0])
+
+        # Test sub-array slice
+        sub = array[0:2, 0:2]
+        assert sub.shape == (2, 2)
+        assert np.allclose(sub[0], [0.0, 1.0])
+        assert np.allclose(sub[1], [3.0, 4.0])
+
+    def test_getitem_with_inner_shape(self, local_storage: LocalStorage):
+        """Test slicing with inner_shape."""
+        array = Array.create(local_storage, 1, "test", inner_shape=(2, 2))
+
+        # Create data with 1D positions
+        for i in range(3):
+            array.append((i,), [[i*4, i*4+1], [i*4+2, i*4+3]])
+
+        # Test outer slice
+        outer = array[0:2]
+        assert outer.shape == (2, 2, 2)
+
+        # Test ellipsis for inner slice
+        inner = array[..., 0, 0]
+        assert inner.shape == (3,)
+        assert np.allclose(inner, [0.0, 4.0, 8.0])
 
     def test_shape(self, local_storage: LocalStorage):
         """Test array shape."""

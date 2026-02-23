@@ -414,6 +414,43 @@ class RemoteArray:
             index=index,
         )
 
+    def __getitem__(self, slice_tuple):
+        """Support NumPy-style slicing.
+
+        Args:
+            slice_tuple: Slice tuple (e.g., [0:2], [..., 0], etc.)
+
+        Returns:
+            Sliced array data
+        """
+        # Convert single index to tuple
+        if not isinstance(slice_tuple, tuple):
+            slice_tuple = (slice_tuple,)
+
+        # Serialize slice parameters for transmission
+        serialized_slices = []
+        for s in slice_tuple:
+            if isinstance(s, slice):
+                serialized_slices.append({
+                    "type": "slice",
+                    "start": s.start,
+                    "stop": s.stop,
+                    "step": s.step,
+                })
+            elif isinstance(s, int):
+                serialized_slices.append({"type": "int", "value": s})
+            elif s is ...:
+                serialized_slices.append({"type": "ellipsis"})
+            else:
+                serialized_slices.append({"type": "other", "value": s})
+
+        return self.storage._call(
+            "array_getitem_slice",
+            dataset_id=self.dataset_id,
+            key=self.key,
+            slices=serialized_slices,
+        )
+
     def iter(self, start: int = 0, count: int = 100) -> list:
         """Iterate over array items."""
         return self.storage._call(
