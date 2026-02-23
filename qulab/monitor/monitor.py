@@ -38,7 +38,7 @@ def main(data_queue: mp.Queue,
     from .qt_compat import QtWidgets  # type: ignore
 
     app = QtWidgets.QApplication(sys.argv)
-    main_window = MainWindow(data_queue, num_columns, minimum_height,
+    _ = MainWindow(data_queue, num_columns, minimum_height,
                              plot_colors)
     sys.exit(app.exec())
 
@@ -290,7 +290,7 @@ if __name__ == "__main__":
 
     # Example 2: Using MonitorServer and Monitor
     def run_server():
-        server = MonitorServer("127.0.0.1", 5555)
+        _ = MonitorServer("127.0.0.1", 5555)
         try:
             while True:
                 time.sleep(1)

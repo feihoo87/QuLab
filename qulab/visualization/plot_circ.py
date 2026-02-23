@@ -316,4 +316,4 @@ def _plot_layer(ax, layer, qubit_mapping=None):
 
 
 def plot_qlisp(ax, circ, qubit_mapping=None):
-    layers = table_to_layers(qlisp_to_table(circ))
+    _ = table_to_layers(qlisp_to_table(circ))

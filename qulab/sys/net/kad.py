@@ -236,7 +236,7 @@ class Node:
         return repr([self.long_id, self.ip, self.port])
 
     def __str__(self):
-        return "%s:%s" % (self.ip, str(self.port))
+        return f"{self.ip}:{self.port}"
 
 
 class NodeHeap:
@@ -734,7 +734,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
 
     def handle_request(self, msg_id, data, address):
         if not isinstance(data, list) or len(data) != 2:
-            raise MalformedMessage("Could not read packet: %s" % data)
+            raise MalformedMessage(f"Could not read packet: {data}")
         funcname, args = data
 
         try:

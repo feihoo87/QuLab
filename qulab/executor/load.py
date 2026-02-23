@@ -1,11 +1,8 @@
 import atexit
 import inspect
-import os
 import pickle
-import shutil
 import sys
 import tempfile
-import time
 import warnings
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -16,8 +13,7 @@ from loguru import logger
 
 from .registry import Registry
 from .storage import Report
-from .template import (TemplateKeyError, TemplateTypeError, decode_mapping,
-                       inject_mapping)
+from .template import TemplateKeyError, inject_mapping
 
 
 class SetConfigWorkflow():

@@ -97,8 +97,7 @@ class Ext(object):
             raise TypeError("ext type is not type integer")
         elif not (-2**7 <= type <= 2**7 - 1):
             raise ValueError(
-                "ext type value {:d} is out of range (-128 to 127)".format(
-                    type))
+                f"ext type value {type:d} is out of range (-128 to 127)")
         # Check data is type bytes or str
         elif sys.version_info[0] == 3 and not isinstance(data, bytes):
             raise TypeError("ext data is not type \'bytes\'")
@@ -125,9 +124,9 @@ class Ext(object):
         """
         String representation of this Ext object.
         """
-        s = "Ext Object (Type: {:d}, Data: ".format(self.type)
+        s = f"Ext Object (Type: {self.type:d}, Data: "
         s += " ".join([
-            "0x{:02x}".format(ord(self.data[i:i + 1]))
+            f"0x{ord(self.data[i:i + 1]):02x}"
             for i in range(min(len(self.data), 8))
         ])
         if len(self.data) > 8:
@@ -179,16 +178,13 @@ def ext_serializable(ext_type):
             raise TypeError("Ext type is not type integer")
         elif not (-2**7 <= ext_type <= 2**7 - 1):
             raise ValueError(
-                "Ext type value {:d} is out of range of -128 to 127".format(
-                    ext_type))
+                f"Ext type value {ext_type:d} is out of range of -128 to 127")
         elif ext_type in _ext_type_to_class:
             raise ValueError(
-                "Ext type {:d} already registered with class {:s}".format(
-                    ext_type, repr(_ext_type_to_class[ext_type])))
+                f"Ext type {ext_type:d} already registered with class {repr(_ext_type_to_class[ext_type]):s}")
         elif cls in _ext_class_to_type:
             raise ValueError(
-                "Class {:s} already registered with Ext type {:d}".format(
-                    repr(cls), ext_type))
+                f"Class {repr(cls):s} already registered with Ext type {ext_type:d}")
 
         _ext_type_to_class[ext_type] = cls
         _ext_class_to_type[cls] = ext_type
@@ -506,8 +502,7 @@ def _pack3(obj, fp, **options):
                       options)
         except AttributeError:
             raise NotImplementedError(
-                "Ext serializable class {:s} is missing implementation of packb()"
-                .format(repr(obj.__class__)))
+                f"Ext serializable class {repr(obj.__class__):s} is missing implementation of packb()")
     elif isinstance(obj, bool):
         _pack_boolean(obj, fp, options)
     elif isinstance(obj, int):
@@ -536,8 +531,7 @@ def _pack3(obj, fp, **options):
         if t:
             _pack_ext(ext_handlers[t](obj), fp, options)
         else:
-            raise UnsupportedTypeException("unsupported type: {:s}".format(
-                str(type(obj))))
+            raise UnsupportedTypeException(f"unsupported type: {str(type(obj)):s}")
     elif _ext_class_to_type:
         # Linear search for superclass
         t = next((t for t in _ext_class_to_type if isinstance(obj, t)), None)
@@ -546,14 +540,11 @@ def _pack3(obj, fp, **options):
                 _pack_ext(Ext(_ext_class_to_type[t], obj.packb()), fp, options)
             except AttributeError:
                 raise NotImplementedError(
-                    "Ext serializable class {:s} is missing implementation of packb()"
-                    .format(repr(t)))
+                    f"Ext serializable class {repr(t):s} is missing implementation of packb()")
         else:
-            raise UnsupportedTypeException("unsupported type: {:s}".format(
-                str(type(obj))))
+            raise UnsupportedTypeException(f"unsupported type: {str(type(obj)):s}")
     else:
-        raise UnsupportedTypeException("unsupported type: {:s}".format(
-            str(type(obj))))
+        raise UnsupportedTypeException(f"unsupported type: {str(type(obj)):s}")
 
 
 def _packb3(obj, **options):

@@ -1,8 +1,6 @@
 """Script model - content-addressed storage for code scripts."""
 
 import lzma
-from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import Session

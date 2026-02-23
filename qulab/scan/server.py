@@ -1,8 +1,5 @@
 import asyncio
-import os
 import pickle
-import subprocess
-import sys
 import time
 import uuid
 from pathlib import Path
@@ -20,8 +17,8 @@ from .curd import (create_cell, create_config, create_notebook, get_config,
 from .models import Cell, Notebook
 from .models import Record as RecordInDB
 from .models import Session, create_engine, create_tables, sessionmaker, utcnow
-from .record import BufferList, Record, random_path
-from .utils import dump_dict, load_dict
+from .record import Record, random_path
+from .utils import load_dict
 
 default_record_port = get_config_value('port',
                                        int,
@@ -75,14 +72,14 @@ def clear_cache():
         return
 
     logger.debug(f"clear_cache record_cache: {len(record_cache)}")
-    for ((k, (t, r)),
-         i) in zip(sorted(record_cache.items(), key=lambda x: x[1][0]),
+    for ((k, (_, _)),
+         _) in zip(sorted(record_cache.items(), key=lambda x: x[1][0]),
                    range(len(record_cache) - CACHE_SIZE)):
         del record_cache[k]
 
     logger.debug(f"clear_cache buffer_list_cache: {len(buffer_list_cache)}")
-    for ((k, (t, r)),
-         i) in zip(sorted(buffer_list_cache.items(), key=lambda x: x[1][0]),
+    for ((k, (_, _)),
+         _) in zip(sorted(buffer_list_cache.items(), key=lambda x: x[1][0]),
                    range(len(buffer_list_cache) - CACHE_SIZE)):
         del buffer_list_cache[k]
     logger.debug(f"clear_cache done.")
@@ -90,7 +87,7 @@ def clear_cache():
 
 def flush_cache():
     logger.debug(f"flush_cache: {len(record_cache)}")
-    for k, (t, r) in record_cache.items():
+    for _, (_, r) in record_cache.items():
         r.flush()
     logger.debug(f"flush_cache done.")
 

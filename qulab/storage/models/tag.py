@@ -2,7 +2,6 @@ from typing import Type
 
 from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Query, Session, aliased, relationship
-from sqlalchemy.orm.exc import NoResultFound
 
 from . import Base
 

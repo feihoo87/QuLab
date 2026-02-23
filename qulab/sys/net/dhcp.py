@@ -25,11 +25,9 @@
 # See http://www.iana.org/assignments/bootp-dhcp-parameters
 
 import base64
-import logging
 import socket
 from enum import Enum
 from struct import Struct, pack, unpack
-from typing import NamedTuple
 
 MAGIC_COOKIE = b'c\x82Sc'
 

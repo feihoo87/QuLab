@@ -1,7 +1,6 @@
 from typing import Any, Sequence
 
 import nevergrad as ng
-import numpy as np
 from scipy.optimize import OptimizeResult
 
 

@@ -1,7 +1,7 @@
 """Storage abstract base class - defines the interface for all storage implementations."""
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Iterator, List, Optional, Union
+from typing import TYPE_CHECKING, Iterator, List, Optional
 
 if TYPE_CHECKING:
     from datetime import datetime

@@ -40,9 +40,9 @@ def IEEE_488_2_BinBlock(datalist, dtype="int16", is_big_endian=True):
         else:
             endianc = '<'
         datablock = struct.pack(
-            '%s%d%s' % (endianc, len(datalist), types[dtype][1]), *datalist)
-    size = '%d' % len(datablock)
-    header = '#%d%s' % (len(size), size)
+            f'{endianc}{len(datalist)}{types[dtype][1]}', *datalist)
+    size = f'{len(datablock)}'
+    header = f'#{len(size)}{size}'
 
     return header.encode() + datablock
 
@@ -73,7 +73,7 @@ def decode_IEEE_488_2_BinBlock(data, dtype="int16", is_big_endian=True):
         endianc = '<'
     datalist = list(
         struct.unpack(
-            '%s%d%s' % (endianc, size // struct.calcsize(types[dtype][1]),
-                        types[dtype][1]), datablock))
+            f'{endianc}{size // struct.calcsize(types[dtype][1])}{types[dtype][1]}',
+            datablock))
 
     return datalist

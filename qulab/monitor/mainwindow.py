@@ -180,7 +180,7 @@ class MainWindow(QtWidgets.QMainWindow):
         xy_pairs = self.toolbar.xypairs
 
         # Group plots by X axis
-        for idx, (x_name, y_name) in enumerate(xy_pairs):
+        for idx, (x_name, _) in enumerate(xy_pairs):
             if x_name not in same_x_axis:
                 same_x_axis[x_name] = []
             same_x_axis[x_name].append(idx)

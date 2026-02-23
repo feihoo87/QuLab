@@ -176,7 +176,7 @@ def plot_mat(rho, title='$\\chi$', cmap='coolwarm'):
     ax1.set_yticks(np.arange(N))
 
     ax2 = plt.subplot(122)
-    cax2 = ax2.imshow(rho.imag, vmin=-lim, vmax=lim, cmap=cmap)
+    _ = ax2.imshow(rho.imag, vmin=-lim, vmax=lim, cmap=cmap)
     ax2.set_title('Im')
     ax2.set_xticks(np.arange(N))
     ax2.set_yticks(np.arange(N))
@@ -184,5 +184,5 @@ def plot_mat(rho, title='$\\chi$', cmap='coolwarm'):
     plt.subplots_adjust(bottom=0.2, right=0.9, top=0.95)
 
     cbar_ax = fig.add_axes([0.15, 0.15, 0.7, 0.05])
-    cb = fig.colorbar(cax1, cax=cbar_ax, orientation='horizontal')
+    _ = fig.colorbar(cax1, cax=cbar_ax, orientation='horizontal')
     plt.show()

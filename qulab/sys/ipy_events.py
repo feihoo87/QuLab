@@ -1,5 +1,4 @@
 import contextlib
-import time
 from datetime import datetime, timezone
 
 def utcnow():

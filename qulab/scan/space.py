@@ -1,4 +1,3 @@
-import itertools
 from typing import Type
 
 import numpy as np

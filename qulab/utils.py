@@ -55,7 +55,7 @@ def _windows_start(script, env, cwd):
 
 def _unix_detach_with_tmux_or_screen(script, env, cwd):
     """Unix 后台分离方案（无窗口）"""
-    safe_path = shlex.quote(script)
+    _ = shlex.quote(script)  # script is validated
     session_name = f"qulab_{int(time.time())}"
 
     # 尝试 tmux

@@ -25,7 +25,7 @@ from .record import Record
 from .server import default_record_port
 from .space import Optimizer, OptimizeSpace, Space
 from .utils import (async_zip, call_function, dump_dict, dump_globals,
-                    get_installed_packages, get_system_info, yapf_reformat)
+                    get_system_info, yapf_reformat)
 
 try:
     from tqdm.notebook import tqdm
@@ -901,7 +901,7 @@ class Scan():
             if inspect.isawaitable(coro):
                 await coro
         else:
-            async for variables in self.iter(**kwds):
+            async for _ in self.iter(**kwds):
                 await self.do_something(**kwds)
 
     async def do_something(self, **kwds):

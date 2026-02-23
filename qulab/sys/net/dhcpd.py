@@ -54,11 +54,8 @@
 
 import asyncio
 import logging
-import socket
-from typing import NamedTuple
 
-from waveforms.sys.net.dhcp import (MAGIC_COOKIE, DHCPMessageType, DHCPOption,
-                                    DHCPPacket)
+from waveforms.sys.net.dhcp import (DHCPMessageType, DHCPOption, DHCPPacket)
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +77,7 @@ class DHCPServerProtocol:
             logger.error("Error decoding DHCP packet: %s", e)
             return
 
-        print("\nReceived DHCP packet from %s:%d" % (addr[0], addr[1]))
+        print(f"\nReceived DHCP packet from {addr[0]}:{addr[1]}")
         print(received)
 
         # see if there is a DHCP message type option
@@ -127,7 +124,7 @@ class DHCPServerProtocol:
         response_packet = response.encode()
 
         # send it
-        print("\nSending DHCP packet to %s:%d" % (addr[0], addr[1]))
+        print(f"\nSending DHCP packet to {addr[0]}:{addr[1]}")
         print(DHCPPacket.decode(response_packet))
         self.send_packet(response_packet, addr)
 

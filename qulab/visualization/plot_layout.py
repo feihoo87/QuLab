@@ -46,7 +46,7 @@ def complete_layout(layout):
         qubits = layout['couplers'][c]['qubits']
         for q in qubits:
             if q not in layout['qubits']:
-                raise ValueError('qubit {} not found'.format(q))
+                raise ValueError(f'qubit {q} not found')
             if 'couplers' not in layout['qubits'][q]:
                 layout['qubits'][q]['couplers'] = []
             if c not in layout['qubits'][q]['couplers']:
@@ -88,8 +88,6 @@ def load_layout_from_xlsx(qubit_info, coupler_info, pad_info):
     :param pad_info: 垫片信息文件路径
     :return: 布局信息
     """
-    import pandas as pd
-
     _qubits = {}
 
     qubit_pad = read_xlsx_to_dict(qubit_info, value_col=4)
@@ -181,17 +179,14 @@ def get_neighbours(layout,
     if type == 'qubit':
         if inrange:
             return list(functools.reduce(operator.or_, neighbors, set()))
-        else:
-            return list(neighbors[-1])
-    elif type == 'coupler':
+        return list(neighbors[-1])
+    if type == 'coupler':
         if inrange:
             if qubit_or_coupler in couplers[0]:
                 couplers = couplers[1:]
             return list(functools.reduce(operator.or_, couplers, set()))
-        else:
-            return list(couplers[-1])
-    else:
-        raise ValueError("type must be 'qubit' or 'coupler'")
+        return list(couplers[-1])
+    raise ValueError("type must be 'qubit' or 'coupler'")
 
 
 def plot_range(ax,
@@ -300,7 +295,7 @@ def project(pos, camera=(0, 0, 100), rotation=None):
         x, y, z = pos
     x, y, z = rot_round(x, y, z, rotation['axis'], rotation['angle'],
                         rotation['center'])
-    x, y, d = projection(x - x0, y - y0, z, d0=z0)
+    x, y, _ = projection(x - x0, y - y0, z, d0=z0)
     return x + x0, y + y0
 
 

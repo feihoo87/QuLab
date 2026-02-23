@@ -54,7 +54,7 @@ def default(obj: Any) -> msgpack.ExtType:
         if isinstance(obj, cls):
             return msgpack.ExtType(t, encode(obj))
     else:
-        raise TypeError("Unknown type: %r" % (obj, ))
+        raise TypeError(f"Unknown type: {obj!r}")
 
 
 def ext_hook(code: int, data: bytes) -> msgpack.ExtType:

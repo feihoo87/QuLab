@@ -13,7 +13,7 @@ import itertools
 import re
 from typing import Callable, List, Tuple
 
-from .config import STYLE, TRANSFORM_NAMES
+from .config import STYLE
 from .qt_compat import AlignRight, QtWidgets  # type: ignore
 
 

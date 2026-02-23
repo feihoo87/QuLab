@@ -6,7 +6,7 @@ data visualization. It includes features like auto-ranging, mouse interaction
 for data selection, and clipboard integration.
 """
 
-from .config import (COLOR_SELECTED, COLOR_UNSELECTED, DEFAULT_COLORS,
+from .config import (COLOR_UNSELECTED, DEFAULT_COLORS,
                      LINE_WIDTHS, ROLL_INDICES, SYMBOL_SIZES)
 from .qt_compat import QtWidgets  # type: ignore
 

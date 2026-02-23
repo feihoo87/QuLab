@@ -15,7 +15,7 @@ import zmq
 from qulab.sys.rpc.zmq_socket import ZMQContextManager
 
 from .curd import get_config
-from .space import OptimizeSpace, Space
+from .space import Space
 
 _not_given = object()
 
@@ -187,13 +187,13 @@ class BufferList():
 
     def value(self):
         d = []
-        for pos, value in self.iter():
+        for _, value in self.iter():
             d.append(value)
         return d
 
     def pos(self):
         p = []
-        for pos, value in self.iter():
+        for pos, _ in self.iter():
             p.append(pos)
         return p
 
@@ -328,7 +328,7 @@ class Record():
         for name, value in self.description['intrinsic_loops'].items():
             self._items[name] = value
 
-        for level, range_list in description['loops'].items():
+        for _, range_list in description['loops'].items():
             for name, iterable in range_list:
                 if name in self.description['independent_variables']:
                     self._items[name] = iterable
@@ -528,7 +528,7 @@ class Record():
         if self.is_remote_record() or self.is_cache_record():
             return
 
-        for key, value in self._items.items():
+        for _, value in self._items.items():
             if isinstance(value, BufferList):
                 value.flush()
 
@@ -545,7 +545,7 @@ class Record():
                     'record_id': self.id
                 })
         elif self.is_local_record():
-            for key, value in self._items.items():
+            for _, value in self._items.items():
                 if isinstance(value, BufferList):
                     value.delete()
             self._file.unlink()

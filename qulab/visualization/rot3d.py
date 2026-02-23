@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.linalg import expm
 
 
 def _rot(theta, v):

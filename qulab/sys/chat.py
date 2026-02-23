@@ -1,7 +1,6 @@
 import dataclasses
 import logging
 import pickle
-import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -17,7 +16,6 @@ from IPython import get_ipython
 from IPython.display import Markdown, display
 from openai.error import (APIConnectionError, APIError, RateLimitError,
                           ServiceUnavailableError, Timeout)
-from scipy import spatial
 
 logger = logging.getLogger(__name__)
 

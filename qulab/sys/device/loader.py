@@ -1,6 +1,5 @@
 import importlib
 from pathlib import Path
-from typing import Type
 
 from .basedevice import BaseDevice
 

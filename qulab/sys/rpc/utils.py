@@ -1,6 +1,4 @@
 import inspect
-import os
-from hashlib import sha1
 
 
 def acceptArg(f, name, keyword=True):

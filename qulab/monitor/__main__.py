@@ -24,9 +24,9 @@ def main(columns: int, height: int, address: str, port: int):
         address: Address to bind the server (default: 127.0.0.1)
         port: Port to bind the server (default: 5555)
     """
-    server = MonitorServer(address=address, 
+    _ = MonitorServer(address=address,
                          port=port,
-                         number_of_columns=columns, 
+                         number_of_columns=columns,
                          minimum_height=height)
     try:
         while True:

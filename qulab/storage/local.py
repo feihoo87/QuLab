@@ -1,7 +1,5 @@
 """LocalStorage implementation - file-based storage with SQLite metadata."""
 
-import lzma
-import pickle
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator, List, Optional, Union
 
