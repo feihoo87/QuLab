@@ -56,10 +56,13 @@ def load_chunk(file: str | Path, compressed: bool = False, base_path: Path | Non
     if isinstance(file, Path):
         filepath = base / file
     elif isinstance(file, str):
-        if file.startswith('chunks/'):
+        # Normalize path separators for cross-platform compatibility
+        # Windows uses backslashes, but we need forward slashes for checks
+        normalized = file.replace('\\', '/')
+        if normalized.startswith('chunks/'):
             filepath = base / file
-        elif file.startswith('packs/'):
-            *filepath_parts, start, size = file.split('/')
+        elif normalized.startswith('packs/'):
+            *filepath_parts, start, size = normalized.split('/')
             filepath = base / '/'.join(filepath_parts)
             with open(filepath, 'rb') as f:
                 f.seek(int(start))
