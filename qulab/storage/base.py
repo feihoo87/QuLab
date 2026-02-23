@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Iterator, List, Optional
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from .dataset import Dataset, DatasetRef
+    from .datastore import Dataset, DatasetRef
     from .document import Document, DocumentRef
 
 
