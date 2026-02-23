@@ -850,10 +850,12 @@ shutil.copytree(storage.base_path, backup_dir)
 
 ### 数据库锁定
 
-```python
-# 如果出现数据库锁定错误，检查是否有其他进程正在使用
+由于使用了 WAL (Write-Ahead Logging) 模式，数据库锁定问题已大大减少。WAL 模式允许读取和写入同时进行，提高了并发性能。
+
+如果出现数据库锁定错误，检查是否有其他进程正在使用：
+```bash
 # 使用 lsof 检查
-# lsof ~/.qulab/storage/storage.db
+lsof ~/.qulab/storage/storage.db
 ```
 
 ### 远程连接失败

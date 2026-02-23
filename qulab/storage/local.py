@@ -5,7 +5,7 @@ import pickle
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator, List, Optional, Union
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from .base import Storage
@@ -35,6 +35,14 @@ class LocalStorage(Storage):
             db_url = f"sqlite:///{self.base_path / 'storage.db'}"
         self.engine = create_engine(db_url)
         self.Session = sessionmaker(bind=self.engine)
+
+        # Enable WAL mode for SQLite to improve concurrent access performance
+        @event.listens_for(self.engine, "connect")
+        def set_sqlite_wal_mode(dbapi_conn, connection_record):
+            """Enable WAL mode for SQLite database."""
+            import sqlite3
+            if isinstance(dbapi_conn, sqlite3.Connection):
+                dbapi_conn.execute("PRAGMA journal_mode=WAL")
 
         # Initialize tables
         from .models import Base

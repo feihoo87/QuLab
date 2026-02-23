@@ -23,6 +23,15 @@ class SessionManager:
     def from_url(cls, url: str) -> "SessionManager":
         """Create a SessionManager from a database URL."""
         engine = create_engine(url)
+
+        # Enable WAL mode for SQLite to improve concurrent access performance
+        @event.listens_for(engine, "connect")
+        def set_sqlite_wal_mode(dbapi_conn, connection_record):
+            """Enable WAL mode for SQLite database."""
+            import sqlite3
+            if isinstance(dbapi_conn, sqlite3.Connection):
+                dbapi_conn.execute("PRAGMA journal_mode=WAL")
+
         return cls(engine)
 
     def get_session(self) -> Session:

@@ -2,6 +2,7 @@
 
 import pytest
 from pathlib import Path
+from sqlalchemy import text
 
 from qulab.storage.local import LocalStorage, DocumentRef, DatasetRef
 from qulab.storage.document import Document
@@ -411,3 +412,10 @@ class TestLocalStorage:
         # Get latest with state filter that matches nothing
         not_found_state = local_storage.get_latest_document(name="versioned_doc", state="unknown")
         assert not_found_state is None
+
+    def test_sqlite_wal_mode_enabled(self, local_storage: LocalStorage):
+        """Test that SQLite WAL mode is enabled."""
+        with local_storage.engine.connect() as conn:
+            result = conn.execute(text("PRAGMA journal_mode"))
+            journal_mode = result.scalar()
+            assert journal_mode.lower() == "wal"
