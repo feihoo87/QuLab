@@ -282,9 +282,14 @@ class Array:
         inner_shape = data.shape[1:]
         full_shape = shape + inner_shape
 
-        # Create output array with NaN fill
+        # Create output array with appropriate fill value
         dtype = data.dtype if hasattr(data.dtype, "kind") else float
-        x = np.full(full_shape, np.nan, dtype=dtype)
+        # Use NaN for float types, 0 for integer types to avoid cast warning
+        if np.issubdtype(dtype, np.floating):
+            fill_value = np.nan
+        else:
+            fill_value = 0
+        x = np.full(full_shape, fill_value, dtype=dtype)
 
         # Fill in the data
         if pos.size > 0:
