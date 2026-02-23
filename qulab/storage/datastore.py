@@ -53,7 +53,7 @@ class Dataset:
         description: dict,
         config: Optional[dict] = None,
         script: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
     ) -> "DatasetRef":
         """Create a new dataset in storage.
 
@@ -70,21 +70,24 @@ class Dataset:
         """
         from .local import DatasetRef
         from .models import Dataset as DatasetModel
-        from .models import get_or_create_config, get_or_create_script, get_or_create_tag
+        from .models import (get_or_create_config, get_or_create_script,
+                             get_or_create_tag)
 
         with storage._get_session() as session:
             ds = DatasetModel(name=name, description=description)
 
             # Handle config if provided
             if config is not None:
-                config_model = get_or_create_config(session, config, storage.base_path)
+                config_model = get_or_create_config(session, config,
+                                                    storage.base_path)
                 session.flush()  # Flush to get the config ID
                 ds.config_id = config_model.id
                 config_model.ref_count += 1
 
             # Handle script if provided
             if script is not None:
-                script_model = get_or_create_script(session, script, storage.base_path)
+                script_model = get_or_create_script(session, script,
+                                                    storage.base_path)
                 session.flush()  # Flush to get the script ID
                 ds.script_id = script_model.id
                 script_model.ref_count += 1
@@ -166,7 +169,8 @@ class Dataset:
         if self._config is None and self._config_hash is not None:
             from .models import load_config
 
-            self._config = load_config(self._config_hash, self.storage.base_path)
+            self._config = load_config(self._config_hash,
+                                       self.storage.base_path)
         return self._config
 
     @property
@@ -180,7 +184,8 @@ class Dataset:
         if self._script is None and self._script_hash is not None:
             from .models import load_script
 
-            self._script = load_script(self._script_hash, self.storage.base_path)
+            self._script = load_script(self._script_hash,
+                                       self.storage.base_path)
         return self._script
 
     @property
@@ -237,9 +242,8 @@ class Dataset:
         from .models import Array as ArrayModel
 
         with self.storage._get_session() as session:
-            arrays = (
-                session.query(ArrayModel).filter_by(dataset_id=self.id).all()
-            )
+            arrays = (session.query(ArrayModel).filter_by(
+                dataset_id=self.id).all())
             return [a.name for a in arrays]
 
     def get_array(self, key: str) -> "Array":
@@ -259,15 +263,11 @@ class Dataset:
             from .models import Array as ArrayModel
 
             with self.storage._get_session() as session:
-                arr_model = (
-                    session.query(ArrayModel)
-                    .filter_by(dataset_id=self.id, name=key)
-                    .first()
-                )
+                arr_model = (session.query(ArrayModel).filter_by(
+                    dataset_id=self.id, name=key).first())
                 if arr_model is None:
                     raise KeyError(
-                        f"Array {key} not found in dataset {self.id}"
-                    )
+                        f"Array {key} not found in dataset {self.id}")
 
                 self._arrays[key] = Array.load(
                     self.storage,
@@ -281,9 +281,7 @@ class Dataset:
 
         return self._arrays[key]
 
-    def create_array(
-        self, key: str, inner_shape: tuple = ()
-    ) -> "Array":
+    def create_array(self, key: str, inner_shape: tuple = ()) -> "Array":
         """Create a new array in this dataset.
 
         Args:
@@ -298,15 +296,11 @@ class Dataset:
 
         # Check if array already exists
         with self.storage._get_session() as session:
-            existing = (
-                session.query(ArrayModel)
-                .filter_by(dataset_id=self.id, name=key)
-                .first()
-            )
+            existing = (session.query(ArrayModel).filter_by(dataset_id=self.id,
+                                                            name=key).first())
             if existing:
                 raise ValueError(
-                    f"Array {key} already exists in dataset {self.id}"
-                )
+                    f"Array {key} already exists in dataset {self.id}")
 
         # Create the array
         arr = Array.create(self.storage, self.id, key, inner_shape)
@@ -316,7 +310,9 @@ class Dataset:
             arr_model = ArrayModel(
                 dataset_id=self.id,
                 name=key,
-                file_path=str(arr.file.relative_to(self.storage.datasets_path / str(self.id))),
+                file_path=str(
+                    arr.file.relative_to(self.storage.datasets_path /
+                                         str(self.id))),
                 inner_shape=list(inner_shape),
                 lu=[],
                 rd=[],
@@ -341,7 +337,8 @@ class Dataset:
                 # Auto-create array if needed
                 import numpy as np
 
-                inner_shape = np.asarray(value).shape if hasattr(value, "shape") else ()
+                inner_shape = np.asarray(value).shape if hasattr(
+                    value, "shape") else ()
                 try:
                     self._arrays[key] = self.create_array(key, inner_shape)
                 except ValueError:
@@ -355,11 +352,8 @@ class Dataset:
             from .models import Array as ArrayModel
 
             with self.storage._get_session() as session:
-                arr_model = (
-                    session.query(ArrayModel)
-                    .filter_by(dataset_id=self.id, name=key)
-                    .first()
-                )
+                arr_model = (session.query(ArrayModel).filter_by(
+                    dataset_id=self.id, name=key).first())
                 if arr_model:
                     arr_model.lu = list(arr.lu)
                     arr_model.rd = list(arr.rd)
