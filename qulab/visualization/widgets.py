@@ -1,9 +1,84 @@
 """可视化交互组件模块，提供 Matplotlib 图表的交互式工具。"""
 
 import threading
+from typing import Callable, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+
+def _guess_initial_params(
+    fit_func: Callable,
+    x_data: np.ndarray,
+    y_data: np.ndarray,
+    n_attempts: int = 10
+) -> Tuple[Optional[np.ndarray], float]:
+    """通过随机尝试猜测最优初始参数。
+
+    Args:
+        fit_func: 拟合函数，签名为 fit_func(x, *params) -> y
+        x_data: x 坐标数据
+        y_data: y 坐标数据
+        n_attempts: 随机尝试次数
+
+    Returns:
+        tuple: (最优初始参数, 该初始参数对应的残差平方和)
+               如果所有尝试都失败，返回 (None, inf)
+    """
+    # 根据数据范围估计参数的数量级
+    y_range = np.ptp(y_data) if len(y_data) > 0 else 1.0
+    x_range = np.ptp(x_data) if len(x_data) > 0 else 1.0
+
+    # 尝试确定函数需要的参数个数
+    # 通过传入不同数量的参数来测试
+    n_params = None
+    for n in range(1, 10):
+        try:
+            test_params = np.zeros(n)
+            fit_func(x_data[:1] if len(x_data) > 0 else np.array([0]), *test_params)
+            n_params = n
+            break
+        except TypeError:
+            continue
+
+    if n_params is None:
+        # 无法确定参数个数，返回 None
+        return None, float('inf')
+
+    best_params = None
+    best_residual = float('inf')
+
+    for _ in range(n_attempts):
+        # 生成随机初始参数，范围基于数据
+        # 使用对数尺度覆盖不同数量级
+        random_params = np.random.randn(n_params)
+
+        # 根据参数位置调整尺度（第一个参数通常是幅度，后面的可能是频率、相位等）
+        scales = []
+        for i in range(n_params):
+            if i == 0:
+                scales.append(y_range * (0.5 + np.abs(random_params[i])))
+            elif i == 1 and x_range > 0:
+                scales.append(2 * np.pi / x_range * (0.5 + np.abs(random_params[i])))
+            else:
+                scales.append(1.0 + np.abs(random_params[i]))
+        scales = np.array(scales)
+
+        # 随机符号
+        signs = np.random.choice([-1, 1], n_params)
+        initial_guess = signs * scales
+
+        try:
+            y_pred = fit_func(x_data, *initial_guess)
+            residual = np.sum((y_data - y_pred) ** 2)
+
+            if residual < best_residual:
+                best_residual = residual
+                best_params = initial_guess.copy()
+        except (ValueError, RuntimeError, OverflowError):
+            continue
+
+    return best_params, best_residual
 
 
 class DataPicker:  # pylint: disable=too-many-instance-attributes
@@ -20,6 +95,12 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
     - 'r' 键：重做上一步撤销的操作（仅激活的 picker 响应）
     - 'a' 键：切换选取模式（全局生效）
     - 'c' 键：切换坐标标签显示（黑色 -> 隐藏 -> 白色，仅激活的 picker 响应）
+    - 'f' 键：强制重新拟合（仅当设置了拟合函数时生效，仅激活的 picker 响应）
+
+    拟合功能：
+    通过 set_fitter() 方法配置拟合函数后，当选中的数据点达到最小数量时，
+    会自动进行曲线拟合并在图表上显示拟合曲线。拟合结果存储在 namespace 中，
+    可通过 namespace['fit_result'] 访问。
 
     被选中的点会按 x 坐标排序后存储，可通过 get_xy() 方法获取。
 
@@ -137,6 +218,16 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         # 数据变化回调函数
         self.on_changed = on_changed
 
+        # 拟合相关属性（由 set_fitter 方法配置）
+        self._fit_func = None
+        self._fit_min_points = 3
+        self._fit_initial_params = None
+        self._fit_n_guesses = 10
+        self._fit_refit_noise = 0.1
+        self._fit_line_style = 'g--'
+        self._fit_line_label = None
+        self._fit_last_params = None
+
         # 绑定事件
         self.ax.figure.canvas.mpl_connect('button_press_event', self.on_click)
         self.ax.figure.canvas.mpl_connect('button_release_event',
@@ -161,6 +252,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         - 'r': 重做上一步撤销的操作（仅当本 picker 是最近操作的 picker 时生效）
         - 'a': 切换选取模式（全局生效）
         - 'c': 切换坐标标签显示模式（白色 -> 黑色 -> 隐藏）
+        - 'f': 强制重新拟合（仅当本 picker 设置了拟合函数时生效）
 
         Args:
             event: Matplotlib KeyEvent 对象，包含按键信息
@@ -183,6 +275,10 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
             # 切换坐标显示模式（仅激活的 picker 响应）
             if DataPicker._active_picker is self:
                 self.cycle_coord_display()
+        elif event.key == 'f':
+            # 强制重新拟合（仅激活的 picker 响应）
+            if DataPicker._active_picker is self and hasattr(self, '_fit_func'):
+                self.refit()
 
     def cycle_coord_display(self):
         """循环切换坐标标签显示模式。
@@ -551,3 +647,175 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
             y = np.asarray(y)[index]
             return x, y
         return np.array([]), np.array([])
+
+    def set_fitter(
+        self,
+        fit_func: Callable,
+        min_points: int = 3,
+        initial_params: Optional[np.ndarray] = None,
+        n_initial_guesses: int = 10,
+        refit_noise_scale: float = 0.1,
+        fit_line_style: str = 'g--',
+        fit_line_label: Optional[str] = None,
+    ):
+        """配置实时拟合功能。
+
+        当选中的数据点数量达到 min_points 时，会自动使用 fit_func 进行拟合，
+        并在图表上显示拟合曲线。拟合结果存储在 picker.namespace 中。
+
+        快捷键：
+        - 'f': 强制重新拟合（即使数据点没有变化）
+
+        Args:
+            fit_func: 拟合函数，签名为 fit_func(x, *params) -> y
+            min_points: 触发拟合的最小数据点数，默认 3
+            initial_params: 初始拟合参数，如果为 None 则自动猜测
+            n_initial_guesses: 自动猜测初始参数时的随机尝试次数，默认 10
+            refit_noise_scale: 重新拟合时在现有参数周围添加的噪声尺度，默认 0.1
+            fit_line_style: 拟合曲线的线型，默认 'g--'（绿色虚线）
+            fit_line_label: 拟合曲线的图例标签，默认为 None
+
+        Examples:
+            >>> import matplotlib.pyplot as plt
+            >>> import numpy as np
+            >>> from qulab.visualization.widgets import DataPicker
+            >>>
+            >>> fig, ax = plt.subplots()
+            >>> x = np.linspace(0, 10, 100)
+            >>> ax.plot(x, np.sin(x) + 0.1 * np.random.randn(100))
+            >>>
+            >>> # 定义拟合函数（正弦函数）
+            >>> def sin_fit(x, amplitude, frequency, phase, offset):
+            ...     return amplitude * np.sin(2 * np.pi * frequency * x + phase) + offset
+            >>>
+            >>> picker = DataPicker(ax)
+            >>> picker.set_fitter(
+            ...     sin_fit,
+            ...     min_points=4,
+            ...     fit_line_label='Sine fit'
+            ... )
+            >>> plt.show()
+            >>>
+            >>> # 选取4个或更多点后，会自动显示拟合曲线
+            >>> # 按 'f' 键可强制重新拟合
+            >>>
+            >>> # 获取拟合结果
+            >>> fit_result = picker.namespace.get('fit_result')
+            >>> if fit_result:
+            ...     print(f"拟合参数: {fit_result['params']}")
+            ...     print(f"拟合优度 (R²): {fit_result['r_squared']:.4f}")
+        """
+        self._fit_func = fit_func
+        self._fit_min_points = min_points
+        self._fit_initial_params = initial_params
+        self._fit_n_guesses = n_initial_guesses
+        self._fit_refit_noise = refit_noise_scale
+        self._fit_line_style = fit_line_style
+        self._fit_line_label = fit_line_label
+        self._fit_last_params = None  # 存储上次成功的拟合参数
+
+        # 设置 on_changed 回调
+        self.on_changed = self._on_changed_with_fit
+
+    def _do_fit(self, force: bool = False) -> bool:
+        """执行拟合并更新图表。
+
+        Args:
+            force: 是否强制重新拟合，即使数据点没有变化
+
+        Returns:
+            bool: 拟合是否成功
+        """
+        if not hasattr(self, '_fit_func'):
+            return False
+
+        x_data, y_data = self.get_xy()
+
+        if len(x_data) < self._fit_min_points:
+            # 点数不足，移除拟合曲线
+            fit_line = self.namespace.get('fit_line')
+            if fit_line is not None:
+                fit_line.remove()
+                self.namespace['fit_line'] = None
+                self.namespace['fit_result'] = None
+                self.ax.figure.canvas.draw()
+            return False
+
+        # 尝试使用 scipy 进行拟合
+        try:
+            from scipy.optimize import curve_fit
+
+            # 确定初始参数
+            if self._fit_initial_params is not None and not force:
+                # 用户提供了初始参数且不是强制重新拟合
+                initial_guess = self._fit_initial_params
+            elif self._fit_last_params is not None and not force:
+                # 使用上次成功的参数，添加小量噪声以寻找更好的解
+                noise = np.random.randn(len(self._fit_last_params)) * self._fit_refit_noise
+                initial_guess = self._fit_last_params * (1 + noise)
+            else:
+                # 自动猜测初始参数
+                initial_guess, _ = _guess_initial_params(
+                    self._fit_func, x_data, y_data, self._fit_n_guesses
+                )
+                if initial_guess is None:
+                    return False
+
+            # 执行拟合
+            params, pcov = curve_fit(self._fit_func, x_data, y_data, p0=initial_guess)
+
+            # 计算拟合优度 R²
+            y_pred = self._fit_func(x_data, *params)
+            ss_res = np.sum((y_data - y_pred) ** 2)
+            ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
+            r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 1.0
+
+            # 存储拟合结果
+            self._fit_last_params = params.copy()
+            fit_result = {
+                'params': params,
+                'covariance': pcov,
+                'r_squared': r_squared,
+                'std_errors': np.sqrt(np.diag(pcov)) if pcov is not None else None,
+            }
+            self.namespace['fit_result'] = fit_result
+
+            # 生成拟合曲线的数据点
+            x_fit = np.linspace(x_data.min(), x_data.max(), 200)
+            y_fit = self._fit_func(x_fit, *params)
+
+            # 更新或创建拟合曲线
+            fit_line = self.namespace.get('fit_line')
+            if fit_line is None:
+                fit_line, = self.ax.plot(
+                    x_fit, y_fit, self._fit_line_style,
+                    label=self._fit_line_label
+                )
+                self.namespace['fit_line'] = fit_line
+            else:
+                fit_line.set_data(x_fit, y_fit)
+
+            self.ax.figure.canvas.draw()
+            return True
+
+        except ImportError:
+            # scipy 未安装
+            print("Warning: scipy is required for fitting. Install with: pip install scipy")
+            return False
+        except (RuntimeError, ValueError, OverflowError):
+            # 拟合失败
+            return False
+
+    def _on_changed_with_fit(self, picker):
+        """on_changed 回调函数，包含拟合逻辑。"""
+        self._do_fit(force=False)
+
+    def refit(self):
+        """强制重新拟合当前数据。
+
+        会清除上次的拟合参数记忆，重新进行初始参数猜测和拟合。
+        按 'f' 键触发。
+        """
+        if hasattr(self, '_fit_func'):
+            self._fit_last_params = None
+            self._do_fit(force=True)
