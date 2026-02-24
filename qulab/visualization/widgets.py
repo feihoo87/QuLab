@@ -59,12 +59,55 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
     # 类变量：跟踪最近操作的 DataPicker 实例
     _active_picker = None
 
-    def __init__(self, ax=None, long_press_threshold=0.5):
+    def __init__(self, ax=None, long_press_threshold=0.5, on_changed=None):
         """初始化 DataPicker。
 
         Args:
             ax: Matplotlib Axes 对象，如果为 None 则使用当前坐标轴 plt.gca()
             long_press_threshold: 长按检测阈值（秒），默认 0.5 秒
+            on_changed: 数据变化时的回调函数，会在添加点、删除点、撤销、
+                重做操作后被调用。函数签名为 `on_changed(picker)`，其中
+                picker 是当前 DataPicker 实例。
+
+        Examples:
+            >>> import matplotlib.pyplot as plt
+            >>> import numpy as np
+            >>> from qulab.visualization.widgets import DataPicker
+            >>>
+            >>> fig, ax = plt.subplots()
+            >>> x = np.linspace(0, 10, 100)
+            >>> ax.plot(x, np.sin(x))
+            >>>
+            >>> # 示例：自动拟合二次函数并绘制拟合曲线
+            >>>
+            >>> def on_changed(picker):
+            ...     x_data, y_data = picker.get_xy()
+            ...
+            ...     # 如果点数大于等于4，进行二次函数拟合
+            ...     if len(x_data) >= 4:
+            ...         # 二次函数拟合: y = ax^2 + bx + c
+            ...         coeffs = np.polyfit(x_data, y_data, 2)
+            ...         p = np.poly1d(coeffs)
+            ...
+            ...         # 生成拟合曲线的 x 值
+            ...         x_fit = np.linspace(x_data.min(), x_data.max(), 100)
+            ...         y_fit = p(x_fit)
+            ...
+            ...         # 更新或创建拟合曲线
+            ...         if picker.namespace.get('fit_line', None) is None:
+            ...             fit_line, = ax.plot(x_fit, y_fit, 'g--',
+            ...                                 label='Quadratic fit')
+            ...             picker.namespace['fit_line'] = fit_line
+            ...         else:
+            ...             picker.namespace['fit_line'].set_data(x_fit, y_fit)
+            ...     else:
+            ...         # 点数不足时删除拟合曲线
+            ...         if picker.namespace.get('fit_line', None) is not None:
+            ...             picker.namespace['fit_line'].remove()
+            ...             picker.namespace['fit_line'] = None
+            ...
+            >>> picker = DataPicker(ax, on_changed=on_changed)
+            >>> plt.show()
         """
         self.points_and_text = {}
         self.points = None
@@ -87,17 +130,24 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         self.undo_stack = []
         self.redo_stack = []
 
+        # 数据变化回调函数
+        self.on_changed = on_changed
+
         # 绑定事件
-        self.ax.figure.canvas.mpl_connect('button_press_event',
-                                          self.on_click)
+        self.ax.figure.canvas.mpl_connect('button_press_event', self.on_click)
         self.ax.figure.canvas.mpl_connect('button_release_event',
                                           self.on_release)
-        self.ax.figure.canvas.mpl_connect('key_press_event',
-                                          self.on_key_press)
+        self.ax.figure.canvas.mpl_connect('key_press_event', self.on_key_press)
+        self.namespace = {}  # 用于存储用户自定义的变量供 on_changed 回调函数使用
 
     def _set_active(self):
         """将当前 picker 设为激活状态（最近操作）。"""
         DataPicker._active_picker = self
+
+    def _trigger_changed(self):
+        """触发数据变化回调函数。"""
+        if self.on_changed is not None:
+            self.on_changed(self)
 
     def on_key_press(self, event):
         """处理键盘按键事件。
@@ -297,6 +347,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         else:
             self.points.set_data(x, y)
 
+        self._trigger_changed()
         self.ax.figure.canvas.draw()
 
     def _remove_point(self, point):
@@ -329,6 +380,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
             self.points.remove()
             self.points = None
 
+        self._trigger_changed()
         self.ax.figure.canvas.draw()
 
     def undo(self):
@@ -370,6 +422,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
                 self.points.remove()
                 self.points = None
 
+        self._trigger_changed()
         self.ax.figure.canvas.draw()
 
     def redo(self):
@@ -415,6 +468,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
                 self.points.remove()
                 self.points = None
 
+        self._trigger_changed()
         self.ax.figure.canvas.draw()
 
     def get_xy(self):
