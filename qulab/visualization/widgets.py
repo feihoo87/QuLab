@@ -16,15 +16,17 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
     DataPicker 提供了一个交互式界面，支持多种添加/删除点的方式：
     - 轻点/鼠标左键：添加数据点
     - 长按（0.5秒）/鼠标右键：删除附近的已有数据点
-    - 'z' 键：撤销上一步操作
-    - 'r' 键：重做上一步撤销的操作
-    - 'a' 键：切换选取模式（pick 模式 vs 默认模式）
+    - 'z' 键：撤销上一步操作（仅激活的 picker 响应）
+    - 'r' 键：重做上一步撤销的操作（仅激活的 picker 响应）
+    - 'a' 键：切换选取模式（全局生效）
+    - 'c' 键：切换坐标标签显示（黑色 -> 隐藏 -> 白色，仅激活的 picker 响应）
 
     被选中的点会按 x 坐标排序后存储，可通过 get_xy() 方法获取。
 
     Attributes:
         ax: Matplotlib Axes 对象，用于交互的坐标轴
         mode: 当前模式，'pick' 表示选取模式，'default' 表示默认模式
+        coord_display: 坐标标签显示模式，'white'、'black' 或 'hidden'
         points_and_text: 字典，存储选取的点坐标和对应的文本标签
         points: Matplotlib Line2D 对象，显示所有选取的点
         undo_stack: 列表，存储操作历史用于撤销
@@ -44,7 +46,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         >>> plt.show()  # 显示图表，开始交互选取
         >>>
         >>> # 轻点/左键添加点，长按/右键删除点
-        >>> # 'z' 撤销，'r' 重做
+        >>> # 'z' 撤销，'r' 重做，'c' 切换坐标显示
         >>>
         >>> x_selected, y_selected = picker.get_xy()
         >>> print(f"选取了 {len(x_selected)} 个点")
@@ -52,6 +54,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
     Note:
         - 在 'pick' 模式下，支持轻点/左键添加点，长按/右键删除点
         - 按 'a' 键可在 'pick' 模式和 'default' 模式之间切换
+        - 按 'c' 键可在坐标标签的黑色、隐藏、白色三种状态间循环切换（仅激活的 picker 响应）
         - 在 'default' 模式下，鼠标交互恢复正常，不会添加或删除点
         - 撤销/重做仅支持添加和删除操作，不支持模式切换
     """
@@ -118,6 +121,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
             ax = plt.gca()
         self.ax = ax
         self.mode = 'pick'
+        self.coord_display = 'black'  # 坐标显示模式: 'white', 'black', 'hidden'
 
         # 长按检测相关属性
         self.long_press_threshold = long_press_threshold
@@ -156,6 +160,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         - 'z': 撤销上一步操作（仅当本 picker 是最近操作的 picker 时生效）
         - 'r': 重做上一步撤销的操作（仅当本 picker 是最近操作的 picker 时生效）
         - 'a': 切换选取模式（全局生效）
+        - 'c': 切换坐标标签显示模式（白色 -> 黑色 -> 隐藏）
 
         Args:
             event: Matplotlib KeyEvent 对象，包含按键信息
@@ -174,6 +179,47 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
                 self.mode = 'pick'
             else:
                 self.mode = 'default'
+        elif event.key == 'c':
+            # 切换坐标显示模式（仅激活的 picker 响应）
+            if DataPicker._active_picker is self:
+                self.cycle_coord_display()
+
+    def cycle_coord_display(self):
+        """循环切换坐标标签显示模式。
+
+        模式循环顺序：黑色 -> 隐藏 -> 白色 -> 黑色
+        更新所有现有坐标标签的显示状态。
+        """
+        # 切换到下一个模式
+        if self.coord_display == 'black':
+            self.coord_display = 'hidden'
+        elif self.coord_display == 'hidden':
+            self.coord_display = 'white'
+        else:  # white
+            self.coord_display = 'black'
+
+        # 更新所有坐标标签的显示
+        self._update_coord_display()
+
+    def _update_coord_display(self):
+        """更新所有坐标标签的显示状态。
+
+        根据当前的 coord_display 模式更新所有文本标签：
+        - 'white': 白色文字
+        - 'black': 黑色文字
+        - 'hidden': 隐藏标签
+        """
+        for _point, text in self.points_and_text.items():
+            if self.coord_display == 'white':
+                text.set_visible(True)
+                text.set_color('white')
+            elif self.coord_display == 'black':
+                text.set_visible(True)
+                text.set_color('black')
+            else:  # hidden
+                text.set_visible(False)
+
+        self.ax.figure.canvas.draw()
 
     def on_click(self, event):
         """处理鼠标点击/触摸板按下事件。
@@ -328,12 +374,8 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         # 设为激活 picker
         self._set_active()
 
-        # 创建文本标签
-        text = self.ax.text(point[0],
-                            point[1],
-                            f'({point[0]:.2f}, {point[1]:.2f})',
-                            verticalalignment='center')
-
+        # 创建文本标签，根据当前显示模式设置颜色和可见性
+        text = self._create_coord_text(point)
         self.points_and_text[point] = text
 
         # 记录操作到撤销栈
@@ -425,6 +467,24 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         self._trigger_changed()
         self.ax.figure.canvas.draw()
 
+    def _create_coord_text(self, point):
+        """根据当前显示模式创建坐标文本标签。
+
+        Args:
+            point: 点坐标 (x, y)
+
+        Returns:
+            Matplotlib Text 对象
+        """
+        x, y = point
+        label = f'({x:.2f}, {y:.2f})'
+        if self.coord_display == 'white':
+            return self.ax.text(x, y, label, verticalalignment='center', color='white')
+        if self.coord_display == 'black':
+            return self.ax.text(x, y, label, verticalalignment='center', color='black')
+        # hidden
+        return self.ax.text(x, y, label, verticalalignment='center', visible=False)
+
     def redo(self):
         """重做上一步撤销的操作。
 
@@ -442,10 +502,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
             # 重做添加操作
             point = action[1]
             if point not in self.points_and_text:
-                text = self.ax.text(point[0],
-                                    point[1],
-                                    f'({point[0]:.2f}, {point[1]:.2f})',
-                                    verticalalignment='center')
+                text = self._create_coord_text(point)
                 self.points_and_text[point] = text
                 self.undo_stack.append(('add', point))
         elif action[0] == 'remove':
