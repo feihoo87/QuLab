@@ -360,9 +360,12 @@ class RemoteDataset:
 
     def append(self, position: tuple, data: dict[str, Any]) -> bool:
         """Append data to the dataset."""
-        return self.storage._call(
+        result = self.storage._call(
             "dataset_append", id=self.id, position=position, data=data
         )
+        # Clear cached info since append may create new arrays
+        self._info = None
+        return result
 
     def get_array(self, key: str) -> "RemoteArray":
         """Get a remote array proxy."""
@@ -465,17 +468,17 @@ class RemoteArray:
         """Convert to numpy array."""
         import numpy as np
 
-        items = []
-        start = 0
-        while True:
-            batch = self.iter(start=start, count=1000)
-            if not batch:
-                break
-            items.extend([v for _, v in batch])
-            start += len(batch)
-            if len(batch) < 1000:
-                break
-        return np.array(items)
+        # Call server-side toarray to get proper shape
+        result = self.storage._call(
+            "array_toarray",
+            dataset_id=self.dataset_id,
+            key=self.key,
+        )
+
+        # Handle serialized array format
+        if isinstance(result, dict) and "shape" in result:
+            return np.array(result["data"]).reshape(result["shape"])
+        return np.array(result)
 
     def __repr__(self) -> str:
         return f"RemoteArray(dataset_id={self.dataset_id}, key={self.key!r})"

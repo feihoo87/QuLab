@@ -160,10 +160,10 @@ def demo_remote_dataset():
     for j in range(5):
         for i in range(10):
             ds.append(position=(j, i),
-                    data={
-                        "frequency": 5.0e9 + i * 10e6,
-                        "amplitude": np.random.rand(1024, 64)
-                    })
+                      data={
+                          "frequency": 5.0e9 + i * 10e6,
+                          "amplitude": np.random.rand(1024, 64)
+                      })
     print("数据追加完成")
 
     # 查看数组
@@ -178,6 +178,7 @@ def demo_remote_dataset():
     amp_array = ds.get_array("amplitude")
     amp_data = amp_array.toarray()
     print(f"幅度数组: {amp_data.shape}")
+    assert amp_data.shape == (5, 10, 1024, 64)
 
 
 def demo_remote_dataset_query():

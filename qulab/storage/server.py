@@ -333,6 +333,24 @@ class StorageServer:
             results.append(item)
         return results
 
+    async def handle_array_toarray(
+        self, dataset_id: int, key: str
+    ) -> Any:
+        """Convert array to numpy array."""
+        import numpy as np
+
+        ds = self.storage.get_dataset(dataset_id)
+        arr = ds.get_array(key)
+        arr.flush()
+
+        # Get the full array with proper shape
+        result = arr.toarray()
+
+        # Convert numpy array to list for serialization
+        if isinstance(result, np.ndarray):
+            return {"shape": result.shape, "dtype": str(result.dtype), "data": result.tolist()}
+        return result
+
     async def run(self):
         """Run the server."""
         self._running = True

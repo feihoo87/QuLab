@@ -252,7 +252,7 @@ class TestIntegration:
         array = dataset.create_array("complex_data", (2, 3))
 
         # Append data with complex structure
-        for i in range(5):
+        for i in range(7):
             for j in range(5):
                 # Each point has a 2x3 matrix
                 matrix = [[i*5+j+k*3+l for l in range(3)] for k in range(2)]
@@ -263,17 +263,17 @@ class TestIntegration:
 
         # Test iteration
         items = list(array.iter())
-        assert len(items) == 25
+        assert len(items) == 35
 
         # Test positions and values
         positions = array.positions()
         values = array.value()
-        assert len(positions) == 25
-        assert len(values) == 25
+        assert len(positions) == 35
+        assert len(values) == 35
 
         # Test numpy array conversion
         np_array = array.toarray()
-        assert np_array.shape == (5, 5, 2, 3)
+        assert np_array.shape == (7, 5, 2, 3)
 
         # Test slicing
         slice_data = array[0:2, 0:2]
