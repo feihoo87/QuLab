@@ -323,15 +323,49 @@ CREATE TABLE arrays (
     file_path VARCHAR NOT NULL,
     inner_shape JSON,
     lu JSON,  -- 左下边界
-    rd JSON   -- 右上边界
+    rd JSON,  -- 右上边界
+    pattern JSON,       -- 数组生成模式（linspace/logspace/arange/full）
+    storage_type VARCHAR DEFAULT 'data'  -- 'pattern' 或 'data'
 );
 ```
 
 **更新说明：**
 - 新增 `config_id` 字段，关联 Config 模型，用于存储实验配置参数
 - 新增 `script_id` 字段，关联 Script 模型，用于存储数据采集代码
+- 新增 `pattern` 字段，存储数组生成模式的 JSON 参数（如 linspace 的 start/stop/num）
+- 新增 `storage_type` 字段，标记存储类型（'pattern' 或 'data'）
+  - `'pattern'`: 模式存储，仅存储生成参数，适合 linspace/logspace 等规则数组
+  - `'data'`: 完整数据存储，适合随机数据等无法简单生成的数组
+- 模式存储可大幅减少存储空间（如 1M 点的 linspace 仅需存储 3 个参数）
 - 新增复合索引 `ix_datasets_name_ctime`，与 Document 保持一致，优化查询性能
 - 查询默认按 `ctime DESC` 排序，返回最新的数据集优先
+
+#### Array 存储模式
+
+Array 支持两种存储模式：
+
+**1. 位置相关模式 (append-based)**
+- 使用 `append()` 方法追加数据
+- 适用于扫描数据、实验结果等位置相关的多维数据
+- 数据按 `(position, value)` 格式存储
+
+**2. 独立数组模式 (set_array)**
+- 使用 `set_array()` 方法存储
+- 适用于坐标轴、偏置点表等位置无关的数组
+- 自动检测 linspace/logspace/arange/full 模式，仅存储参数
+
+```python
+# 位置相关模式 - 扫描数据
+ds.append(position=(0, 0), data={'frequency': 5e9, 'amplitude': 0.5})
+ds.append(position=(0, 1), data={'frequency': 5.01e9, 'amplitude': 0.6})
+
+# 独立数组模式 - 坐标轴（自动检测为 linspace）
+ds.set_array('frequency_axis', np.linspace(5e9, 5.1e9, 101))
+ds.set_array('bias_points', np.linspace(-1, 1, 51))
+
+# 独立数组模式 - 随机数据（存储为完整数据）
+ds.set_array('noise', np.random.rand(1000))
+```
 
 ### 内容寻址存储
 

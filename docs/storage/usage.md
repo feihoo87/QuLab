@@ -429,6 +429,87 @@ subset = arr[0:10, 0:5]
 single = arr[5, 3]
 ```
 
+### 设置独立数组
+
+使用 `set_array` 存储与位置无关的独立数组（如坐标轴、偏置点等）。系统会自动检测数组是否可用 `linspace`、`logspace` 等简单方式生成，仅存储参数而非完整数据，显著减少存储空间。
+
+```python
+# 存储坐标轴数组 - 自动检测为 linspace，仅存储参数
+ds.set_array('frequency_axis', np.linspace(5e9, 5.1e9, 101))
+ds.set_array('bias_points', np.linspace(-1, 1, 51))
+
+# 存储对数坐标数组 - 自动检测为 logspace
+ds.set_array('log_scale', np.logspace(1, 3, 100))
+
+# 存储常数数组 - 自动检测为 full
+ds.set_array('constant', np.full((100,), 5.0))
+
+# 存储随机数组 - 无法检测为简单模式，存储完整数据
+np.random.seed(42)
+ds.set_array('noise', np.random.rand(1000))
+
+# 获取独立数组
+freq_axis = ds.get_array('frequency_axis')
+print(freq_axis.shape)  # (101,)
+
+# 转换为 numpy 数组
+freq_data = freq_axis.toarray()
+print(freq_data[0])     # 5000000000.0
+
+# 支持索引和切片（不生成完整数组，直接计算）
+val = freq_axis[50]           # 直接计算中间值
+subset = freq_axis[20:30]     # 直接计算子范围
+```
+
+### 存储优化说明
+
+`set_array` 会自动检测数组的生成模式：
+
+| 模式 | 说明 | 存储内容 |
+|------|------|----------|
+| **linspace** | 等差数列（均匀分布） | `start`, `stop`, `num` |
+| **logspace** | 等比数列（对数坐标） | `start`, `stop`, `num`, `base` |
+| **arange** | 整数步长序列 | `start`, `stop`, `step` |
+| **full** | 常数数组 | `shape`, `fill_value` |
+| **data** | 无法简单生成的数组 | 存储完整数据 |
+
+**优势：**
+- 大幅减少存储空间（如 1M 点的 linspace 仅存储 3 个参数）
+- 索引和切片直接计算，无需生成完整数组
+- 适合存储大型坐标轴、偏置点表等实验参数
+
+**示例：**
+
+```python
+# 创建数据集
+ds_ref = storage.create_dataset("experiment", description={"type": "spectroscopy"})
+ds = ds_ref.get()
+
+# 存储坐标轴（pattern 模式）
+ds.set_array('frequency', np.linspace(5e9, 5.1e9, 10001))  # 仅存储 3 个参数
+ds.set_array('bias', np.linspace(-1, 1, 101))
+
+# 存储实验数据（append 模式）
+for i in range(101):
+    for j in range(10001):
+        ds.append(
+            position=(i, j),
+            data={'amplitude': np.random.rand(), 'phase': np.random.rand()}
+        )
+
+# 高效访问坐标轴数据
+freq = ds.get_array('frequency')
+bias = ds.get_array('bias')
+
+# 直接计算索引值，不生成完整数组
+print(freq[5000])   # 中间频率值
+print(bias[50])     # 中间偏置值
+
+# 获取完整坐标轴数据
+freq_full = freq.toarray()  # (10001,)
+bias_full = bias.toarray()  # (101,)
+```
+
 ### 查询数据集
 
 ```python
@@ -949,6 +1030,7 @@ except Exception as e:
 | `keys()` | 获取数组键列表 |
 | `get_array(key)` | 获取数组 |
 | `create_array(key, inner_shape)` | 创建数组 |
+| `set_array(key, data)` | 设置独立数组（自动检测 linspace/logspace 模式） |
 | `append(position, data)` | 追加数据 |
 | `flush()` | 刷新到磁盘 |
 | `tags` | 标签列表 |
@@ -976,6 +1058,7 @@ except Exception as e:
 | `items()` | 获取位置和值 |
 | `toarray()` | 转换为 numpy 数组 |
 | `__getitem__()` | 切片访问 |
+| `set_array(data, pattern)` | 设置独立数组（pattern 为可选生成模式） |
 
 ### RemoteStorage 类
 
