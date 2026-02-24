@@ -572,3 +572,183 @@ class TestDatasetTags:
         # Query again
         results = list(local_storage.query_datasets(tags=["searchable"]))
         assert len(results) == 0
+
+
+class TestDatasetSetArray:
+    """Test Dataset.set_array functionality."""
+
+    def test_set_array_linspace(self, local_storage: LocalStorage):
+        """Test set_array with linspace data (should use pattern storage)."""
+        ref = Dataset.create(local_storage, "test_dataset", description={})
+        dataset = ref.get()
+
+        # Set linspace array
+        bias_data = np.linspace(-1, 1, 101)
+        dataset.set_array("bias", bias_data)
+
+        # Verify array was created
+        assert "bias" in dataset.keys()
+
+        # Retrieve and verify
+        bias_array = dataset.get_array("bias")
+        assert bias_array._storage_type == "pattern"
+        assert bias_array._pattern is not None
+        assert bias_array._pattern["type"] == "linspace"
+
+        # Verify shape
+        assert bias_array.shape == (101,)
+
+        # Verify data can be retrieved
+        retrieved = bias_array.toarray()
+        np.testing.assert_array_almost_equal(retrieved, bias_data)
+
+    def test_set_array_logspace(self, local_storage: LocalStorage):
+        """Test set_array with logspace data."""
+        ref = Dataset.create(local_storage, "test_dataset", description={})
+        dataset = ref.get()
+
+        # Set logspace array
+        log_data = np.logspace(1, 3, 100)
+        dataset.set_array("log_scale", log_data)
+
+        # Verify array was created with pattern
+        log_array = dataset.get_array("log_scale")
+        assert log_array._storage_type == "pattern"
+        assert log_array._pattern["type"] == "logspace"
+
+    def test_set_array_full(self, local_storage: LocalStorage):
+        """Test set_array with constant array."""
+        ref = Dataset.create(local_storage, "test_dataset", description={})
+        dataset = ref.get()
+
+        # Set constant array
+        const_data = np.full((50,), 5.0)
+        dataset.set_array("constant", const_data)
+
+        # Verify array was created with pattern
+        const_array = dataset.get_array("constant")
+        assert const_array._storage_type == "pattern"
+        assert const_array._pattern["type"] == "full"
+
+    def test_set_array_random_data(self, local_storage: LocalStorage):
+        """Test set_array with random data (should use full storage)."""
+        ref = Dataset.create(local_storage, "test_dataset", description={})
+        dataset = ref.get()
+
+        # Set random array (no pattern)
+        np.random.seed(42)
+        random_data = np.random.rand(50)
+        dataset.set_array("random", random_data)
+
+        # Verify array was created with data storage
+        random_array = dataset.get_array("random")
+        assert random_array._storage_type == "data"
+        assert random_array._pattern is None
+
+        # Verify data can be retrieved
+        retrieved = random_array.toarray()
+        np.testing.assert_array_almost_equal(retrieved, random_data)
+
+    def test_set_array_duplicate_key(self, local_storage: LocalStorage):
+        """Test that set_array raises error for duplicate key."""
+        ref = Dataset.create(local_storage, "test_dataset", description={})
+        dataset = ref.get()
+
+        # Set array first time
+        dataset.set_array("bias", np.linspace(-1, 1, 101))
+
+        # Second set_array should raise
+        with pytest.raises(ValueError, match="already exists"):
+            dataset.set_array("bias", np.linspace(0, 1, 50))
+
+    def test_set_array_getitem(self, local_storage: LocalStorage):
+        """Test indexing on set_array data."""
+        ref = Dataset.create(local_storage, "test_dataset", description={})
+        dataset = ref.get()
+
+        # Set linspace array
+        bias_data = np.linspace(-1, 1, 101)
+        dataset.set_array("bias", bias_data)
+
+        # Get array and test indexing
+        bias_array = dataset.get_array("bias")
+
+        # Test integer indexing
+        val = bias_array[0]
+        assert abs(val - (-1.0)) < 1e-10
+
+        val = bias_array[50]
+        assert abs(val - 0.0) < 1e-10
+
+        val = bias_array[100]
+        assert abs(val - 1.0) < 1e-10
+
+        # Test slice indexing
+        sub = bias_array[49:52]
+        assert sub.shape == (3,)
+        np.testing.assert_array_almost_equal(sub, np.array([-0.02, 0.0, 0.02]))
+
+    def test_set_array_persistence(self, local_storage: LocalStorage):
+        """Test that set_array data persists after reload."""
+        ref = Dataset.create(local_storage, "test_dataset", description={})
+        dataset = ref.get()
+
+        # Set arrays
+        bias_data = np.linspace(-1, 1, 101)
+        dataset.set_array("bias", bias_data)
+
+        # Reload dataset
+        reloaded = Dataset.load(local_storage, dataset.id)
+
+        # Verify array persists
+        bias_array = reloaded.get_array("bias")
+        assert bias_array._storage_type == "pattern"
+        assert bias_array._pattern is not None
+
+        # Verify data
+        retrieved = bias_array.toarray()
+        np.testing.assert_array_almost_equal(retrieved, bias_data)
+
+    def test_set_array_full_workflow(self, local_storage: LocalStorage):
+        """Test the complete set_array workflow with pattern detection."""
+        ref = Dataset.create(local_storage, "test_dataset", description={})
+        dataset = ref.get()
+
+        # Set linspace array (should be stored as pattern)
+        bias_data = np.linspace(-1, 1, 101)
+        dataset.set_array("bias", bias_data)
+
+        # Set random array (should be stored as full data)
+        np.random.seed(42)
+        dataset.set_array("random", np.random.rand(50))
+
+        # Append position-dependent data
+        for j in range(5):
+            for i in range(10):
+                dataset.append(
+                    position=(j, i),
+                    data={
+                        "frequency": 5.0e9 + i * 10e6,
+                        "amplitude": np.random.rand(1024, 64),
+                    },
+                )
+
+        dataset.flush()
+
+        # Reload and verify
+        ds2 = Dataset.load(local_storage, dataset.id)
+
+        # Verify bias array (pattern storage)
+        bias_array = ds2.get_array("bias")
+        bias_retrieved = bias_array.toarray()
+        assert bias_retrieved.shape == (101,)
+        np.testing.assert_array_almost_equal(bias_retrieved, bias_data)
+
+        # Verify indexing works on pattern array
+        assert abs(bias_array[50] - 0.0) < 1e-10  # Middle value should be ~0
+        assert bias_array[0:3].shape == (3,)
+
+        # Verify amplitude array shape
+        amp_array = ds2.get_array("amplitude")
+        amp_data = amp_array.toarray()
+        assert amp_data.shape == (5, 10, 1024, 64)

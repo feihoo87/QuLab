@@ -9,6 +9,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 
+import numpy as np
+
 if TYPE_CHECKING:
     from .array import Array
     from .local import DatasetRef, LocalStorage
@@ -277,6 +279,8 @@ class Dataset:
                     arr_model.lu or (),
                     arr_model.rd or (),
                     arr_model.inner_shape or (),
+                    pattern=arr_model.pattern,
+                    storage_type=arr_model.storage_type or "data",
                 )
 
         return self._arrays[key]
@@ -322,6 +326,64 @@ class Dataset:
 
         self._arrays[key] = arr
         return arr
+
+    def set_array(self, key: str, data: np.ndarray):
+        """Set an independent array with intelligent pattern detection.
+
+        Automatically detects if the array can be represented by simple
+        generation functions (linspace, logspace, etc.) and stores only
+        the parameters to save space.
+
+        This is for position-independent arrays like coordinate axes,
+        bias points, etc. For position-dependent data, use append().
+
+        Args:
+            key: Array name
+            data: NumPy array to store
+
+        Raises:
+            ValueError: If array with this key already exists
+        """
+        import numpy as np
+        from .array import Array
+        from .array_utils import detect_array_pattern
+        from .models import Array as ArrayModel
+
+        data = np.asarray(data)
+
+        # Check if array already exists
+        with self.storage._get_session() as session:
+            existing = (session.query(ArrayModel).filter_by(
+                dataset_id=self.id, name=key).first())
+            if existing:
+                raise ValueError(
+                    f"Array {key} already exists in dataset {self.id}")
+
+        # Detect generation pattern
+        pattern = detect_array_pattern(data)
+
+        # Create array with appropriate shape
+        arr = Array.create(self.storage, self.id, key, inner_shape=data.shape)
+        arr.set_array(data, pattern=pattern)
+
+        # Save to database
+        with self.storage._get_session() as session:
+            arr_model = ArrayModel(
+                dataset_id=self.id,
+                name=key,
+                file_path=str(
+                    arr.file.relative_to(self.storage.datasets_path /
+                                         str(self.id))),
+                inner_shape=list(data.shape),
+                lu=[],
+                rd=[],
+                pattern=pattern,
+                storage_type="pattern" if pattern else "data",
+            )
+            session.add(arr_model)
+            session.commit()
+
+        self._arrays[key] = arr
 
     def append(self, position: tuple, data: dict[str, Any]):
         """Append data at a position.

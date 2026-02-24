@@ -86,6 +86,10 @@ class Array(Base):
     lu = Column(JSON, default=list)  # Lower bounds (left-bottom)
     rd = Column(JSON, default=list)  # Upper bounds (right-top)
 
+    # Pattern-based storage for independent arrays
+    pattern = Column(JSON, nullable=True)  # Generation pattern (linspace, etc.)
+    storage_type = Column(String, default="data")  # 'pattern' or 'data'
+
     # Relationship
     dataset = relationship("Dataset", back_populates="arrays")
 
@@ -96,7 +100,12 @@ class Array(Base):
     def shape(self) -> tuple:
         """Compute logical shape from bounds."""
         if not self.lu or not self.rd:
-            return ()
+            # For pattern-based arrays, get shape from pattern or inner_shape
+            if self.storage_type == "pattern" and self.pattern:
+                from ..array_utils import compute_shape
+                return compute_shape(self.pattern)
+            inner = tuple(self.inner_shape) if self.inner_shape else ()
+            return inner
         outer = tuple(r - l for l, r in zip(self.lu, self.rd))
         inner = tuple(self.inner_shape) if self.inner_shape else ()
         return outer + inner

@@ -335,6 +335,120 @@ class TestArray:
         # File should be gone (array.file becomes None after delete)
         assert not file_path.exists()
 
+    def test_set_array_with_pattern(self, local_storage: LocalStorage):
+        """Test set_array with pattern-based storage."""
+        array = Array.create(local_storage, 1, "test", inner_shape=())
+
+        # Create linspace data with pattern
+        data = np.linspace(-1, 1, 101)
+        pattern = {
+            "type": "linspace",
+            "params": {
+                "start": -1.0,
+                "stop": 1.0,
+                "num": 101,
+                "dtype": "float64"
+            }
+        }
+
+        array.set_array(data, pattern=pattern)
+
+        assert array._storage_type == "pattern"
+        assert array._pattern == pattern
+        assert array.shape == (101,)
+
+    def test_set_array_with_data(self, local_storage: LocalStorage):
+        """Test set_array with full data storage."""
+        array = Array.create(local_storage, 1, "test", inner_shape=())
+
+        # Create random data (no pattern)
+        data = np.random.rand(50)
+        array.set_array(data, pattern=None)
+
+        assert array._storage_type == "data"
+        assert array._pattern is None
+        # For independent arrays, shape should be just inner_shape
+        assert array.shape == (50,)
+
+    def test_set_array_toarray_pattern(self, local_storage: LocalStorage):
+        """Test toarray() with pattern-based storage."""
+        array = Array.create(local_storage, 1, "test", inner_shape=())
+
+        # Create linspace data with pattern
+        data = np.linspace(-1, 1, 101)
+        pattern = {
+            "type": "linspace",
+            "params": {
+                "start": -1.0,
+                "stop": 1.0,
+                "num": 101,
+                "dtype": "float64"
+            }
+        }
+
+        array.set_array(data, pattern=pattern)
+
+        # Convert to array
+        result = array.toarray()
+
+        np.testing.assert_array_almost_equal(result, data)
+        assert result.shape == (101,)
+
+    def test_set_array_getitem_pattern(self, local_storage: LocalStorage):
+        """Test __getitem__ with pattern-based storage."""
+        array = Array.create(local_storage, 1, "test", inner_shape=())
+
+        # Create linspace data with pattern
+        data = np.linspace(-1, 1, 101)
+        pattern = {
+            "type": "linspace",
+            "params": {
+                "start": -1.0,
+                "stop": 1.0,
+                "num": 101,
+                "dtype": "float64"
+            }
+        }
+
+        array.set_array(data, pattern=pattern)
+
+        # Test indexing (should compute directly without generating full array)
+        val = array[0]
+        assert abs(val - (-1.0)) < 1e-10
+
+        val = array[50]
+        assert abs(val - 0.0) < 1e-10
+
+        val = array[100]
+        assert abs(val - 1.0) < 1e-10
+
+        # Test negative indexing
+        val = array[-1]
+        assert abs(val - 1.0) < 1e-10
+
+    def test_set_array_slice_pattern(self, local_storage: LocalStorage):
+        """Test slicing with pattern-based storage."""
+        array = Array.create(local_storage, 1, "test", inner_shape=())
+
+        # Create linspace data with pattern
+        data = np.linspace(-1, 1, 101)
+        pattern = {
+            "type": "linspace",
+            "params": {
+                "start": -1.0,
+                "stop": 1.0,
+                "num": 101,
+                "dtype": "float64"
+            }
+        }
+
+        array.set_array(data, pattern=pattern)
+
+        # Test slicing
+        result = array[49:52]
+        assert result.shape == (3,)
+        np.testing.assert_array_almost_equal(result, np.array([-0.02, 0.0, 0.02]))
+
     def test_append_with_numpy_array(self, local_storage: LocalStorage):
         """Test appending numpy arrays."""
         array = Array.create(local_storage, 1, "test", (3,))

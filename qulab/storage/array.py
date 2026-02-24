@@ -19,6 +19,10 @@ class Array:
 
     Stores sparse multidimensional data with file backing. Supports
     numpy-style slicing and efficient appends.
+
+    Also supports pattern-based storage for independent arrays (set_array)
+    where arrays can be represented by simple generation functions
+    (linspace, logspace, arange, full) rather than storing full data.
     """
 
     BUFFER_SIZE = 1000  # Memory buffer size before flush
@@ -47,6 +51,11 @@ class Array:
         if file is not None:
             self.file = Path(file) if isinstance(file, str) else file
 
+        # Pattern-based storage for independent arrays (set_array)
+        self._pattern: Optional[dict] = None  # Generation pattern
+        self._storage_type: str = "data"  # 'pattern' or 'data'
+        self._cached_array: Optional[np.ndarray] = None  # Lazy loaded array
+
     def __repr__(self) -> str:
         return f"Array(name={self.name!r}, shape={self.shape}, lu={self.lu}, rd={self.rd})"
 
@@ -58,6 +67,8 @@ class Array:
             "lu": self.lu,
             "rd": self.rd,
             "inner_shape": self.inner_shape,
+            "pattern": self._pattern,
+            "storage_type": self._storage_type,
         }
 
     def __setstate__(self, state: dict):
@@ -73,6 +84,9 @@ class Array:
         self.storage = None  # Will be set by parent Dataset
         self.dataset_id = None
         self.name = None
+        self._pattern = state.get("pattern")
+        self._storage_type = state.get("storage_type", "data")
+        self._cached_array = None
 
     @property
     def file(self) -> Optional[Path]:
@@ -85,8 +99,14 @@ class Array:
     @property
     def shape(self) -> tuple:
         """Logical shape of the array."""
+        # Handle pattern-based storage
+        if self._storage_type == "pattern" and self._pattern is not None:
+            from .array_utils import compute_shape
+            return compute_shape(self._pattern)
+
+        # Handle regular sparse storage
         if not self.lu or not self.rd:
-            return ()
+            return self.inner_shape
         outer = tuple(r - l for l, r in zip(self.lu, self.rd))
         return outer + self.inner_shape
 
@@ -132,6 +152,8 @@ class Array:
         lu: tuple,
         rd: tuple,
         inner_shape: tuple,
+        pattern: Optional[dict] = None,
+        storage_type: str = "data",
     ) -> "Array":
         """Load an existing array from storage.
 
@@ -143,6 +165,8 @@ class Array:
             lu: Lower bounds
             rd: Upper bounds
             inner_shape: Inner shape
+            pattern: Optional generation pattern for pattern-based storage
+            storage_type: 'pattern' or 'data'
 
         Returns:
             Array instance
@@ -152,6 +176,8 @@ class Array:
         instance.lu = tuple(lu) if lu else ()
         instance.rd = tuple(rd) if rd else ()
         instance.inner_shape = tuple(inner_shape) if inner_shape else ()
+        instance._pattern = pattern
+        instance._storage_type = storage_type
         return instance
 
     def flush(self):
@@ -267,8 +293,69 @@ class Array:
             d.append(value)
         return p, d
 
+    def set_array(self, data: np.ndarray, pattern: Optional[dict] = None):
+        """Set an independent array with optional pattern-based storage.
+
+        This is used for position-independent arrays (set_array on Dataset)
+        where the array can be represented by generation parameters
+        (linspace, logspace, etc.) rather than storing full data.
+
+        Args:
+            data: NumPy array to store
+            pattern: Optional generation pattern. If provided, only pattern
+                    is stored and data is generated on demand.
+        """
+        data = np.asarray(data)
+        self.inner_shape = data.shape
+        self._storage_type = "pattern" if pattern else "data"
+        self._pattern = pattern
+        self._cached_array = None
+
+        if pattern:
+            # Pattern-based storage: don't store data in file
+            # Just cache it for now
+            self._cached_array = data
+            self.lu = ()
+            self.rd = ()
+        else:
+            # Full data storage: write to file as single element at empty position
+            # Don't set lu/rd - they're for position-based sparse arrays
+            self.lu = ()
+            self.rd = ()
+            with self._lock:
+                with open(self.file, "wb") as f:
+                    dill.dump(((), data), f)
+
     def toarray(self) -> np.ndarray:
         """Convert to numpy array (dense representation)."""
+        # Handle pattern-based storage (independent arrays from set_array)
+        if self._storage_type == "pattern" and self._pattern is not None:
+            from .array_utils import generate_from_pattern
+
+            if self._cached_array is not None:
+                return self._cached_array
+
+            arr = generate_from_pattern(self._pattern)
+            self._cached_array = arr
+            return arr
+
+        # Handle data-based storage for independent arrays (from set_array without pattern)
+        # When lu and rd are empty, this is an independent array stored as single element
+        if self._storage_type == "data" and not self.lu and not self.rd and self.inner_shape:
+            # Read directly from file or cache
+            if self._cached_array is not None:
+                return self._cached_array
+
+            # Read from file - stored as single element at empty position
+            if self._file and self._file.exists():
+                with self._lock:
+                    with open(self._file, "rb") as f:
+                        _, data = dill.load(f)
+                self._cached_array = data
+                return data
+            return np.array([])
+
+        # Handle regular sparse storage (append-based)
         pos, data = self.items()
 
         # Always return full array, ignore self._slice
@@ -387,6 +474,17 @@ class Array:
         # Convert single index to tuple
         if not isinstance(slice_tuple, tuple):
             slice_tuple = (slice_tuple,)
+
+        # Fast path for pattern-based 1D arrays with simple indexing
+        if (self._storage_type == "pattern" and self._pattern is not None
+                and len(slice_tuple) == 1):
+            from .array_utils import compute_index
+
+            try:
+                return compute_index(self._pattern, slice_tuple[0])
+            except (TypeError, ValueError):
+                # Fall through to full array generation if compute fails
+                pass
 
         full_slice, contract, reversed_dims = self._full_slice(slice_tuple)
 
