@@ -104,7 +104,7 @@ class MeasurementTool(BaseTool):
             custom_name: Custom dataset name
 
         Returns:
-            ToolResult with dataset ID and outputs
+            ToolResult with dataset IDs and outputs
         """
         try:
             # Load skill
@@ -120,46 +120,98 @@ class MeasurementTool(BaseTool):
             if errors:
                 return ToolResult(error=f"Input validation failed: {', '.join(errors)}")
 
-            # Create dataset
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            name = custom_name or f"{skill}_{timestamp}"
-
-            dataset_ref = self.storage.create_dataset(
-                name=name,
-                description={
-                    "skill": skill,
-                    "parameters": parameters or {},
-                    "type": "auto_measurement",
-                },
-                tags=tags or [skill, "auto"],
-                script=skill_def.code,
-            )
-
             # Create context
             ctx = MeasurementContext(self.storage)
 
             # Execute skill code
             result = self._execute_skill(skill_def.code, parameters or {}, ctx)
 
-            # Populate dataset if data returned
-            if "dataset" in result:
+            # Process result - support both new 'datasets' (plural) and old 'dataset' (singular)
+            dataset_ids = []
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_name = custom_name or f"{skill}_{timestamp}"
+
+            # New format: datasets (plural) - list of dataset data
+            if "datasets" in result:
+                datasets_list = result["datasets"]
+                if not isinstance(datasets_list, list):
+                    return ToolResult(
+                        error="'datasets' must be a list",
+                        data={"raw_result": result},
+                    )
+
+                for idx, ds_data in enumerate(datasets_list):
+                    ds_name = f"{base_name}_{idx}" if idx > 0 else base_name
+                    dataset_ref = self.storage.create_dataset(
+                        name=ds_name,
+                        description={
+                            "skill": skill,
+                            "parameters": parameters or {},
+                            "type": "auto_measurement",
+                            "index": idx,
+                        },
+                        tags=tags or [skill, "auto"],
+                        script=skill_def.code,
+                    )
+
+                    try:
+                        ds = dataset_ref.get()
+                        self._populate_dataset(ds, ds_data)
+                        ds.flush()
+                        dataset_ids.append(dataset_ref.id)
+                    except Exception as e:
+                        return ToolResult(
+                            error=f"Failed to populate dataset {idx}: {e}",
+                            data={"dataset_ids": dataset_ids, "raw_result": result},
+                        )
+
+                outputs = {k: v for k, v in result.items() if k != "datasets"}
+
+            # Old format: dataset (singular) - single dataset data (backward compatible)
+            elif "dataset" in result:
+                dataset_ref = self.storage.create_dataset(
+                    name=base_name,
+                    description={
+                        "skill": skill,
+                        "parameters": parameters or {},
+                        "type": "auto_measurement",
+                    },
+                    tags=tags or [skill, "auto"],
+                    script=skill_def.code,
+                )
+
                 try:
                     ds = dataset_ref.get()
                     self._populate_dataset(ds, result["dataset"])
                     ds.flush()
+                    dataset_ids.append(dataset_ref.id)
                 except Exception as e:
                     return ToolResult(
                         error=f"Failed to populate dataset: {e}",
-                        data={"dataset_id": dataset_ref.id, "raw_result": result},
+                        data={"dataset_ids": dataset_ids, "raw_result": result},
                     )
 
-            # Build output
-            outputs = {k: v for k, v in result.items() if k != "dataset"}
+                outputs = {k: v for k, v in result.items() if k != "dataset"}
+
+            else:
+                # No dataset returned - still create a record
+                dataset_ref = self.storage.create_dataset(
+                    name=base_name,
+                    description={
+                        "skill": skill,
+                        "parameters": parameters or {},
+                        "type": "auto_measurement",
+                    },
+                    tags=tags or [skill, "auto"],
+                    script=skill_def.code,
+                )
+                dataset_ids.append(dataset_ref.id)
+                outputs = result
 
             return ToolResult(
                 data={
-                    "dataset_id": dataset_ref.id,
-                    "name": name,
+                    "dataset_ids": dataset_ids,
+                    "name": base_name,
                     "outputs": outputs,
                 },
                 metadata={"skill": skill, "parameters": parameters or {}},

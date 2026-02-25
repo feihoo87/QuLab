@@ -4,6 +4,7 @@ type: analysis
 description: |
   对能谱数据进行洛伦兹线型拟合，提取 qubit 频率和线宽。
   适用于单峰 Lorentzian 线型的分析。
+  生成可视化图片展示拟合结果。
 
 capabilities:
   排查问题:
@@ -55,6 +56,9 @@ outputs:
   - name: fit_success
     type: boolean
     description: 拟合是否成功
+  - name: figure
+    type: image
+    description: 拟合结果可视化图片 (base64格式)
 
 metadata:
   tags: [fitting, spectroscopy, analysis, lorentzian]
@@ -94,7 +98,7 @@ def run(dataset_id: int, freq_key: str = 'frequencies',
         ctx: 分析上下文
 
     Returns:
-        包含拟合结果的字典
+        包含拟合结果和图片的字典（使用多文档格式）
     """
     # 获取数据集
     ds = ctx.get_dataset(dataset_id)
@@ -187,43 +191,95 @@ def run(dataset_id: int, freq_key: str = 'frequencies',
         else:
             fit_quality = 'poor'
 
+        # 生成拟合结果图
+        plot_data = {
+            'freqs': freqs,
+            'amps': amps,
+            'fitted_curve': fitted_curve,
+            'f0': f0,
+            'fwhm': fwhm,
+            'Q': Q,
+            'fit_quality': fit_quality,
+            'r_squared': r_squared,
+        }
+
+        def plot_fit(fig, ax, d):
+            """绘制拟合图"""
+            # 绘制原始数据
+            ax.plot(d['freqs'] / 1e9, d['amps'], 'bo', markersize=4,
+                   label='Data', alpha=0.6)
+            # 绘制拟合曲线
+            ax.plot(d['freqs'] / 1e9, d['fitted_curve'], 'r-',
+                   linewidth=2, label='Lorentzian Fit')
+            # 标记峰值位置
+            ax.axvline(d['f0'] / 1e9, color='g', linestyle='--',
+                      alpha=0.7, label=f"f0 = {d['f0']/1e9:.4f} GHz")
+            ax.legend(loc='best')
+            ax.grid(True, alpha=0.3)
+
+        # 使用辅助函数生成图片文档
+        figure_doc = ctx.create_analysis_figure(
+            plot_data,
+            plot_fit,
+            figsize=(10, 6),
+            image_format='png',
+            dpi=150,
+            xlabel='Frequency (GHz)',
+            ylabel='Amplitude (a.u.)',
+            title=f'Lorentzian Fit (Q = {Q:.0f}, R² = {r_squared:.3f})',
+            caption=f'Lorentzian fit result: f01 = {f0/1e9:.4f} GHz, '
+                   f'FWHM = {fwhm/1e6:.2f} MHz, Q = {Q:.0f}. '
+                   f'Fit quality: {fit_quality} (R² = {r_squared:.3f})',
+            extra_tags=['lorentzian', 'fit_result'],
+        )
+
+        # 使用多文档格式返回结果
         return {
-            'data': {
-                'f01': float(f0),
-                'f01_error': float(f0_err),
-                'gamma': float(gamma),
-                'gamma_error': float(gamma_err),
-                'fwhm': float(fwhm),
-                'Q': float(Q),
-                'A': float(A),
-                'A_error': float(A_err),
-                'offset': float(offset),
-                'fit_quality': fit_quality,
-                'r_squared': float(r_squared),
-                'fit_params': {
-                    'f0': float(f0),
-                    'A': float(A),
-                    'gamma': float(gamma),
-                    'offset': float(offset)
-                },
-                'fit_errors': {
-                    'f0': float(f0_err),
-                    'A': float(A_err),
-                    'gamma': float(gamma_err),
-                    'offset': float(offset_err)
+            'documents': [
+                # 图片文档
+                figure_doc,
+                # 拟合参数文档
+                {
+                    'data': {
+                        'f01': float(f0),
+                        'f01_error': float(f0_err),
+                        'gamma': float(gamma),
+                        'gamma_error': float(gamma_err),
+                        'fwhm': float(fwhm),
+                        'Q': float(Q),
+                        'A': float(A),
+                        'A_error': float(A_err),
+                        'offset': float(offset),
+                        'fit_quality': fit_quality,
+                        'r_squared': float(r_squared),
+                        'fit_params': {
+                            'f0': float(f0),
+                            'A': float(A),
+                            'gamma': float(gamma),
+                            'offset': float(offset)
+                        },
+                        'fit_errors': {
+                            'f0': float(f0_err),
+                            'A': float(A_err),
+                            'gamma': float(gamma_err),
+                            'offset': float(offset_err)
+                        }
+                    },
+                    'state': 'ok' if fit_quality in ['good', 'moderate'] else 'warning',
+                    'extracted_info': {
+                        'f01': float(f0),
+                        'f01_error': float(f0_err),
+                        'linewidth': float(fwhm),
+                        'gamma': float(gamma),
+                        'Q': float(Q),
+                        'fit_quality': fit_quality,
+                        'r_squared': float(r_squared),
+                        'fit_success': True
+                    },
+                    'tags': ['fit_params'],
+                    'type': 'params',
                 }
-            },
-            'state': 'ok' if fit_quality in ['good', 'moderate'] else 'warning',
-            'extracted_info': {
-                'f01': float(f0),
-                'f01_error': float(f0_err),
-                'linewidth': float(fwhm),
-                'gamma': float(gamma),
-                'Q': float(Q),
-                'fit_quality': fit_quality,
-                'r_squared': float(r_squared),
-                'fit_success': True
-            }
+            ]
         }
 
     except Exception as e:

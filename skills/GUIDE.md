@@ -134,6 +134,441 @@ def run(dataset_ids: list, peak_prominence: float = 0.1, ctx=None):
     }
 ```
 
+## Storage API 参考
+
+### 在 Skill 中使用 Storage
+
+`ctx.storage` 提供了对 storage 系统的访问，可用于查询和创建数据。
+
+#### Dataset 操作
+
+```python
+# 获取已有 dataset
+ds = ctx.storage.get_dataset(dataset_id)
+
+# 读取数组数据
+freqs = ds.get_array('frequencies')
+amps = ds.get_array('amplitudes')
+
+# 读取属性
+qubit_id = ds.attrs.get('qubit_id')
+
+# 查询 datasets
+results = ctx.storage.query_datasets(
+    tags=['qubit_spectroscopy'],
+    created_after=datetime(2024, 1, 1),
+    limit=10
+)
+```
+
+#### Document 操作
+
+```python
+# 获取已有 document
+doc = ctx.storage.get_document(document_id)
+data = doc.data
+state = doc.state
+
+# 查询 documents
+results = ctx.storage.query_documents(
+    tags=['calibration', 'qubit_01'],
+    state='ok',
+    limit=5
+)
+
+# 获取最近的成功校准
+cal_docs = ctx.storage.query_documents(
+    tags=['calibration', 'frequency'],
+    state='ok',
+    sort_by='created_at',
+    sort_order='desc',
+    limit=1
+)
+if cal_docs:
+    freq = cal_docs[0].data.get('frequency')
+```
+
+### 返回多个 Datasets/Documents
+
+#### 测量技能：返回多个 datasets
+
+```python
+def run(qubit_ids: list, ctx=None):
+    """测量多个比特。"""
+    datasets = []
+    summary = {}
+
+    for qubit_id in qubit_ids:
+        # 执行测量
+        data = measure_qubit(qubit_id)
+
+        datasets.append({
+            'frequencies': data['freqs'],
+            'amplitudes': data['amps'],
+            'qubit_id': qubit_id,
+        })
+        summary[qubit_id] = {
+            'f01': data['peak_freq'],
+            'visibility': data['visibility'],
+        }
+
+    return {
+        'datasets': datasets,  # 复数形式返回列表
+        'summary': summary,
+    }
+```
+
+#### 分析技能：返回多个 documents
+
+```python
+def run(dataset_ids: list, ctx=None):
+    """生成多个分析报告。"""
+    documents = []
+
+    for idx in range(len(dataset_ids)):
+        ds = ctx.get_dataset(idx)
+
+        # 数据分析
+        result = analyze_data(ds)
+
+        documents.append({
+            'data': {
+                'frequency': result['f0'],
+                'linewidth': result['gamma'],
+            },
+            'state': 'ok' if result['success'] else 'error',
+            'extracted_info': {
+                'Q': result['f0'] / result['gamma'],
+            },
+            'tags': ['fit_result'],
+            'type': 'fit',
+        })
+
+    return {
+        'documents': documents,  # 复数形式返回列表
+    }
+```
+
+## 状态与数据形态示例
+
+分析技能应返回清晰的 state，帮助 LLM 判断结果质量。
+
+### 成功状态 (state: "ok")
+
+```python
+return {
+    'data': {
+        'frequency': 4.523e9,
+        'amplitude': 0.85,
+        'linewidth': 2.1e6,
+        'fit_quality': 0.98,
+    },
+    'state': 'ok',
+    'extracted_info': {
+        'f01': 4.523e9,
+        'Q': 2154,
+        'coherence_time': 150e-6,
+    },
+}
+```
+
+### 警告状态 (state: "warning")
+
+```python
+return {
+    'data': {
+        'frequency': 4.523e9,
+        'amplitude': 0.15,  # 信号较弱
+        'linewidth': 5.2e6,  # 线宽较宽
+        'fit_quality': 0.72,  # 拟合质量一般
+    },
+    'state': 'warning',
+    'extracted_info': {
+        'f01': 4.523e9,
+        'Q': 870,
+        'warning_reason': 'Signal quality below threshold',
+        'suggested_action': 'Increase measurement power or check readout',
+    },
+}
+```
+
+### 错误状态 (state: "error")
+
+#### 情况 1：拟合失败
+```python
+return {
+    'data': {
+        'error': 'Peak not found in specified range',
+        'max_snr': 0.8,  # 信噪比过低
+        'search_range': [4.0e9, 5.0e9],
+    },
+    'state': 'error',
+    'extracted_info': {
+        'error_type': 'no_peak_found',
+        'suggested_action': 'Expand frequency range or check qubit coupling',
+    },
+}
+```
+
+#### 情况 2：数据异常
+```python
+return {
+    'data': {
+        'error': 'Unexpected data shape',
+        'expected_shape': (100,),
+        'actual_shape': (100, 2),
+    },
+    'state': 'error',
+    'extracted_info': {
+        'error_type': 'data_shape_mismatch',
+        'suggested_action': 'Check measurement configuration',
+    },
+}
+```
+
+#### 情况 3：仪器错误
+```python
+return {
+    'data': {
+        'error': 'Instrument connection timeout',
+        'instrument': 'VNA_01',
+        'timeout_seconds': 30,
+    },
+    'state': 'error',
+    'extracted_info': {
+        'error_type': 'instrument_timeout',
+        'suggested_action': 'Check instrument connection and retry',
+    },
+}
+```
+
+### 状态判断流程
+
+分析技能应遵循以下流程确定 state：
+
+```python
+def run(dataset_ids: list, ctx=None):
+    ds = ctx.get_dataset(0)
+    data = ds.get_array('amplitudes')
+
+    # 1. 数据有效性检查
+    if len(data) == 0:
+        return {
+            'data': {'error': 'Empty dataset'},
+            'state': 'error',
+            'extracted_info': {'error_type': 'no_data'},
+        }
+
+    # 2. 执行分析
+    result = fit_peak(data)
+
+    # 3. 结果质量评估
+    if not result['success']:
+        return {
+            'data': {'error': result['error_message']},
+            'state': 'error',
+            'extracted_info': {
+                'error_type': 'fit_failed',
+                'details': result.get('details'),
+            },
+        }
+
+    # 4. 质量阈值检查
+    if result['snr'] < 3.0:
+        return {
+            'data': result,
+            'state': 'warning',
+            'extracted_info': {
+                'f01': result['frequency'],
+                'warning': 'Low SNR detected',
+            },
+        }
+
+    # 5. 成功
+    return {
+        'data': result,
+        'state': 'ok',
+        'extracted_info': {
+            'f01': result['frequency'],
+            'Q': result['Q'],
+        },
+    }
+```
+
+## 图片生成与存储
+
+利用 LLM 的多模态能力，分析技能可以生成图片并返回。
+
+### 基础图片生成
+
+```python
+def run(dataset_ids: list, ctx=None):
+    import matplotlib.pyplot as plt
+
+    ds = ctx.get_dataset(0)
+    freqs = ds.get_array('frequencies')
+    amps = ds.get_array('amplitudes')
+
+    # 创建图片
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.plot(freqs / 1e9, amps, 'b-', label='Data')
+    ax.set_xlabel('Frequency (GHz)')
+    ax.set_ylabel('Amplitude')
+    ax.set_title('Qubit Spectroscopy')
+    ax.legend()
+    ax.grid(True)
+
+    # 转换为 base64
+    img_base64 = ctx.figure_to_base64(fig, image_format='png', dpi=150)
+    plt.close(fig)
+
+    return {
+        'data': {
+            'image': img_base64,
+            'caption': 'Qubit spectroscopy showing clear peak at 4.523 GHz',
+            'format': 'png',
+        },
+        'state': 'ok',
+        'extracted_info': {
+            'peak_frequency': 4.523e9,
+        },
+    }
+```
+
+### 多子图示例
+
+```python
+def run(dataset_ids: list, ctx=None):
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+    for idx, ax in enumerate(axes.flat):
+        if idx < len(dataset_ids):
+            ds = ctx.get_dataset(idx)
+            freqs = ds.get_array('frequencies')
+            amps = ds.get_array('amplitudes')
+
+            ax.plot(freqs / 1e9, amps)
+            ax.set_title(f'Qubit {idx}')
+            ax.set_xlabel('Frequency (GHz)')
+            ax.set_ylabel('Amplitude')
+
+    plt.tight_layout()
+
+    img_base64 = ctx.figure_to_base64(fig, format='png', dpi=150)
+    plt.close(fig)
+
+    return {
+        'data': {
+            'image': img_base64,
+            'caption': f'Comparison of {len(dataset_ids)} qubits',
+        },
+        'state': 'ok',
+        'extracted_info': {},
+    }
+```
+
+### 使用 create_analysis_figure 辅助函数
+
+```python
+def run(dataset_ids: list, ctx=None):
+    ds = ctx.get_dataset(0)
+    data = {
+        'x': ds.get_array('frequencies'),
+        'y': ds.get_array('amplitudes'),
+        'fit_x': ds.get_array('fit_freqs'),
+        'fit_y': ds.get_array('fit_amps'),
+    }
+
+    def plot_func(fig, ax, d):
+        ax.plot(d['x'] / 1e9, d['y'], 'bo', label='Data', markersize=4)
+        ax.plot(d['fit_x'] / 1e9, d['fit_y'], 'r-', label='Fit', linewidth=2)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+    # 使用辅助函数创建标准化图片文档
+    figure_doc = ctx.create_analysis_figure(
+        data,
+        plot_func,
+        figsize=(10, 6),
+        image_format='png',
+        dpi=150,
+        xlabel='Frequency (GHz)',
+        ylabel='Transmission (a.u.)',
+        title='Lorentzian Fit Result',
+        caption='Clean Lorentzian fit with Q ~ 5000',
+        extra_tags=['qubit_spectroscopy', 'fit_result'],
+    )
+
+    # 可以作为多个 documents 之一返回
+    return {
+        'documents': [
+            figure_doc,
+            {
+                'data': {'fit_params': {'f0': 4.523e9, 'Q': 5234}},
+                'state': 'ok',
+                'extracted_info': {'f01': 4.523e9, 'Q': 5234},
+                'tags': ['fit_params'],
+                'type': 'params',
+            },
+        ],
+    }
+```
+
+### 为 LLM 多模态优化
+
+生成图片时应考虑 LLM 的视觉理解能力：
+
+```python
+def run(dataset_ids: list, ctx=None):
+    import matplotlib.pyplot as plt
+
+    ds = ctx.get_dataset(0)
+
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=100)
+
+    # 1. 清晰的线条和标记
+    ax.plot(ds.get_array('frequencies') / 1e9,
+            ds.get_array('amplitudes'),
+            'b-', linewidth=2, label='Signal')
+
+    # 2. 突出关键特征
+    peak_idx = np.argmax(ds.get_array('amplitudes'))
+    peak_freq = ds.get_array('frequencies')[peak_idx] / 1e9
+    peak_amp = ds.get_array('amplitudes')[peak_idx]
+
+    ax.plot(peak_freq, peak_amp, 'ro', markersize=12, label=f'Peak: {peak_freq:.3f} GHz')
+
+    # 3. 清晰的标签
+    ax.set_xlabel('Frequency (GHz)', fontsize=12)
+    ax.set_ylabel('Amplitude (a.u.)', fontsize=12)
+    ax.set_title('Qubit Spectroscopy Result', fontsize=14)
+
+    # 4. 添加注释
+    ax.annotate(f'f01 = {peak_freq:.3f} GHz',
+                xy=(peak_freq, peak_amp),
+                xytext=(peak_freq + 0.01, peak_amp - 0.1),
+                arrowprops=dict(arrowstyle='->', color='red'),
+                fontsize=11, color='red')
+
+    ax.legend(loc='best', fontsize=11)
+    ax.grid(True, alpha=0.3)
+
+    img_base64 = ctx.figure_to_base64(fig, format='png', dpi=150)
+    plt.close(fig)
+
+    return {
+        'data': {
+            'image': img_base64,
+            'caption': f'Qubit spectroscopy with clear peak at {peak_freq:.3f} GHz. '
+                       f'Look for the red marker indicating the peak position.',
+        },
+        'state': 'ok',
+        'extracted_info': {'f01': peak_freq * 1e9},
+    }
+```
+
 ## 最佳实践
 
 1. **优先使用已有数据进行分析**
@@ -160,6 +595,13 @@ def run(dataset_ids: list, peak_prominence: float = 0.1, ctx=None):
 6. **在 extracted_info 中提取关键信息**
    - 便于后续决策使用
    - 提取的数值要标准化
+
+7. **图片生成建议**
+   - 使用适中的 DPI (150-200) 平衡清晰度和数据大小
+   - 始终包含清晰的标题和标签
+   - 使用颜色突出关键特征
+   - 在 caption 中描述关键信息
+   - 关闭图片释放内存 (`plt.close(fig)`)
 
 ## 技能搜索路径
 
