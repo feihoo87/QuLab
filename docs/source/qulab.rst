@@ -3,6 +3,45 @@ qulab package
 
 The best place to start is the examples folder before diving into the API.
 
+qulab.auto package
+------------------------
+
+.. automodule:: qulab.auto
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+qulab.auto.agent module
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: qulab.auto.agent
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+qulab.auto.llm module
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: qulab.auto.llm
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+qulab.auto.skills module
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: qulab.auto.skills
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+qulab.auto.tools module
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: qulab.auto.tools
+    :members:
+    :undoc-members:
+    :show-inheritance:
 
 qulab.dht package
 ------------------------
