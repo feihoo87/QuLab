@@ -39,8 +39,10 @@ dependencies = [
     "msgpack>=1.0.5",
     "nevergrad>=1.0.2",
     "numpy>=1.13.3",
+    "openai>=1.0.0",
     "ply>=3.11",
     "pyperclip>=1.8.2",
+    "pyyaml>=6.0",
     "pyzmq>=25.1.0",
     "qlisp>=1.1.4",
     "qlispc>=1.1.8",
@@ -86,4 +88,5 @@ version = {attr = "qulab.version.__version__"}
 dev = [
     "pylint[spelling]>=4.0.5",
     "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
 ]
