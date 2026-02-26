@@ -25,10 +25,12 @@ Example:
 """
 
 from .array import Array
+from .attachment import Attachment, AttachmentRef
 from .base import Storage
 from .dataset import Dataset
 from .document import Document
 from .local import DatasetRef, DocumentRef, LocalStorage
+from .render import ContentRenderer
 
 # Optional: remote storage (requires zmq)
 try:
@@ -56,10 +58,14 @@ __all__ = [
     "LocalStorage",
     "DocumentRef",
     "DatasetRef",
+    "AttachmentRef",
     # Data classes
     "Document",
     "Dataset",
     "Array",
+    "Attachment",
+    # Rendering
+    "ContentRenderer",
     # Remote storage (optional)
     "RemoteStorage",
     "RemoteDocumentRef",

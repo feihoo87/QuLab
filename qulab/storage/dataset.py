@@ -13,6 +13,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from .array import Array
+    from .attachment import AttachmentRef
     from .local import DatasetRef, LocalStorage
 
 
@@ -39,6 +40,10 @@ class Dataset:
         self._config_hash: Optional[str] = None
         self._script: Optional[str] = None
         self._script_hash: Optional[str] = None
+        # Content cache (lazy loaded)
+        self._content: Optional[str] = None
+        self._content_hash: Optional[str] = None
+        self._content_type: Optional[str] = None
         # Timestamp caches
         self._ctime: Optional[datetime] = None
         self._mtime: Optional[datetime] = None
@@ -56,6 +61,8 @@ class Dataset:
         config: Optional[dict] = None,
         script: Optional[str] = None,
         tags: Optional[list[str]] = None,
+        content: Optional[str] = None,
+        content_type: str = "text/markdown",
     ) -> "DatasetRef":
         """Create a new dataset in storage.
 
@@ -66,10 +73,13 @@ class Dataset:
             config: Optional configuration dictionary
             script: Optional script code string
             tags: Optional list of tags
+            content: Optional long text content (e.g., markdown)
+            content_type: MIME type for content (default: text/markdown)
 
         Returns:
             DatasetRef for the created dataset
         """
+        from .chunk import save_chunk
         from .local import DatasetRef
         from .models import Dataset as DatasetModel
         from .models import (get_or_create_config, get_or_create_script,
@@ -93,6 +103,13 @@ class Dataset:
                 session.flush()  # Flush to get the script ID
                 ds.script_id = script_model.id
                 script_model.ref_count += 1
+
+            # Handle content if provided
+            if content is not None:
+                content_bytes = content.encode("utf-8")
+                chunk_path, _ = save_chunk(content_bytes, base_path=storage.base_path)
+                ds.content_hash = chunk_path.name
+                ds.content_type = content_type
 
             session.add(ds)
             session.flush()  # Flush to get the dataset ID
@@ -141,6 +158,10 @@ class Dataset:
                 ds._config_hash = ds_model.config.config_hash
             if ds_model.script:
                 ds._script_hash = ds_model.script.script_hash
+
+            # Store content hash for lazy loading
+            ds._content_hash = ds_model.content_hash
+            ds._content_type = ds_model.content_type
 
             # Cache timestamps
             ds._ctime = ds_model.ctime
@@ -194,6 +215,62 @@ class Dataset:
     def script_hash(self) -> Optional[str]:
         """Get script hash (SHA1 identifier)."""
         return self._script_hash
+
+    @property
+    def content(self) -> Optional[str]:
+        """Get dataset content (lazy loaded from content-addressed storage)."""
+        if self._content is None and self._content_hash is not None:
+            from .chunk import load_chunk
+
+            content_bytes = load_chunk(
+                self._content_hash, base_path=self.storage.base_path
+            )
+            self._content = content_bytes.decode("utf-8")
+        return self._content
+
+    @content.setter
+    def content(self, value: Optional[str]) -> None:
+        """Set dataset content."""
+        self._content = value
+        # Note: content is not persisted until save() is called
+
+    @property
+    def content_hash(self) -> Optional[str]:
+        """Get content hash (SHA1 identifier)."""
+        return self._content_hash
+
+    @property
+    def content_type(self) -> Optional[str]:
+        """Get content MIME type."""
+        return self._content_type
+
+    def save_content(self, content: str, content_type: str = "text/markdown") -> None:
+        """Save content to storage.
+
+        Args:
+            content: Content text to save
+            content_type: MIME type for content
+        """
+        from .chunk import save_chunk
+        from .models import Dataset as DatasetModel
+
+        content_bytes = content.encode("utf-8")
+        chunk_path, _ = save_chunk(content_bytes, base_path=self.storage.base_path)
+
+        with self.storage._get_session() as session:
+            ds_model = session.get(DatasetModel, self.id)
+            if ds_model is None:
+                raise KeyError(f"Dataset {self.id} not found")
+
+            ds_model.content_hash = chunk_path.name
+            ds_model.content_type = content_type
+            ds_model.mtime = datetime.now()
+            session.commit()
+
+            # Update cache
+            self._content = content
+            self._content_hash = chunk_path.name
+            self._content_type = content_type
 
     @property
     def ctime(self) -> Optional[datetime]:
@@ -546,6 +623,69 @@ class Dataset:
 
             session.commit()
 
+    def add_attachment(self, attachment_id: int) -> None:
+        """Add an attachment to this dataset.
+
+        Args:
+            attachment_id: Attachment ID to add
+        """
+        from .models import Attachment as AttachmentModel
+        from .models import Dataset as DatasetModel
+
+        with self.storage._get_session() as session:
+            ds_model = session.get(DatasetModel, self.id)
+            if ds_model is None:
+                raise KeyError(f"Dataset {self.id} not found")
+
+            att_model = session.get(AttachmentModel, attachment_id)
+            if att_model is None:
+                raise KeyError(f"Attachment {attachment_id} not found")
+
+            if att_model not in ds_model.attachments:
+                ds_model.attachments.append(att_model)
+                session.commit()
+
+    def remove_attachment(self, attachment_id: int) -> None:
+        """Remove an attachment from this dataset.
+
+        Args:
+            attachment_id: Attachment ID to remove
+        """
+        from .models import Attachment as AttachmentModel
+        from .models import Dataset as DatasetModel
+
+        with self.storage._get_session() as session:
+            ds_model = session.get(DatasetModel, self.id)
+            if ds_model is None:
+                raise KeyError(f"Dataset {self.id} not found")
+
+            att_model = session.get(AttachmentModel, attachment_id)
+            if att_model is None:
+                raise KeyError(f"Attachment {attachment_id} not found")
+
+            if att_model in ds_model.attachments:
+                ds_model.attachments.remove(att_model)
+                session.commit()
+
+    def get_attachments(self) -> list["AttachmentRef"]:
+        """Get all attachments associated with this dataset.
+
+        Returns:
+            List of AttachmentRef objects
+        """
+        from .attachment import AttachmentRef
+        from .models import Dataset as DatasetModel
+
+        with self.storage._get_session() as session:
+            ds_model = session.get(DatasetModel, self.id)
+            if ds_model is None:
+                return []
+
+            return [
+                AttachmentRef(att.id, self.storage, name=att.name)
+                for att in ds_model.attachments
+            ]
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
@@ -556,6 +696,9 @@ class Dataset:
             "tags": self.tags,
             "config_hash": self._config_hash,
             "script_hash": self._script_hash,
+            "content": self.content,
+            "content_hash": self._content_hash,
+            "content_type": self._content_type,
             "ctime": self.ctime.isoformat() if self.ctime else None,
             "mtime": self.mtime.isoformat() if self.mtime else None,
             "atime": self.atime.isoformat() if self.atime else None,

@@ -71,12 +71,18 @@ class LocalStorage(Storage):
         state: str = "unknown",
         tags: Optional[List[str]] = None,
         script: Optional[str] = None,
+        content: Optional[str] = None,
+        content_type: str = "text/markdown",
+        attachments: Optional[List[int]] = None,
         **meta,
     ) -> "DocumentRef":
         """Create a new document."""
         from .document import Document
 
-        return Document.create(self, name, data, state=state, tags=tags, script=script, **meta)
+        return Document.create(
+            self, name, data, state=state, tags=tags, script=script,
+            content=content, content_type=content_type, attachments=attachments, **meta
+        )
 
     def get_document(self, id: int) -> "Document":
         """Get a document by ID."""
@@ -160,11 +166,16 @@ class LocalStorage(Storage):
         config: Optional[dict] = None,
         script: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        content: Optional[str] = None,
+        content_type: str = "text/markdown",
     ) -> "DatasetRef":
         """Create a new dataset."""
         from .dataset import Dataset
 
-        return Dataset.create(self, name, description, config=config, script=script, tags=tags)
+        return Dataset.create(
+            self, name, description, config=config, script=script, tags=tags,
+            content=content, content_type=content_type
+        )
 
     def get_dataset(self, id: int) -> "Dataset":
         """Get a dataset by ID."""
@@ -349,6 +360,155 @@ class LocalStorage(Storage):
                 ds.tags.append(tag)
 
             session.commit()
+
+    # Attachment API
+    def create_attachment(
+        self,
+        file_path: Union[str, Path],
+        name: Optional[str] = None,
+        mime_type: Optional[str] = None,
+        meta: Optional[dict] = None,
+    ) -> "AttachmentRef":
+        """Create a new attachment from file.
+
+        Args:
+            file_path: Path to the file to attach
+            name: Original filename (defaults to file_path name)
+            mime_type: MIME type (auto-detected if not provided)
+            meta: Optional metadata dictionary
+
+        Returns:
+            AttachmentRef for the created attachment
+        """
+        from .attachment import Attachment
+
+        return Attachment.create(self, file_path, name=name, mime_type=mime_type, meta=meta)
+
+    def create_attachment_from_bytes(
+        self,
+        data: bytes,
+        name: str,
+        mime_type: str,
+        meta: Optional[dict] = None,
+    ) -> "AttachmentRef":
+        """Create a new attachment from bytes.
+
+        Args:
+            data: File content as bytes
+            name: Original filename
+            mime_type: MIME type
+            meta: Optional metadata dictionary
+
+        Returns:
+            AttachmentRef for the created attachment
+        """
+        from .attachment import Attachment
+
+        return Attachment.create_from_bytes(self, data, name, mime_type, meta=meta)
+
+    def get_attachment(self, id: int) -> "Attachment":
+        """Get an attachment by ID.
+
+        Args:
+            id: Attachment ID
+
+        Returns:
+            Attachment instance
+        """
+        from .attachment import Attachment
+
+        return Attachment.load(self, id)
+
+    def query_attachments(
+        self,
+        name: Optional[str] = None,
+        mime_type: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> Iterator["AttachmentRef"]:
+        """Query attachments with filters.
+
+        Args:
+            name: Name pattern (supports * wildcard)
+            mime_type: MIME type filter (supports * wildcard)
+            offset: Query offset
+            limit: Maximum results
+
+        Returns:
+            Iterator of AttachmentRef objects
+        """
+        from .models import query_attachments
+
+        with self._get_session() as session:
+            attachments = query_attachments(
+                session,
+                name=name,
+                mime_type=mime_type,
+                offset=offset,
+                limit=limit,
+            )
+            for att in attachments:
+                yield AttachmentRef(att.id, self, name=att.name)
+
+    def count_attachments(
+        self,
+        name: Optional[str] = None,
+        mime_type: Optional[str] = None,
+    ) -> int:
+        """Count attachments matching filters.
+
+        Args:
+            name: Name pattern
+            mime_type: MIME type filter
+
+        Returns:
+            Number of matching attachments
+        """
+        from .models import count_attachments
+
+        with self._get_session() as session:
+            return count_attachments(
+                session, name=name, mime_type=mime_type
+            )
+
+
+class AttachmentRef:
+    """Lightweight reference to an attachment in local storage."""
+
+    def __init__(self, id: int, storage: LocalStorage, name: str = ""):
+        self.id = id
+        self.storage = storage
+        self.name = name
+
+    def get(self) -> "Attachment":
+        """Load the full attachment."""
+        from .attachment import Attachment
+
+        return Attachment.load(self.storage, self.id)
+
+    def delete(self) -> bool:
+        """Delete the attachment.
+
+        Returns:
+            True if deleted, False if still referenced by datasets/documents
+        """
+        from .models import Attachment as AttachmentModel
+
+        with self.storage._get_session() as session:
+            att = session.get(AttachmentModel, self.id)
+            if att is None:
+                return False
+
+            # Check if still referenced
+            if att.datasets or att.documents:
+                return False
+
+            session.delete(att)
+            session.commit()
+            return True
+
+    def __repr__(self) -> str:
+        return f"AttachmentRef(id={self.id}, name={self.name!r})"
 
 
 class DocumentRef:

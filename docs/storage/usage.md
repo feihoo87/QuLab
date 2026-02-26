@@ -126,6 +126,115 @@ print(doc.script)       # 完整的分析代码（延迟加载）
 - 延迟加载：代码仅在访问 `doc.script` 时从存储读取
 - 适合存储生成此文档的分析/处理代码，便于结果复现
 
+### 创建带长文本内容的文档
+
+```python
+# 创建带 Markdown 内容的文档
+doc_ref = storage.create_document(
+    name="experiment_report",
+    data={"fit_result": {"f0": 5.001e9, "Q": 10000}},
+    content="""
+# 实验报告：谐振器测量
+
+## 测量参数
+
+- 频率范围：5.0 - 5.1 GHz
+- 功率：-20 dBm
+- 平均次数：1000
+
+## 结果
+
+拟合得到谐振器频率为 **5.001 GHz**，品质因数 **Q = 10000**。
+
+## 图表
+
+![频谱图](attachment://123)
+
+## 原始数据
+
+详见附件 [原始数据.csv](attachment://124)。
+""",
+    content_type="text/markdown",
+    state="ok",
+    tags=["report", "resonator"]
+)
+
+# 访问文档内容
+doc = doc_ref.get()
+print(doc.content)       # Markdown 文本（延迟加载）
+print(doc.content_hash)  # SHA1 哈希值
+print(doc.content_type)  # "text/markdown"
+
+# 渲染为 HTML（自动替换 attachment:// 为数据 URL）
+from qulab.storage import ContentRenderer
+
+renderer = ContentRenderer(storage)
+html = renderer.render_html(doc.content)
+# 返回: <h1>实验报告：谐振器测量</h1>...<img src="data:image/png;base64,...">...
+```
+
+**设计说明：**
+- `content`: 长文本内容（如带插图的 Markdown），使用内容寻址存储
+- `content_type`: MIME 类型（默认 text/markdown）
+- 延迟加载：内容仅在访问 `doc.content` 时从 chunk 存储读取
+- 支持附件引用：在 Markdown 中使用 `attachment://{id}` 引用附件
+- `data` 和 `content` 可共存：`data` 存储结构化数据，`content` 存储富文本
+
+### 创建带附件的文档
+
+```python
+# 创建附件（从文件）
+att_ref1 = storage.create_attachment(
+    file_path="/path/to/spectrum.png",
+    name="spectrum.png",
+    mime_type="image/png",
+    meta={"width": 800, "height": 600}
+)
+
+# 创建附件（从字节）
+with open("/path/to/data.csv", "rb") as f:
+    csv_data = f.read()
+att_ref2 = storage.create_attachment_from_bytes(
+    data=csv_data,
+    name="raw_data.csv",
+    mime_type="text/csv"
+)
+
+# 创建文档并关联附件
+doc_ref = storage.create_document(
+    name="full_report",
+    data={"summary": "Measurement completed successfully"},
+    content="""
+# 完整报告
+
+![频谱图](attachment://{0})
+
+数据下载：[原始数据](attachment://{1})
+"".format(att_ref1.id, att_ref2.id),
+    attachments=[att_ref1.id, att_ref2.id],  # 关联附件
+    state="ok"
+)
+
+# 获取文档附件
+doc = doc_ref.get()
+for att_ref in doc.get_attachments():
+    att = att_ref.get()
+    print(f"Attachment: {att.name}, MIME: {att.mime_type}, Size: {att.size}")
+
+    # 读取附件数据
+    data = att.read()  # 返回 bytes
+
+    # 保存到文件
+    att.save_to_file(f"/tmp/{att.name}")
+```
+
+**设计说明：**
+- 附件使用内容寻址存储，相同文件只存储一次
+- 支持多对多关系：一个附件可关联多个文档/数据集
+- 延迟加载：附件数据按需读取
+- 自动 MIME 类型检测（也可手动指定）
+- 支持任意文件类型：图片、PDF、视频、数据文件等
+
 ### 获取文档
 
 ```python
@@ -246,6 +355,33 @@ doc.set_tags(["tag1", "tag2", "tag3"])
 storage.document_add_tags(123, ["tag1", "tag2"])
 storage.document_remove_tags(123, ["old_tag"])
 storage.document_set_tags(123, ["new_tag1", "new_tag2"])
+```
+
+### 编辑文档内容
+
+```python
+# 获取文档
+doc = storage.get_document(123)
+
+# 修改内容
+doc.content = """
+# 更新后的报告
+
+新增内容...
+"""
+
+# 保存内容（将新内容写入存储，更新 content_hash）
+doc.save_content(doc.content, content_type="text/markdown")
+
+# 添加附件
+doc.add_attachment(456)  # attachment_id
+
+# 移除附件
+doc.remove_attachment(456)
+
+# 获取所有附件
+for att_ref in doc.get_attachments():
+    print(att_ref.name)
 ```
 
 ### 文档与数据集关联
@@ -369,6 +505,83 @@ print(ds.script[:100])  # 代码前100字符
 - `script`: 数据采集代码，使用内容寻址存储，相同代码自动去重
 - 两者都是延迟加载，仅在访问时从 chunk 存储读取
 - 配置和代码的哈希值可通过 `config_hash` 和 `script_hash` 获取
+
+### 创建带长文本内容的数据集
+
+```python
+# 创建带 Markdown 内容的数据集
+ds_ref = storage.create_dataset(
+    name="qubit_resonator_scan",
+    description={"type": "resonator_scan", "qubit": "Q1"},
+    content="""
+# 实验笔记
+
+## 实验目的
+
+测量 Q1 量子比特的谐振器频率。
+
+## 观察结果
+
+- 谐振器频率：5.001 GHz
+- 线宽：500 kHz
+- 品质因数：10000
+
+## 备注
+
+温度稳定在 15 mK。
+""",
+    content_type="text/markdown",
+    tags=["experiment", "qubit01", "resonator"]
+)
+
+# 访问数据集内容
+ds = ds_ref.get()
+print(ds.content)       # Markdown 文本（延迟加载）
+print(ds.content_hash)  # SHA1 哈希值
+print(ds.content_type)  # "text/markdown"
+
+# 保存新内容
+ds.save_content("# 更新的实验笔记\n\n新增内容...")
+```
+
+### 创建带附件的数据集
+
+```python
+# 创建图片附件
+att_ref = storage.create_attachment(
+    file_path="/path/to/spectrum.png",
+    name="q1_spectrum.png",
+    mime_type="image/png"
+)
+
+# 创建带附件的数据集
+ds_ref = storage.create_dataset(
+    name="qubit_sweep_with_figure",
+    description={"type": "resonator_scan", "qubit": "Q1"},
+    content=f"""
+# 实验结果
+
+## 频谱图
+
+![Q1 频谱](attachment://{att_ref.id})
+
+测量时间：2024-02-22
+""",
+    tags=["experiment", "qubit01"]
+)
+
+# 关联附件
+ds = ds_ref.get()
+ds.add_attachment(att_ref.id)
+
+# 获取数据集附件
+for att_ref in ds.get_attachments():
+    att = att_ref.get()
+    print(f"Attachment: {att.name}")
+
+    # 读取附件数据
+    data = att.read()
+```
 
 ### 追加数据
 
@@ -916,7 +1129,91 @@ doc2 = storage.create_document(
 print(doc1.script_hash == doc2.script_hash)  # True
 ```
 
-### 5. 数据备份
+### 5. 富文本报告与附件
+
+使用 Content 字段和附件系统创建完整的实验报告：
+
+```python
+# 创建带图片附件的数据集
+ds_ref = storage.create_dataset(
+    name="qubit_01_resonator_scan",
+    description={"type": "resonator_scan", "qubit": "Q1"},
+    config={
+        "frequency": {"start": 5.0e9, "stop": 5.1e9, "points": 101},
+        "power": {"drive": -20, "readout": -30},
+        "averages": 1000
+    }
+)
+ds = ds_ref.get()
+
+# 添加实验数据...
+# ds.append(...)
+
+# 生成图表并创建附件
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots()
+# ax.plot(...)
+fig.savefig("/tmp/spectrum.png")
+
+att_ref = storage.create_attachment("/tmp/spectrum.png")
+ds.add_attachment(att_ref.id)
+
+# 创建带 Markdown 内容的分析报告
+ds.save_content(f"""
+# 实验报告：Q1 谐振器测量
+
+## 实验参数
+
+- 频率范围：{ds.config['frequency']['start']/1e9:.1f} - {ds.config['frequency']['stop']/1e9:.1f} GHz
+- 驱动功率：{ds.config['power']['drive']} dBm
+
+## 测量结果
+
+![频谱图](attachment://{att_ref.id})
+
+## 备注
+
+温度稳定在 15 mK，测量成功。
+""")
+
+# 创建关联的分析文档（复用相同附件）
+doc_ref = storage.create_document(
+    name="qubit_01_analysis",
+    data={"fit_result": {"f0": 5.001e9, "Q": 10000}},
+    content=f"""
+# 数据分析报告
+
+基于数据集 #{ds.id} 的分析结果。
+
+## 拟合结果
+
+- 谐振频率：5.001 GHz
+- 品质因数：10,000
+
+频谱图如下：
+
+![频谱图](attachment://{att_ref.id})
+""",
+    attachments=[att_ref.id],  # 复用相同附件
+    state="ok",
+    tags=["analysis", "qubit_01"]
+)
+
+# 渲染报告为 HTML
+from qulab.storage import ContentRenderer
+
+renderer = ContentRenderer(storage)
+html = renderer.render_html(doc.content)
+# 可用于导出为 HTML 文件或显示在 Web 界面
+```
+
+**最佳实践：**
+- 使用 Markdown 格式编写内容，支持附件引用
+- 图表作为附件存储，可在多个文档/数据集中复用
+- 使用 `attachment://{id}` 协议在 Markdown 中引用附件
+- 使用 `ContentRenderer` 将 Markdown 渲染为 HTML
+
+### 6. 数据备份
 
 ```python
 import shutil
@@ -981,7 +1278,12 @@ except Exception as e:
 | `document_add_tags(id, tags)` | 为文档添加标签 |
 | `document_remove_tags(id, tags)` | 移除文档标签 |
 | `document_set_tags(id, tags)` | 设置文档标签（替换） |
-| `create_dataset(name, description, config, script, tags)` | 创建数据集 |
+| `create_attachment(file_path, name, mime_type, meta)` | 创建附件（从文件） |
+| `create_attachment_from_bytes(data, name, mime_type, meta)` | 创建附件（从字节） |
+| `get_attachment(id)` | 获取附件 |
+| `query_attachments(name, mime_type, offset, limit)` | 查询附件 |
+| `count_attachments(name, mime_type)` | 计数附件 |
+| `create_dataset(name, description, config, script, tags, content, content_type)` | 创建数据集 |
 | `get_dataset(id)` | 获取数据集 |
 | `query_datasets(**filters)` | 查询数据集 |
 | `count_datasets(**filters)` | 计数数据集 |
@@ -1008,12 +1310,20 @@ except Exception as e:
 | `state` | 状态 |
 | `script` | 分析代码字符串（延迟加载） |
 | `script_hash` | 代码的 SHA1 哈希值 |
+| `content` | 长文本内容（延迟加载，支持 Markdown） |
+| `content_hash` | 内容的 SHA1 哈希值 |
+| `content_type` | 内容 MIME 类型 |
+| `attachment_ids` | 关联的附件 ID 列表 |
 | `ctime` | 创建时间 |
 | `mtime` | 修改时间 |
 | `atime` | 访问时间 |
 | `add_tag(tag)` | 添加标签 |
 | `remove_tag(tag)` | 移除标签 |
 | `set_tags(tags)` | 设置标签（替换） |
+| `save_content(content, content_type)` | 保存内容到存储 |
+| `add_attachment(attachment_id)` | 添加附件关联 |
+| `remove_attachment(attachment_id)` | 移除附件关联 |
+| `get_attachments()` | 获取所有关联的附件 |
 
 **延迟加载属性说明：**
 - `data`: 文档数据，仅在首次访问时从 chunk 存储读取
@@ -1041,6 +1351,13 @@ except Exception as e:
 | `config_hash` | 配置的 SHA1 哈希值 |
 | `script` | 采集代码字符串（延迟加载） |
 | `script_hash` | 代码的 SHA1 哈希值 |
+| `content` | 长文本内容（延迟加载，支持 Markdown） |
+| `content_hash` | 内容的 SHA1 哈希值 |
+| `content_type` | 内容 MIME 类型 |
+| `save_content(content, content_type)` | 保存内容到存储 |
+| `add_attachment(attachment_id)` | 添加附件关联 |
+| `remove_attachment(attachment_id)` | 移除附件关联 |
+| `get_attachments()` | 获取所有关联的附件 |
 
 **内容寻址属性说明：**
 - `config` / `config_hash`: 访问实验配置，配置使用内容寻址存储实现去重
@@ -1113,6 +1430,41 @@ except Exception as e:
 | `__getitem__(slice)` | 支持 NumPy 风格切片访问（服务端切片，只传输所需数据） |
 | `iter(start, count)` | 迭代数据点（分页） |
 | `toarray()` | 转换为 numpy 数组（分批传输） |
+
+### Attachment 类
+
+| 属性/方法 | 说明 |
+|------|------|
+| `id` | 附件 ID |
+| `name` | 原始文件名 |
+| `mime_type` | MIME 类型 |
+| `size` | 文件大小（字节） |
+| `meta` | 元数据字典 |
+| `ctime` | 创建时间 |
+| `atime` | 访问时间 |
+| `read()` | 读取附件数据（返回 bytes） |
+| `save_to_file(path)` | 保存附件到文件系统 |
+| `delete()` | 删除附件（仅当无引用时） |
+
+### AttachmentRef 类
+
+| 属性/方法 | 说明 |
+|------|------|
+| `id` | 附件 ID |
+| `name` | 附件名称 |
+| `get()` | 加载完整 Attachment 对象 |
+| `delete()` | 删除附件引用 |
+
+### ContentRenderer 类
+
+| 方法 | 说明 |
+|------|------|
+| `render_markdown(content, context)` | 渲染 Markdown，替换 attachment:// 为数据 URL |
+| `render_html(content, context)` | 转换为 HTML，嵌入附件 |
+| `get_attachment_url(id, format)` | 获取附件 URL（data/path/link） |
+| `extract_attachments(content)` | 提取内容中的所有附件 ID |
+| `get_attachment_info(id)` | 获取附件元数据 |
+| `render_attachment_list(ids, format)` | 渲染附件列表 |
 
 **远程切片优化：**
 - `__getitem__` 支持 NumPy 风格切片（如 `[0:10]`, `[..., 0]`, `[::-1]` 等）

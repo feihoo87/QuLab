@@ -28,6 +28,8 @@
 | BufferList (scan) | 多维数组数据存储 | **Array** - 专用数组存储 |
 | Config | 实验配置参数 | **Config** - 内容寻址配置存储 |
 | Script | 实验/分析代码 | **Script** - 内容寻址代码存储 |
+| - | 长文本内容（带插图的Markdown等） | **Content** - 内容寻址长文本存储 |
+| - | 文件附件（图片、PDF、视频等） | **Attachment** - 内容寻址附件存储 |
 
 ### 存储模式
 
@@ -61,7 +63,8 @@ qulab/storage/
     ├── document.py          # Document 模型
     ├── file.py              # File/FileChunk 模型
     ├── script.py            # Script 模型 (内容寻址代码)
-    └── tag.py               # Tag 模型
+    ├── tag.py               # Tag 模型
+    └── attachment.py        # Attachment 模型 (内容寻址附件存储)
 ```
 
 ### 核心类设计
@@ -266,6 +269,49 @@ CREATE TABLE scripts (
 - `ref_count`: 引用计数，跟踪有多少 Dataset/Document 引用此脚本
 - 脚本内容存储在 `chunks/` 目录下，使用 lzma 压缩的文本格式
 
+#### Attachment 模型
+
+附件系统支持多对多关系，一个附件可被多个 Dataset/Document 共享引用：
+
+```sql
+CREATE TABLE attachments (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR NOT NULL,              -- 原始文件名
+    mime_type VARCHAR NOT NULL,         -- MIME 类型
+    chunk_hash VARCHAR(40) INDEX,       -- SHA1 哈希 (内容寻址)
+    size INTEGER,                       -- 文件大小（字节）
+    meta JSON DEFAULT '{}',             -- 可选元数据
+    ctime DATETIME DEFAULT CURRENT_TIMESTAMP,
+    atime DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Dataset-Attachment 关联表（多对多）
+CREATE TABLE dataset_attachments (
+    dataset_id INTEGER REFERENCES datasets(id),
+    attachment_id INTEGER REFERENCES attachments(id),
+    PRIMARY KEY (dataset_id, attachment_id)
+);
+
+-- Document-Attachment 关联表（多对多）
+CREATE TABLE document_attachments (
+    document_id INTEGER REFERENCES documents(id),
+    attachment_id INTEGER REFERENCES attachments(id),
+    PRIMARY KEY (document_id, attachment_id)
+);
+```
+
+**设计说明：**
+- `chunk_hash`: 附件内容的 SHA1 哈希，用于内容寻址存储
+- `mime_type`: MIME 类型，用于正确的内容渲染（如 image/png, application/pdf）
+- **内容去重**：相同内容的附件只存储一次，通过哈希实现
+- **多对多关系**：一个附件可关联多个 Dataset/Document，支持复用
+- 附件数据存储在 `chunks/` 目录下，使用内容寻址
+- 支持任意文件类型：图片、PDF、视频、数据文件等
+
+**引用协议：**
+- Markdown 中使用 `attachment://{id}` 协议引用附件
+- 渲染时自动替换为实际的数据 URL 或文件路径
+
 #### Document 模型
 
 ```sql
@@ -277,6 +323,8 @@ CREATE TABLE documents (
     parent_id INTEGER REFERENCES documents(id),
     chunk_hash VARCHAR(40) INDEX,  -- SHA1 hash (data content)
     chunk_size INTEGER,
+    content_hash VARCHAR(40) INDEX,  -- SHA1 hash (long text content)
+    content_type VARCHAR DEFAULT 'text/markdown',  -- MIME type
     script_id INTEGER REFERENCES scripts(id),  -- 关联的分析代码
     meta JSON DEFAULT '{}',
     ctime DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -295,7 +343,10 @@ CREATE TABLE document_tags (
 ```
 
 **更新说明：**
+- 新增 `content_hash` 字段，存储长文本内容（如带插图的 Markdown）的 SHA1 哈希
+- 新增 `content_type` 字段，标识内容 MIME 类型（默认 text/markdown）
 - 新增 `script_id` 字段，关联 Script 模型，用于存储生成此文档的分析代码
+- 注意：`chunk_hash` 用于存储结构化数据字典，`content_hash` 专门用于长文本内容
 - 新增复合索引 `ix_documents_name_ctime`，优化"查找给定 name 的最新 Document"查询性能
 - 查询默认按 `ctime DESC` 排序，返回最新的文档优先
 
@@ -308,6 +359,8 @@ CREATE TABLE datasets (
     description JSON,
     config_id INTEGER REFERENCES configs(id),  -- 关联的配置
     script_id INTEGER REFERENCES scripts(id),  -- 关联的采集代码
+    content_hash VARCHAR(40) INDEX,  -- SHA1 hash (long text content)
+    content_type VARCHAR DEFAULT 'text/markdown',  -- MIME type
     ctime DATETIME DEFAULT CURRENT_TIMESTAMP,
     mtime DATETIME DEFAULT CURRENT_TIMESTAMP,
     atime DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -330,6 +383,8 @@ CREATE TABLE arrays (
 ```
 
 **更新说明：**
+- 新增 `content_hash` 字段，存储长文本内容（如带插图的 Markdown）的 SHA1 哈希
+- 新增 `content_type` 字段，标识内容 MIME 类型（默认 text/markdown）
 - 新增 `config_id` 字段，关联 Config 模型，用于存储实验配置参数
 - 新增 `script_id` 字段，关联 Script 模型，用于存储数据采集代码
 - 新增 `pattern` 字段，存储数组生成模式的 JSON 参数（如 linspace 的 start/stop/num）
@@ -584,10 +639,52 @@ LIMIT 1;
 2. **访问控制** - 通过文件系统权限
 3. **远程安全** - ZMQ CURVE 加密支持
 
+## 内容渲染
+
+### ContentRenderer
+
+支持渲染包含附件引用的 Markdown 内容：
+
+```python
+from qulab.storage import ContentRenderer
+
+# 创建渲染器
+renderer = ContentRenderer(storage)
+
+# 渲染 Markdown，自动替换 attachment:// 协议
+html = renderer.render_html("""
+# 实验报告
+
+## 结果
+
+![频谱图](attachment://123)
+
+数据详情见附件 [原始数据](attachment://124)。
+""")
+
+# 提取内容中的所有附件引用
+attachment_ids = renderer.extract_attachments(content)
+# 返回: [123, 124]
+
+# 获取附件数据 URL
+url = renderer.get_attachment_url(123, format="data")
+# 返回: "data:image/png;base64,iVBORw0KGgo..."
+```
+
+**支持的渲染格式：**
+- `render_markdown()`: 渲染 Markdown，替换 attachment:// 为数据 URL
+- `render_html()`: 转换为 HTML，嵌入图片附件
+- `get_attachment_url(format="data")`: 获取 base64 数据 URL
+- `get_attachment_url(format="path")`: 获取文件系统路径
+- `get_attachment_url(format="link")`: 获取 HTTP 链接（需配置 base_url）
+
 ## 未来扩展
 
-1. **分布式存储** - 支持多节点存储集群
-2. **缓存层** - Redis/Memcached 缓存支持
-3. **压缩算法** - 支持多种压缩算法 (lz4, zstd)
-4. **数据迁移** - 自动数据迁移工具
-5. **备份恢复** - 增量备份支持
+1. **附件引用计数** - 当附件不被任何 Dataset/Document 引用时自动清理
+2. **缩略图生成** - 图片附件自动生成缩略图
+3. **附件搜索** - 按文件名、类型、元数据搜索附件
+4. **分布式存储** - 支持多节点存储集群
+5. **缓存层** - Redis/Memcached 缓存支持
+6. **压缩算法** - 支持多种压缩算法 (lz4, zstd)
+7. **数据迁移** - 自动数据迁移工具
+8. **备份恢复** - 增量备份支持

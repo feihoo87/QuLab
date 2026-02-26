@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, List, Optional
 
 if TYPE_CHECKING:
+    from .attachment import AttachmentRef
     from .local import LocalStorage
 
 
@@ -43,6 +44,14 @@ class Document:
     # Data cache (lazy loaded from chunk storage)
     _data: Optional[dict] = field(default=None, repr=False)
     _chunk_hash: Optional[str] = field(default=None, repr=False)
+
+    # Content cache (lazy loaded from chunk storage for long text)
+    _content: Optional[str] = field(default=None, repr=False)
+    _content_hash: Optional[str] = field(default=None, repr=False)
+    _content_type: Optional[str] = field(default=None, repr=False)
+
+    # Attachment IDs (lazy loaded)
+    _attachment_ids: Optional[List[int]] = field(default=None, repr=False)
 
     # Storage reference (needed for lazy loading)
     _storage: Optional["LocalStorage"] = field(default=None, repr=False)
@@ -86,6 +95,45 @@ class Document:
         """Get script hash (SHA1 identifier)."""
         return self._script_hash
 
+    @property
+    def content(self) -> Optional[str]:
+        """Get document content - long text (lazy loaded from chunk storage)."""
+        if self._content is None and self._content_hash is not None and self._storage is not None:
+            from .chunk import load_chunk
+
+            content_bytes = load_chunk(self._content_hash, base_path=self._storage.base_path)
+            self._content = content_bytes.decode("utf-8")
+        return self._content
+
+    @content.setter
+    def content(self, value: Optional[str]) -> None:
+        """Set document content."""
+        self._content = value
+
+    @property
+    def content_hash(self) -> Optional[str]:
+        """Get content hash (SHA1 identifier)."""
+        return self._content_hash
+
+    @property
+    def content_type(self) -> Optional[str]:
+        """Get content MIME type."""
+        return self._content_type
+
+    @property
+    def attachment_ids(self) -> List[int]:
+        """Get the IDs of attachments associated with this document."""
+        if self._attachment_ids is None:
+            if self._storage is None:
+                return []
+            from .models import Document as DocumentModel
+
+            with self._storage._get_session() as session:
+                doc_model = session.get(DocumentModel, self.id)
+                if doc_model:
+                    self._attachment_ids = [att.id for att in doc_model.attachments]
+        return self._attachment_ids if self._attachment_ids is not None else []
+
     def get_datasets(self, storage: "LocalStorage") -> List["Dataset"]:
         """Load and return the related datasets.
 
@@ -110,6 +158,9 @@ class Document:
         parent_id: Optional[int] = None,
         datasets: Optional[List[int]] = None,
         script: Optional[str] = None,
+        content: Optional[str] = None,
+        content_type: str = "text/markdown",
+        attachments: Optional[List[int]] = None,
         **extra_meta,
     ) -> "DocumentRef":
         """Create a new document in storage.
@@ -123,6 +174,9 @@ class Document:
             parent_id: Parent document ID for versioning
             datasets: List of dataset IDs this document is derived from
             script: Optional script code string
+            content: Optional long text content (e.g., markdown)
+            content_type: MIME type for content (default: text/markdown)
+            attachments: List of attachment IDs to associate
             **extra_meta: Additional metadata
 
         Returns:
@@ -130,6 +184,7 @@ class Document:
         """
         from .chunk import save_chunk
         from .local import DocumentRef
+        from .models import Attachment as AttachmentModel
         from .models import Dataset as DatasetModel
         from .models import Document as DocumentModel
         from .models import get_or_create_script, get_or_create_tag
@@ -141,6 +196,13 @@ class Document:
         # Get hash from path - chunk_path is like Path('chunks/xx/yy/zzzz')
         # We want just the filename (hash) part
         chunk_hash = chunk_path.name
+
+        # Handle content if provided
+        content_hash = None
+        if content is not None:
+            content_bytes = content.encode("utf-8")
+            content_chunk_path, _ = save_chunk(content_bytes, base_path=storage.base_path)
+            content_hash = content_chunk_path.name
 
         with storage._get_session() as session:
             # Determine version - if parent_id provided, increment parent's version
@@ -156,6 +218,8 @@ class Document:
                 state=state,
                 chunk_hash=chunk_hash,
                 chunk_size=size,
+                content_hash=content_hash,
+                content_type=content_type,
                 meta=extra_meta,
                 parent_id=parent_id,
                 version=version,
@@ -169,6 +233,7 @@ class Document:
                 script_model.ref_count += 1
 
             session.add(doc)
+            session.flush()  # Flush to get the document ID
 
             # Add tags
             if tags:
@@ -182,6 +247,13 @@ class Document:
                     ds = session.get(DatasetModel, ds_id)
                     if ds:
                         doc.datasets.append(ds)
+
+            # Add attachments
+            if attachments:
+                for att_id in attachments:
+                    att = session.get(AttachmentModel, att_id)
+                    if att:
+                        doc.attachments.append(att)
 
             session.commit()
 
@@ -229,6 +301,9 @@ class Document:
                 _dataset_ids=[ds.id for ds in doc_model.datasets],
                 _script_hash=script_hash,
                 _chunk_hash=doc_model.chunk_hash,
+                _content_hash=doc_model.content_hash,
+                _content_type=doc_model.content_type,
+                _attachment_ids=[att.id for att in doc_model.attachments],
                 _storage=storage,
             )
 
@@ -332,12 +407,97 @@ class Document:
             # Update local cache
             self.tags = list(tags)
 
+    def add_attachment(self, attachment_id: int) -> None:
+        """Add an attachment to this document.
+
+        Args:
+            attachment_id: Attachment ID to add
+        """
+        if self._storage is None:
+            raise RuntimeError("Document is not associated with a storage")
+
+        from .models import Attachment as AttachmentModel
+        from .models import Document as DocumentModel
+
+        with self._storage._get_session() as session:
+            doc_model = session.get(DocumentModel, self.id)
+            if doc_model is None:
+                raise KeyError(f"Document {self.id} not found")
+
+            att_model = session.get(AttachmentModel, attachment_id)
+            if att_model is None:
+                raise KeyError(f"Attachment {attachment_id} not found")
+
+            if att_model not in doc_model.attachments:
+                doc_model.attachments.append(att_model)
+                session.commit()
+
+            # Update local cache
+            if self._attachment_ids is None:
+                self._attachment_ids = []
+            if attachment_id not in self._attachment_ids:
+                self._attachment_ids.append(attachment_id)
+
+    def remove_attachment(self, attachment_id: int) -> None:
+        """Remove an attachment from this document.
+
+        Args:
+            attachment_id: Attachment ID to remove
+        """
+        if self._storage is None:
+            raise RuntimeError("Document is not associated with a storage")
+
+        from .models import Attachment as AttachmentModel
+        from .models import Document as DocumentModel
+
+        with self._storage._get_session() as session:
+            doc_model = session.get(DocumentModel, self.id)
+            if doc_model is None:
+                raise KeyError(f"Document {self.id} not found")
+
+            att_model = session.get(AttachmentModel, attachment_id)
+            if att_model is None:
+                raise KeyError(f"Attachment {attachment_id} not found")
+
+            if att_model in doc_model.attachments:
+                doc_model.attachments.remove(att_model)
+                session.commit()
+
+            # Update local cache
+            if self._attachment_ids and attachment_id in self._attachment_ids:
+                self._attachment_ids.remove(attachment_id)
+
+    def get_attachments(self) -> list["AttachmentRef"]:
+        """Get all attachments associated with this document.
+
+        Returns:
+            List of AttachmentRef objects
+        """
+        if self._storage is None:
+            return []
+
+        from .attachment import AttachmentRef
+        from .models import Document as DocumentModel
+
+        with self._storage._get_session() as session:
+            doc_model = session.get(DocumentModel, self.id)
+            if doc_model is None:
+                return []
+
+            return [
+                AttachmentRef(att.id, self._storage, name=att.name)
+                for att in doc_model.attachments
+            ]
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "id": self.id,
             "name": self.name,
             "data": self.data,
+            "content": self.content,
+            "content_hash": self._content_hash,
+            "content_type": self._content_type,
             "meta": self.meta,
             "ctime": self.ctime.isoformat(),
             "mtime": self.mtime.isoformat(),
@@ -347,6 +507,7 @@ class Document:
             "version": self.version,
             "parent_id": self.parent_id,
             "script_hash": self._script_hash,
+            "attachment_ids": self.attachment_ids,
         }
 
     @classmethod
@@ -364,7 +525,11 @@ class Document:
             version=data.get("version", 1),
             parent_id=data.get("parent_id"),
             _data=data.get("data", {}),
+            _content=data.get("content"),
+            _content_hash=data.get("content_hash") or data.get("_content_hash"),
+            _content_type=data.get("content_type") or data.get("_content_type"),
             _script_hash=data.get("script_hash") or data.get("_script_hash"),
             _dataset_ids=data.get("dataset_ids") or data.get("_dataset_ids"),
+            _attachment_ids=data.get("attachment_ids") or data.get("_attachment_ids"),
             _script=data.get("script") or data.get("_script"),
         )

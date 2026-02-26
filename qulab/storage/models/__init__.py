@@ -3,6 +3,14 @@
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from .attachment import (
+    Attachment,
+    count_attachments,
+    dataset_attachments,
+    document_attachments,
+    get_attachment_by_hash,
+    query_attachments,
+)
 from .base import Base, SessionManager
 from .config import Config, get_or_create_config, load_config, save_config
 from .dataset import Array, Dataset, count_datasets, get_array, query_datasets
@@ -37,6 +45,13 @@ __all__ = [
     "Document",
     "Dataset",
     "Array",
+    # Attachment models
+    "Attachment",
+    "dataset_attachments",
+    "document_attachments",
+    "query_attachments",
+    "count_attachments",
+    "get_attachment_by_hash",
     # Config models
     "Config",
     "get_or_create_config",

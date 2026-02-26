@@ -10,6 +10,7 @@ from .base import Base, utcnow
 from .tag import has_tags
 
 if TYPE_CHECKING:
+    from .attachment import Attachment
     from .document import Document
     from .tag import Tag
 
@@ -59,6 +60,18 @@ class Dataset(Base):
         secondary="document_datasets",
         back_populates="datasets",
         doc="Documents derived from this dataset",
+    )
+
+    # Content fields for long text storage (e.g., markdown with figures)
+    content_hash = Column(String(40), index=True, nullable=True)  # SHA1 hash to chunk
+    content_type = Column(String, default="text/markdown")  # MIME type
+
+    # Many-to-many relationship with Attachment
+    attachments = relationship(
+        "Attachment",
+        secondary="dataset_attachments",
+        back_populates="datasets",
+        doc="Attachments associated with this dataset",
     )
 
     def __repr__(self) -> str:
