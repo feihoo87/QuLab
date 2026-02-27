@@ -12,6 +12,8 @@ Welcome to QuLab's documentation!
 
    introduction
    source/modules
+   auto/cli
+   auto/design
 
 
 
