@@ -1,11 +1,13 @@
 import click
 
+from ..auto.cli import auto_cli
 from ..executor.cli import (boot, create, delete, export, get, load, maintain,
                             reboot, reproduce, run, set)
 from ..monitor.__main__ import main as monitor
 from ..scan.server import server
 from ..sys.net.cli import dht
 from ..visualization.__main__ import plot
+from ..storage.cli import storage
 
 
 @click.group()
@@ -40,3 +42,5 @@ reg.add_command(load)
 reg.add_command(export)
 cli.add_command(boot)
 cli.add_command(reboot)
+cli.add_command(auto_cli)
+cli.add_command(storage)
