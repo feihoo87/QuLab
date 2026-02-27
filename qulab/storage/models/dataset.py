@@ -33,6 +33,7 @@ class Dataset(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, index=True)
     description = Column(JSON, default=dict)
+    attrs = Column(JSON, default=dict)  # Scalar attributes for the dataset
 
     # Config and Script references (content-addressed)
     config_id = Column(Integer, ForeignKey("configs.id"), nullable=True)

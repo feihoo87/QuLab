@@ -48,6 +48,53 @@ class Dataset:
         self._ctime: Optional[datetime] = None
         self._mtime: Optional[datetime] = None
         self._atime: Optional[datetime] = None
+        # Attributes cache for scalar metadata
+        self._attrs: Optional[dict] = None
+
+    @property
+    def attrs(self) -> dict:
+        """Get dataset attributes (scalar metadata).
+
+        Returns:
+            Dictionary of attributes
+        """
+        if self._attrs is None:
+            from .models import Dataset as DatasetModel
+
+            with self.storage._get_session() as session:
+                ds_model = session.get(DatasetModel, self.id)
+                if ds_model:
+                    self._attrs = ds_model.attrs or {}
+                else:
+                    self._attrs = {}
+        return self._attrs
+
+    def set_attr(self, key: str, value: Any) -> None:
+        """Set a scalar attribute.
+
+        Args:
+            key: Attribute name
+            value: Attribute value (must be JSON serializable)
+        """
+        from .models import Dataset as DatasetModel
+
+        with self.storage._get_session() as session:
+            ds_model = session.get(DatasetModel, self.id)
+            if ds_model is None:
+                raise KeyError(f"Dataset {self.id} not found")
+
+            # Initialize attrs if None
+            if ds_model.attrs is None:
+                ds_model.attrs = {}
+
+            ds_model.attrs[key] = value
+            ds_model.mtime = datetime.now()
+            session.commit()
+
+            # Update cache
+            if self._attrs is None:
+                self._attrs = {}
+            self._attrs[key] = value
 
     def __repr__(self) -> str:
         return f"Dataset(id={self.id}, name={self.name!r}, arrays={self.keys()})"

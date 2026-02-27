@@ -276,7 +276,7 @@ def server():
 @click.option(
     "--data-path",
     "-d",
-    default=lambda: str(get_config_value("data", Path, Path.home() / ".qulab" / "storage")),
+    default=lambda: str(get_config_value("data", Path, default=Path.home() / ".qulab" / "storage")),
     help="Storage path",
 )
 def server_start(host, port, data_path):
