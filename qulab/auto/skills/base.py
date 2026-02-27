@@ -32,7 +32,7 @@ class Skill:
     A skill describes an experiment or analysis method with:
     - Metadata (name, type, description, capabilities)
     - Input/output parameter definitions
-    - Execution code
+    - Execution code (direct mode) or generation guide (code mode)
     """
 
     name: str
@@ -42,7 +42,9 @@ class Skill:
     inputs: list[dict]
     outputs: list[dict]
     metadata: dict
-    code: str  # Execution code
+    generation_mode: str  # "code" | "direct"
+    guide_content: str  # Code generation guide (for "code" mode)
+    code: str | None = None  # Execution code (for "direct" mode or cached code)
     filepath: Path | None = None
 
     def to_prompt(self) -> str:

@@ -39,6 +39,7 @@ class ToolRegistry:
         from .analysis import AnalysisTool
         from .config import ConfigTool
         from .human import HumanQueryTool
+        from .lesson import CreateGuideTool, QueryLessonsTool, SaveLessonTool
         from .measurement import MeasurementTool
         from .query import QueryTool
 
@@ -47,6 +48,9 @@ class ToolRegistry:
         self.register(AnalysisTool(self.storage, self.skill_loader))
         self.register(ConfigTool())
         self.register(HumanQueryTool())
+        self.register(SaveLessonTool(self.storage))
+        self.register(QueryLessonsTool(self.storage))
+        self.register(CreateGuideTool(self.storage))
 
     def register(self, tool: BaseTool) -> None:
         """Register a tool.

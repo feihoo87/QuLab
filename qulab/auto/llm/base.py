@@ -21,6 +21,7 @@ class LLMResponse:
     tool_calls: list[ToolCall]
     model: str
     usage: dict | None = None
+    reasoning_content: str | None = None  # For models with thinking capability (e.g., Kimi)
 
 
 class LLMProvider(ABC):

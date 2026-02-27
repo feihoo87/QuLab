@@ -8,7 +8,72 @@ from .base import BaseTool, ToolResult
 if TYPE_CHECKING:
     from qulab.storage import Storage
 
+    from ..skills.base import Skill
+    from ..skills.cache import SkillCodeCache
+    from ..skills.generator import CodeGenerator
     from ..skills.loader import SkillLoader
+
+
+class DatasetWrapper:
+    """Wrapper for Dataset to provide dict-like access."""
+
+    def __init__(self, dataset: Any):
+        """Initialize wrapper.
+
+        Args:
+            dataset: Dataset instance to wrap
+        """
+        self._dataset = dataset
+        self._cache: dict[str, Any] = {}
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get value by key (array or attr).
+
+        Args:
+            key: Array name or attr name
+            default: Default value if not found
+
+        Returns:
+            Array data or attr value
+        """
+        # Check cache first
+        if key in self._cache:
+            return self._cache[key]
+
+        # Try to get as array
+        try:
+            import numpy as np
+            arr = self._dataset.get_array(key)
+            value = arr[:]
+            self._cache[key] = value
+            return value
+        except KeyError:
+            pass
+
+        # Try to get as attr
+        try:
+            attrs = self._dataset.attrs
+            if key in attrs:
+                return attrs[key]
+        except Exception:
+            pass
+
+        return default
+
+    def __getitem__(self, key: str) -> Any:
+        """Get item by key."""
+        result = self.get(key)
+        if result is None and key not in self._dataset.attrs:
+            raise KeyError(key)
+        return result
+
+    def __contains__(self, key: str) -> bool:
+        """Check if key exists."""
+        return self.get(key) is not None
+
+    def keys(self) -> list[str]:
+        """Get all available keys."""
+        return self._dataset.keys()
 
 
 class AnalysisContext:
@@ -22,7 +87,8 @@ class AnalysisContext:
             datasets: List of loaded datasets
         """
         self.storage = storage
-        self.datasets = datasets
+        # Wrap datasets for dict-like access
+        self.datasets = [DatasetWrapper(ds) for ds in datasets]
 
     def get_dataset(self, index: int) -> Any:
         """Get dataset by index.
@@ -122,7 +188,7 @@ class AnalysisContext:
 
 
 class AnalysisTool(BaseTool):
-    """Execute analysis skills."""
+    """Execute analysis skills with code generation support."""
 
     name = "run_analysis"
     description = "Execute an analysis task using a skill. Results are saved as a Document."
@@ -154,17 +220,37 @@ class AnalysisTool(BaseTool):
             "type": "string",
             "description": "Custom name for the document (optional)",
         },
+        "force_regenerate": {
+            "type": "boolean",
+            "description": "Force code regeneration even if cached",
+            "default": False,
+        },
+        "max_retries": {
+            "type": "integer",
+            "description": "Maximum retries on execution error",
+            "default": 3,
+        },
     }
 
-    def __init__(self, storage: "Storage", skill_loader: "SkillLoader"):
+    def __init__(
+        self,
+        storage: "Storage",
+        skill_loader: "SkillLoader",
+        code_generator: "CodeGenerator | None" = None,
+        max_retries: int = 3,
+    ):
         """Initialize analysis tool.
 
         Args:
             storage: Storage instance
             skill_loader: Skill loader
+            code_generator: Optional code generator for dynamic skill generation
+            max_retries: Maximum number of retries on execution error
         """
         self.storage = storage
         self.skill_loader = skill_loader
+        self.code_generator = code_generator
+        self.max_retries = max_retries
 
     async def execute(
         self,
@@ -173,6 +259,8 @@ class AnalysisTool(BaseTool):
         dataset_ids: list[int] | None = None,
         tags: list[str] | None = None,
         custom_name: str | None = None,
+        force_regenerate: bool = False,
+        max_retries: int | None = None,
     ) -> ToolResult:
         """Execute analysis skill.
 
@@ -182,10 +270,14 @@ class AnalysisTool(BaseTool):
             dataset_ids: Dataset IDs to analyze
             tags: Document tags
             custom_name: Custom document name
+            force_regenerate: Force code regeneration even if cached
+            max_retries: Override default max retries for error recovery
 
         Returns:
             ToolResult with document IDs and results
         """
+        max_retries = max_retries if max_retries is not None else self.max_retries
+
         try:
             # Load skill
             skill_def = self.skill_loader.get(skill)
@@ -204,11 +296,18 @@ class AnalysisTool(BaseTool):
                 except KeyError:
                     return ToolResult(error=f"Dataset not found: {ds_id}")
 
+            # Get or generate code
+            code = await self._get_or_generate_code(
+                skill_def, parameters or {}, force_regenerate
+            )
+
             # Create context
             ctx = AnalysisContext(self.storage, datasets)
 
-            # Execute skill code
-            result = self._execute_skill(skill_def.code, parameters or {}, ctx)
+            # Execute skill code with retry
+            result, executed_code = await self._execute_with_retry(
+                code, parameters or {}, ctx, skill_def, max_retries
+            )
 
             # Process result - support both new 'documents' (plural) and old format
             document_ids = []
@@ -256,7 +355,7 @@ class AnalysisTool(BaseTool):
                         data=data,
                         state=doc_state,
                         tags=(tags or [skill, "auto", "analysis"]) + doc_tags,
-                        script=skill_def.code,
+                        script=executed_code,
                         meta={
                             "skill": skill,
                             "parameters": parameters or {},
@@ -268,12 +367,15 @@ class AnalysisTool(BaseTool):
                     )
                     document_ids.append(doc_ref.id)
 
+                # Build LLM-friendly summary from extracted_info
+                llm_summary = self._build_llm_summary(aggregated_extracted_info)
+
                 return ToolResult(
                     data={
                         "document_ids": document_ids,
                         "name": base_name,
                         "state": aggregated_state,
-                        "extracted_info": aggregated_extracted_info,
+                        "summary": llm_summary,  # LLM-friendly summary
                     },
                     metadata={
                         "skill": skill,
@@ -293,7 +395,7 @@ class AnalysisTool(BaseTool):
                     data=data,
                     state=state,
                     tags=tags or [skill, "auto", "analysis"],
-                    script=skill_def.code,
+                    script=executed_code,
                     meta={
                         "skill": skill,
                         "parameters": parameters or {},
@@ -303,12 +405,15 @@ class AnalysisTool(BaseTool):
                 )
                 document_ids.append(doc_ref.id)
 
+                # Build LLM-friendly summary from extracted_info
+                llm_summary = self._build_llm_summary(extracted_info)
+
                 return ToolResult(
                     data={
                         "document_ids": document_ids,
                         "name": base_name,
                         "state": state,
-                        "extracted_info": extracted_info,
+                        "summary": llm_summary,  # LLM-friendly summary
                     },
                     metadata={
                         "skill": skill,
@@ -322,6 +427,159 @@ class AnalysisTool(BaseTool):
         except Exception as e:
             return ToolResult(error=f"Analysis failed: {str(e)}")
 
+    async def _get_or_generate_code(
+        self,
+        skill_def: "Skill",
+        parameters: dict,
+        force_regenerate: bool,
+    ) -> str:
+        """Get code for skill, generating if necessary.
+
+        Args:
+            skill_def: Skill definition
+            parameters: Parameters for the skill
+            force_regenerate: Force code regeneration
+
+        Returns:
+            Python code to execute
+
+        Raises:
+            RuntimeError: If code generation is needed but no generator available
+        """
+        # Direct mode: use the code directly
+        if skill_def.generation_mode == "direct":
+            if not skill_def.code:
+                raise RuntimeError(f"Direct mode skill {skill_def.name} has no code")
+            return skill_def.code
+
+        # Code generation mode: need a code generator
+        if self.code_generator is None:
+            raise RuntimeError(
+                f"Skill {skill_def.name} requires code generation but no code generator provided"
+            )
+
+        # Generate or retrieve cached code
+        return await self.code_generator.generate(
+            skill_def, parameters, force_regenerate=force_regenerate
+        )
+
+    async def _execute_with_retry(
+        self,
+        code: str,
+        parameters: dict,
+        ctx: AnalysisContext,
+        skill_def: "Skill",
+        max_retries: int,
+    ) -> tuple[dict, str]:
+        """Execute skill code with error retry and regeneration.
+
+        Args:
+            code: Python code to execute
+            parameters: Parameters to pass
+            ctx: Analysis context
+            skill_def: Skill definition for error feedback
+            max_retries: Maximum number of retries
+
+        Returns:
+            Tuple of (execution result, executed code)
+
+        Raises:
+            RuntimeError: If all retries fail
+        """
+        last_error = None
+
+        for attempt in range(max_retries):
+            try:
+                result = self._execute_skill(code, parameters, ctx)
+                return result, code
+            except SyntaxError as e:
+                # Syntax error - must regenerate code
+                last_error = f"SyntaxError: {e}"
+                if (
+                    attempt < max_retries - 1
+                    and skill_def.generation_mode == "code"
+                    and self.code_generator
+                ):
+                    code = await self.code_generator.fix(
+                        skill_def, code, str(e), parameters, error_type="syntax"
+                    )
+                else:
+                    raise
+            except (NameError, AttributeError, TypeError, KeyError) as e:
+                # Runtime error - try to fix
+                last_error = f"{type(e).__name__}: {e}"
+                if (
+                    attempt < max_retries - 1
+                    and skill_def.generation_mode == "code"
+                    and self.code_generator
+                ):
+                    code = await self.code_generator.fix(
+                        skill_def, code, str(e), parameters, error_type="runtime"
+                    )
+                else:
+                    raise
+            except Exception as e:
+                # Other errors - don't retry
+                raise
+
+        # Should not reach here, but just in case
+        raise RuntimeError(f"Failed after {max_retries} attempts. Last error: {last_error}")
+
+    def _build_llm_summary(self, extracted_info: dict) -> dict:
+        """Build LLM-friendly summary from extracted info, filtering out large data.
+
+        Args:
+            extracted_info: Raw extracted info from analysis
+
+        Returns:
+            Filtered info with only scalar/numeric values and small strings
+        """
+        import json
+        import numpy as np
+
+        summary = {}
+        for key, value in extracted_info.items():
+            # Skip None values
+            if value is None:
+                continue
+            # Include scalar numeric values and small strings
+            if isinstance(value, (int, float, bool)):
+                summary[key] = value
+            elif isinstance(value, str):
+                # Include short strings (< 500 chars)
+                if len(value) < 500:
+                    summary[key] = value
+                else:
+                    summary[key] = value[:500] + "... [truncated]"
+            elif isinstance(value, np.integer):
+                summary[key] = int(value)
+            elif isinstance(value, np.floating):
+                summary[key] = float(value)
+            elif isinstance(value, np.ndarray) and value.size == 1:
+                summary[key] = value.item()
+            # Skip arrays and large objects
+            elif isinstance(value, (list, np.ndarray)):
+                # Include list length as info
+                summary[key] = f"[{len(value)} items]"
+            elif isinstance(value, dict):
+                # Recursively process small dicts
+                try:
+                    json_str = json.dumps(value)
+                    if len(json_str) < 1000:
+                        summary[key] = value
+                    else:
+                        summary[key] = "{... large object ...}"
+                except (TypeError, ValueError):
+                    summary[key] = "{... non-serializable ...}"
+            else:
+                # Try to include other scalar types
+                try:
+                    json.dumps({key: value})
+                    summary[key] = value
+                except (TypeError, ValueError):
+                    continue
+        return summary
+
     def _execute_skill(self, code: str, parameters: dict, ctx: AnalysisContext) -> dict:
         """Execute skill code.
 
@@ -333,6 +591,9 @@ class AnalysisTool(BaseTool):
         Returns:
             Execution result
         """
+        if not code:
+            raise RuntimeError("No code to execute")
+
         # Create namespace with standard imports
         namespace = {
             "np": __import__("numpy"),

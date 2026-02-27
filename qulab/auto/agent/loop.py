@@ -24,7 +24,8 @@ class AgentConfig:
 class AgentEvent:
     """Event emitted by agent loop."""
 
-    type: str  # "thinking", "tool_call", "tool_result", "complete", "error", "human_query", "config_request"
+    type: str  # "thinking", "tool_call", "tool_result", "complete", "error"
+                # "human_query", "config_request"
     content: str | None = None
     tool_name: str | None = None
     tool_args: dict | None = None
@@ -111,18 +112,32 @@ class AgentLoop:
                 )
                 return
 
-            # Process thinking if present
+            # Process thinking if present (skip for models that don't support it well)
             if response.content and self.config.enable_thinking:
-                yield AgentEvent(
-                    type="thinking",
-                    content=response.content,
-                )
+                # Skip thinking events if content looks like tool call reasoning
+                # Some models (like Kimi k2.5) have issues with thinking + tool calls
+                if not (response.tool_calls and "kimi" in self.llm.name.lower()):
+                    yield AgentEvent(
+                        type="thinking",
+                        content=response.content,
+                    )
 
             # Add assistant message with tool calls
+            assistant_content = response.content or ""
+
+            # For Kimi models with reasoning_content, handle it properly
+            if "kimi" in self.llm.name.lower() and response.reasoning_content:
+                # Kimi requires reasoning_content to be preserved in assistant messages
+                assistant_content = ""  # Content is empty when there are tool calls
+
             assistant_message = {
                 "role": "assistant",
-                "content": response.content or "",
+                "content": assistant_content,
             }
+
+            # Add reasoning_content for models that support it (e.g., Kimi)
+            if response.reasoning_content:
+                assistant_message["reasoning_content"] = response.reasoning_content
 
             # Add tool_calls in OpenAI format
             if response.tool_calls:
@@ -304,7 +319,46 @@ class AgentLoop:
             Full context with system prompt
         """
         system_prompt = self._build_system_prompt()
-        return [{"role": "system", "content": system_prompt}] + messages
+
+        # For Kimi models, remove thinking-related words to avoid triggering thinking mode
+        # which causes API errors with tool calls
+        if "kimi" in self.llm.name.lower():
+            system_prompt = self._sanitize_for_kimi(system_prompt)
+
+        context = [{"role": "system", "content": system_prompt}] + messages
+
+        # For Kimi models, add extra instruction to avoid thinking format
+        if "kimi" in self.llm.name.lower():
+            context[0]["content"] += "\n\nIMPORTANT: Do NOT use <thinking> tags or any special reasoning format. Just provide plain text responses and tool calls."
+
+        return context
+
+    def _sanitize_for_kimi(self, text: str) -> str:
+        """Remove thinking-related words that trigger Kimi's thinking mode.
+
+        Args:
+            text: Input text
+
+        Returns:
+            Sanitized text
+        """
+        # Replace thinking-related words with alternatives
+        replacements = {
+            "thinking": "analysis",
+            "thinking": "analysis",
+            "thinking": "analysis",
+            "reasoning": "explanation",
+            "reasoning": "explanation",
+            "reason": "rationale",
+        }
+
+        result = text
+        for old, new in replacements.items():
+            result = result.replace(old, new)
+            result = result.replace(old.capitalize(), new.capitalize())
+            result = result.replace(old.upper(), new.upper())
+
+        return result
 
     def _build_system_prompt(self) -> str:
         """Build system prompt with skills and instructions.
@@ -349,31 +403,109 @@ You have access to the following tools:
    - Use when uncertain or approval needed
    - Provide clear question and optional options
 
+6. **save_lesson**: Save a lesson learned from experience
+   - Use after solving a problem or discovering important insights
+   - Record problem, solution, and related skill
+
+7. **query_lessons**: Query previously saved lessons
+   - Use before executing a skill to check for known issues
+   - Search by skill name or keyword
+
+8. **create_guide**: Create a comprehensive guide from accumulated lessons
+   - Compile multiple lessons into a skill usage guide
+
 ## Decision Guidelines
 
 1. **Start by assessing the current state**: Query storage to see what data exists
-2. **Plan the workflow**: Determine what measurements/analyses are needed
-3. **Execute skills**: Use run_measurement or run_analysis as appropriate
-4. **Review results**: Check if further action is needed
-5. **Ask when uncertain**: Use ask_human when not sure what to do
+2. **Check for lessons**: Before executing a skill, query_lessons to see if there are known issues
+3. **Plan the workflow**: Determine what measurements/analyses are needed
+4. **Execute skills**: Use run_measurement or run_analysis as appropriate
+5. **Review results**: Check if further action is needed
+6. **Save lessons**: After fixing problems or discovering insights, save_lesson for future reference
+7. **Ask when uncertain**: Use ask_human when not sure what to do
 
 ## Important Rules
 
 - Always query existing data before running new measurements
+- Query lessons before executing a skill to learn from past experience
 - Provide clear reasoning for your decisions
 - Configuration updates require human approval
 - Analysis can use multiple datasets - specify their IDs
-- If a measurement fails, try adjusting parameters or ask the human
+- If a measurement fails:
+  1. Analyze the error and try to fix it
+  2. If fixed, save_lesson to document the solution
+  3. If still stuck after 2 attempts, ask_human for help
+- Always save a lesson when you learn something important
+
+## Measurement Dependencies
+
+Quantum measurements have dependencies that must be satisfied:
+
+1. **Resonator Spectroscopy (腔频测量)**: Usually the first measurement
+   - No dependencies - can run directly
+   - Output: Resonator frequency (fr)
+
+2. **Qubit Spectroscopy (Qubit 能谱)**: Depends on resonator frequency
+   - Requires: readout_frequency (from resonator_spectroscopy)
+   - Output: Qubit frequency (fq)
+
+3. **Rabi Measurement**: Depends on qubit frequency
+   - Requires: qubit_frequency (from qubit_spectroscopy)
+   - Output: Pi-pulse duration (pi_pulse_duration)
+
+4. **T1 Measurement**: Depends on pi-pulse
+   - Requires: pi_pulse_duration (from rabi_measurement)
+   - Output: T1 time constant
+
+5. **T2 Measurement**: Depends on pi-pulse
+   - Requires: pi_pulse_duration (from rabi_measurement)
+   - Output: T2 time constant
+
+6. **T2 Echo Measurement**: Depends on pi-pulse
+   - Requires: pi_pulse_duration (from rabi_measurement)
+   - Output: T2_echo time constant
+
+## Typical Workflow Example
+
+Measuring T1 standard workflow:
+```
+1. Measure resonator frequency (resonator_spectroscopy)
+   → Get resonator frequency
+
+2. Analyze resonator data (lorentzian_fit)
+   → Confirm resonator peak
+
+3. Measure qubit spectroscopy (qubit_spectroscopy)
+   → Use resonator frequency for readout
+   → Get qubit frequency
+
+4. Perform Rabi measurement (rabi_measurement)
+   → Use qubit frequency
+   → Get pi_pulse_duration
+
+5. Perform T1 measurement (t1_measurement)
+   → Use pi_pulse_duration from Rabi
+   → Output: T1 decay data
+
+6. Analyze T1 data (decay_fit)
+   → Get T1 time constant
+   → Report final result
+```
+
+## Execution Strategy
+
+When given a goal (e.g., "measure T1"):
+1. First query_storage to check what data already exists
+2. Determine which measurements are needed based on dependencies
+3. Execute missing measurements in order
+4. Use analysis skills to extract final results
+5. Report the final answer to the user
 
 ## Response Format
 
-Use the <think> tags to show your reasoning process, then make tool calls to take action.
+Provide clear reasoning for your decisions, then make tool calls to take action.
 
-Example:
-<thinking>
-I need to check if there's existing qubit spectroscopy data before running a new measurement.
-</thinking>
-[Tool call to query_storage]
+IMPORTANT: When making tool calls, do NOT use <thinking> tags or any special formatting. Simply provide your reasoning in plain text, then make the tool calls.
 """
 
     @property

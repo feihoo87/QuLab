@@ -30,7 +30,15 @@ The framework consists of:
 - **Storage**: Persistent storage via qulab.storage
 """
 
-from .config import AutoLabConfig, LLMConfig
+from .config import (
+    AutoLabConfig,
+    BusConfig,
+    ExecutorConfig,
+    LLMConfig,
+    MemoryConfig,
+    SkillConfig,
+    WorldModelConfig,
+)
 from .exceptions import (
     AutoLabError,
     ConfigError,
@@ -49,6 +57,11 @@ __all__ = [
     # Configuration
     "AutoLabConfig",
     "LLMConfig",
+    "SkillConfig",
+    "ExecutorConfig",
+    "MemoryConfig",
+    "WorldModelConfig",
+    "BusConfig",
     # Exceptions
     "AutoLabError",
     "SkillError",
@@ -72,10 +85,25 @@ def __getattr__(name):
     if name == "AgentEvent":
         from .agent.loop import AgentEvent
         return AgentEvent
+    if name == "PlannerAgent":
+        from .agent.planner import PlannerAgent
+        return PlannerAgent
+    if name == "ExecutorAgent":
+        from .agent.executor import ExecutorAgent
+        return ExecutorAgent
+    if name == "AnalysisAgent":
+        from .agent.analyzer import AnalysisAgent
+        return AnalysisAgent
     if name == "Skill":
         from .skills.base import Skill
         return Skill
     if name == "SkillLoader":
         from .skills.loader import SkillLoader
         return SkillLoader
+    if name == "MessageBus":
+        from .bus import MessageBus
+        return MessageBus
+    if name == "WorldModel":
+        from .world_model import WorldModel
+        return WorldModel
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -23,6 +23,7 @@ class ProviderRegistry:
         """Initialize registry."""
         self._providers: dict[str, type[LLMProvider]] = {
             "openai": OpenAIProvider,
+            "kimi": OpenAIProvider,  # Kimi uses OpenAI-compatible API
         }
 
         if HAS_ANTHROPIC:
@@ -66,6 +67,14 @@ class ProviderRegistry:
 
         if config.max_tokens is not None:
             kwargs["max_tokens"] = config.max_tokens
+
+        # Add extra config parameters (provider-specific options)
+        if config.extra:
+            # Filter out internal parameters that shouldn't be passed to API
+            internal_params = {"enable_thinking"}
+            for key, value in config.extra.items():
+                if key not in internal_params:
+                    kwargs[key] = value
 
         # Add provider-specific arguments
         if provider_name in ("openai", "kimi"):

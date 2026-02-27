@@ -78,6 +78,10 @@ class OpenAIProvider(LLMProvider):
             if tool_choice != "auto":
                 request_args["tool_choice"] = tool_choice
 
+        # Kimi k2.5 requires temperature=1
+        if "kimi" in self.model.lower():
+            request_args["temperature"] = 1.0
+
         # Make API call
         response = await self.client.chat.completions.create(**request_args)
 
@@ -111,11 +115,15 @@ class OpenAIProvider(LLMProvider):
                 "total_tokens": response.usage.total_tokens,
             }
 
+        # Extract reasoning_content for models that support it (e.g., Kimi)
+        reasoning_content = getattr(message, 'reasoning_content', None)
+
         return LLMResponse(
             content=message.content,
             tool_calls=tool_calls,
             model=response.model or self.model,
             usage=usage,
+            reasoning_content=reasoning_content,
         )
 
     def _parse_response(self, response: Any) -> LLMResponse:

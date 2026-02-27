@@ -21,10 +21,35 @@ class ToolResult:
         """Convert to dictionary for serialization."""
         return {
             "success": self.success,
-            "data": self.data,
+            "data": self._serialize_data(self.data),
             "error": self.error,
-            "metadata": self.metadata,
+            "metadata": self._serialize_data(self.metadata),
         }
+
+    def _serialize_data(self, obj):
+        """Recursively serialize data for JSON compatibility.
+
+        Args:
+            obj: Object to serialize
+
+        Returns:
+            JSON-serializable object
+        """
+        import numpy as np
+
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.integer, np.int64, np.int32)):
+            return int(obj)
+        elif isinstance(obj, (np.floating, np.float64, np.float32)):
+            return float(obj)
+        elif isinstance(obj, dict):
+            return {k: self._serialize_data(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._serialize_data(item) for item in obj]
+        elif isinstance(obj, tuple):
+            return tuple(self._serialize_data(item) for item in obj)
+        return obj
 
 
 class BaseTool(ABC):

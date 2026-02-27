@@ -155,22 +155,41 @@ class SkillLoader:
 
         # Parse YAML frontmatter
         try:
-            metadata = yaml.safe_load(frontmatter) if frontmatter else {}
+            yaml_metadata = yaml.safe_load(frontmatter) if frontmatter else {}
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML frontmatter: {e}")
 
-        # Extract code from markdown
+        # Get generation mode
+        # If not specified, detect based on content:
+        # - Has code blocks and no explicit guide -> "direct" (backward compatible)
+        # - No code blocks -> "code" (need generation)
         code = self._extract_code(markdown)
+        generation_mode = yaml_metadata.get("generation_mode", "direct" if code else "code")
 
-        # Build skill
+        # Build skill based on generation mode
+        if generation_mode == "direct":
+            # Direct execution mode - code must be provided
+            if not code:
+                raise ValueError(f"Direct mode skill {filepath} must contain Python code blocks")
+            guide_content = yaml_metadata.get("guide_content", "")
+        else:
+            # Code generation mode (default) - guide content is the markdown
+            # If there's code, it's treated as example/reference
+            guide_content = markdown.strip() if not code else self._extract_guide_content(markdown, code)
+            # code is optional in code mode (will be generated)
+            if not code:
+                code = None
+
         return Skill(
-            name=metadata.get("name", filepath.parent.name),
-            type=metadata.get("type", "unknown"),
-            description=metadata.get("description", ""),
-            capabilities=metadata.get("capabilities", {}),
-            inputs=metadata.get("inputs", []),
-            outputs=metadata.get("outputs", []),
-            metadata=metadata.get("metadata", {}),
+            name=yaml_metadata.get("name", filepath.parent.name),
+            type=yaml_metadata.get("type", "unknown"),
+            description=yaml_metadata.get("description", ""),
+            capabilities=yaml_metadata.get("capabilities", {}),
+            inputs=yaml_metadata.get("inputs", []),
+            outputs=yaml_metadata.get("outputs", []),
+            metadata=yaml_metadata.get("metadata", {}),
+            generation_mode=generation_mode,
+            guide_content=guide_content,
             code=code,
             filepath=filepath,
         )
@@ -215,8 +234,24 @@ class SkillLoader:
         if matches:
             return "\n\n".join(matches)
 
-        # If no code blocks, return entire markdown as code
-        return markdown
+        # If no code blocks, return empty string (code generation mode)
+        return ""
+
+    def _extract_guide_content(self, markdown: str, code: str) -> str:
+        """Extract guide content by removing code blocks from markdown.
+
+        Args:
+            markdown: Markdown content
+            code: Extracted code
+
+        Returns:
+            Guide content (markdown without code blocks)
+        """
+        # Remove Python code blocks to get guide content
+        guide = re.sub(r"```python\n(.*?)\n```", "", markdown, flags=re.DOTALL)
+        # Clean up extra whitespace
+        guide = re.sub(r"\n{3,}", "\n\n", guide)
+        return guide.strip()
 
     def add_search_path(self, path: str | Path) -> None:
         """Add a search path.
