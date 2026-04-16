@@ -57,6 +57,8 @@ dependencies = [
     "pydantic>=2.12.5",
     "openpyxl>=3.1.5",
     "anthropic>=0.84.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
 ]
 dynamic = ["version"]
 

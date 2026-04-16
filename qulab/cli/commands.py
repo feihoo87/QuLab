@@ -8,6 +8,7 @@ from ..scan.server import server
 from ..sys.net.cli import dht
 from ..visualization.__main__ import plot
 from ..storage.cli import storage
+from ..trace.cli import trace_cli
 
 
 @click.group()
@@ -44,3 +45,4 @@ cli.add_command(boot)
 cli.add_command(reboot)
 cli.add_command(auto_cli)
 cli.add_command(storage)
+cli.add_command(trace_cli)
