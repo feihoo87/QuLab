@@ -141,9 +141,19 @@ class TestNotebookWatcher:
             f"No notebook_save events found. "
             f"Got types: {[e['event_type'] for e in events]}"
         )
-        # Take the last notebook_save event (may get spurious early ones)
-        ev = nb_save_events[-1]
-        assert ev["payload"]["cell_count"] == 2
-        changes = ev["payload"]["changed_cells"]
-        change_types = {c["change"] for c in changes}
-        assert "added" in change_types or "modified" in change_types
+
+        # Watchdog may fire duplicate events; find the one with actual changes.
+        # At least one event should have cell_count == 2 (the new state).
+        has_two_cells = [
+            e for e in nb_save_events if e["payload"]["cell_count"] == 2
+        ]
+        assert has_two_cells, "No notebook_save event with 2 cells found"
+
+        # Collect all changed_cells across all notebook_save events,
+        # because duplicate inotify/FSEvents may cause the second event
+        # to see an already-updated snapshot (empty diff).
+        all_changes = set()
+        for ev in nb_save_events:
+            for c in ev["payload"]["changed_cells"]:
+                all_changes.add(c["change"])
+        assert "added" in all_changes or "modified" in all_changes
