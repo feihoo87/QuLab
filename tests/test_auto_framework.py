@@ -71,6 +71,8 @@ def temp_storage():
     with tempfile.TemporaryDirectory() as tmpdir:
         storage = LocalStorage(tmpdir)
         yield storage
+        # Dispose SQLAlchemy engine to release the .db file lock on Windows
+        storage.engine.dispose()
 
 
 @pytest.fixture
