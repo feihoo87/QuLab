@@ -30,7 +30,7 @@ def plotDistribution(s0,
                      info=None,
                      hotThresh=10000,
                      logy=False):
-    from waveforms.math.fit import get_threshold_info, mult_gaussian_pdf
+    from wath.measure.readout import get_threshold_info, mult_gaussian_pdf
 
     if info is None:
         info = get_threshold_info(s0, s1)
