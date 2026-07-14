@@ -143,7 +143,8 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
     # 类变量：跟踪最近操作的 DataPicker 实例
     _active_picker = None
 
-    def __init__(self, ax=None, long_press_threshold=0.5, on_changed=None):
+    def __init__(self, ax=None, long_press_threshold=0.5, on_changed=None,
+                 initial_points=None):
         """初始化 DataPicker。
 
         Args:
@@ -152,6 +153,10 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
             on_changed: 数据变化时的回调函数，会在添加点、删除点、撤销、
                 重做操作后被调用。函数签名为 `on_changed(picker)`，其中
                 picker 是当前 DataPicker 实例。
+            initial_points: 初始数据点，支持以下格式：
+                - (x, y) 元组，x 和 y 为 array-like
+                - [(x1, y1), (x2, y2), ...] 列表
+                初始点不会记录到撤销栈中。
 
         Examples:
             >>> import matplotlib.pyplot as plt
@@ -202,7 +207,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
             ax = plt.gca()
         self.ax = ax
         self.mode = 'pick'
-        self.coord_display = 'black'  # 坐标显示模式: 'white', 'black', 'hidden'
+        self.coord_display = 'hidden'  # 坐标显示模式: 'white', 'black', 'hidden'
 
         # 长按检测相关属性
         self.long_press_threshold = long_press_threshold
@@ -234,6 +239,10 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
                                           self.on_release)
         self.ax.figure.canvas.mpl_connect('key_press_event', self.on_key_press)
         self.namespace = {}  # 用于存储用户自定义的变量供 on_changed 回调函数使用
+
+        # 预填充初始数据点
+        if initial_points is not None:
+            self.add_points(*self._normalize_points(initial_points), record=False)
 
     def _set_active(self):
         """将当前 picker 设为激活状态（最近操作）。"""
@@ -452,7 +461,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
                 self._remove_point(point)
                 break
 
-    def _add_point(self, xdata, ydata):
+    def _add_point(self, xdata, ydata, record=True):
         """添加新点并记录到撤销栈。
 
         同时将当前 picker 设为激活状态。
@@ -460,6 +469,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         Args:
             xdata: 点的 x 坐标
             ydata: 点的 y 坐标
+            record: 是否记录到撤销栈，默认 True。设为 False 用于预填充初始点。
         """
         point = (xdata, ydata)
 
@@ -475,8 +485,9 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         self.points_and_text[point] = text
 
         # 记录操作到撤销栈
-        self.undo_stack.append(('add', point))
-        self.redo_stack.clear()
+        if record:
+            self.undo_stack.append(('add', point))
+            self.redo_stack.clear()
 
         # 更新显示
         x, y = self.get_xy()
@@ -527,41 +538,46 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         只有当前 picker 是最近操作的 picker 时才会执行撤销。
         按 'z' 键触发。
         """
-        if DataPicker._active_picker is not self:
+        if DataPicker._active_picker is not self or not self.undo_stack:
             return
-        if not self.undo_stack:
-            return
+        self._apply_history(self.undo_stack.pop(), self.redo_stack)
 
-        action = self.undo_stack.pop()
+    def _apply_history(self, action, target_stack):
+        """执行一条历史记录并推入对面的栈。
 
-        if action[0] == 'add':
-            # 撤销添加操作：删除该点
+        Args:
+            action: 从源栈取出的操作记录
+            target_stack: 目标栈（撤销时是 redo_stack，重做时是 undo_stack）
+        """
+        kind = action[0]
+        if kind == 'add':
             point = action[1]
             if point in self.points_and_text:
                 text = self.points_and_text.pop(point)
                 text.remove()
-                self.redo_stack.append(('add', point))
-        elif action[0] == 'remove':
-            # 撤销删除操作：恢复该点
+                target_stack.append(('add', point))
+        elif kind == 'remove':
             point, text = action[1], action[2]
             self.points_and_text[point] = text
             self.ax.add_artist(text)
-            self.redo_stack.append(('remove', point, text))
-
-        # 更新显示
-        if self.points_and_text:
-            x, y = self.get_xy()
-            if self.points is None:
-                self.points, = self.ax.plot(x, y, 'ro')
-            else:
-                self.points.set_data(x, y)
-        else:
-            if self.points:
-                self.points.remove()
-                self.points = None
-
+            target_stack.append(('remove', point, text))
+        elif kind == 'add_batch':
+            for point in action[1]:
+                if point in self.points_and_text:
+                    self.points_and_text.pop(point).remove()
+            target_stack.append(action)
+        elif kind == 'remove_batch':
+            for point, text in action[1]:
+                self.points_and_text[point] = text
+                self.ax.add_artist(text)
+            target_stack.append(action)
+        elif kind == 'clear':
+            for point, text in action[1]:
+                self.points_and_text[point] = text
+                self.ax.add_artist(text)
+            target_stack.append(action)
+        self._redraw_points()
         self._trigger_changed()
-        self.ax.figure.canvas.draw()
 
     def _create_coord_text(self, point):
         """根据当前显示模式创建坐标文本标签。
@@ -587,42 +603,40 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
         只有当前 picker 是最近操作的 picker 时才会执行重做。
         按 'r' 键触发。
         """
-        if DataPicker._active_picker is not self:
+        if DataPicker._active_picker is not self or not self.redo_stack:
             return
-        if not self.redo_stack:
-            return
-
         action = self.redo_stack.pop()
-
-        if action[0] == 'add':
-            # 重做添加操作
+        kind = action[0]
+        if kind == 'add':
             point = action[1]
             if point not in self.points_and_text:
-                text = self._create_coord_text(point)
-                self.points_and_text[point] = text
+                self.points_and_text[point] = self._create_coord_text(point)
                 self.undo_stack.append(('add', point))
-        elif action[0] == 'remove':
-            # 重做删除操作
+        elif kind == 'remove':
             point, text = action[1], action[2]
             if point in self.points_and_text:
                 self.points_and_text.pop(point)
                 text.remove()
                 self.undo_stack.append(('remove', point, text))
-
-        # 更新显示
-        if self.points_and_text:
-            x, y = self.get_xy()
-            if self.points is None:
-                self.points, = self.ax.plot(x, y, 'ro')
-            else:
-                self.points.set_data(x, y)
-        else:
-            if self.points:
-                self.points.remove()
-                self.points = None
-
+        elif kind == 'add_batch':
+            for point in action[1]:
+                if point not in self.points_and_text:
+                    self.points_and_text[point] = self._create_coord_text(point)
+            self.undo_stack.append(action)
+        elif kind == 'remove_batch':
+            for point, text in action[1]:
+                if point in self.points_and_text:
+                    self.points_and_text.pop(point)
+                    text.remove()
+            self.undo_stack.append(action)
+        elif kind == 'clear':
+            for point, text in action[1]:
+                if point in self.points_and_text:
+                    self.points_and_text.pop(point)
+                    text.remove()
+            self.undo_stack.append(action)
+        self._redraw_points()
         self._trigger_changed()
-        self.ax.figure.canvas.draw()
 
     def get_xy(self):
         """获取已选取的所有数据点坐标。
@@ -647,6 +661,136 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
             y = np.asarray(y)[index]
             return x, y
         return np.array([]), np.array([])
+
+    @staticmethod
+    def _normalize_points(points):
+        """将不同格式的输入点标准化为 (x, y) 数组。
+
+        Args:
+            points: 以下格式之一：
+                - (x, y) 元组，x 和 y 为 array-like
+                - [(x1, y1), (x2, y2), ...] 列表
+
+        Returns:
+            tuple: (x, y) 两个 numpy 数组
+
+        Raises:
+            ValueError: 如果输入格式无法识别
+        """
+        if isinstance(points, tuple) and len(points) == 2:
+            # (x_array, y_array) 格式
+            return np.asarray(points[0], dtype=float), np.asarray(points[1], dtype=float)
+        if isinstance(points, (list, np.ndarray)):
+            # [(x1, y1), (x2, y2), ...] 格式
+            arr = np.asarray(points, dtype=float)
+            if arr.ndim == 2 and arr.shape[1] == 2:
+                return arr[:, 0], arr[:, 1]
+        raise ValueError(
+            f"无法解析 points 格式: {type(points)}。"
+            "支持的格式: (x_array, y_array) 或 [(x1, y1), (x2, y2), ...]"
+        )
+
+    def add_points(self, x, y, record=True):
+        """批量添加数据点。
+
+        Args:
+            x: x 坐标数组（array-like）
+            y: y 坐标数组（array-like）
+            record: 是否记录到撤销栈，默认 True。设为 False 时整个批量操作
+                作为不可撤销的初始数据。
+
+        Examples:
+            >>> picker = DataPicker(ax)
+            >>> picker.add_points([1, 2, 3], [4, 5, 6])
+            >>> # 或传入初始点不记录撤销
+            >>> picker.add_points([0, 1], [0, 1], record=False)
+        """
+        x = np.asarray(x, dtype=float).ravel()
+        y = np.asarray(y, dtype=float).ravel()
+        if len(x) != len(y):
+            raise ValueError(f"x 和 y 长度必须相同，当前 x: {len(x)}, y: {len(y)}")
+        if record:
+            self._set_active()
+            self.undo_stack.append(('add_batch', list(zip(x, y))))
+            self.redo_stack.clear()
+        for xi, yi in zip(x, y):
+            if (xi, yi) not in self.points_and_text:
+                text = self._create_coord_text((xi, yi))
+                self.points_and_text[(xi, yi)] = text
+        self._redraw_points()
+        self._trigger_changed()
+
+    def remove_points(self, x, y):
+        """批量删除指定坐标的数据点。
+
+        仅删除坐标精确匹配的点，不存在的点会被静默忽略。
+
+        Args:
+            x: x 坐标数组（array-like）
+            y: y 坐标数组（array-like）
+
+        Examples:
+            >>> picker = DataPicker(ax, initial_points=([1, 2, 3], [4, 5, 6]))
+            >>> picker.remove_points([2], [5])  # 删除 (2, 5) 这个点
+
+        Raises:
+            ValueError: 如果 x 和 y 长度不同
+        """
+        x = np.asarray(x, dtype=float).ravel()
+        y = np.asarray(y, dtype=float).ravel()
+        if len(x) != len(y):
+            raise ValueError(f"x 和 y 长度必须相同，当前 x: {len(x)}, y: {len(y)}")
+        removed = []
+        for xi, yi in zip(x, y):
+            point = (xi, yi)
+            if point in self.points_and_text:
+                text = self.points_and_text.pop(point)
+                text.remove()
+                removed.append((point, text))
+        if removed:
+            self._set_active()
+            self.undo_stack.append(('remove_batch', removed))
+            self.redo_stack.clear()
+            self._redraw_points()
+            self._trigger_changed()
+
+    def clear(self):
+        """清除所有已选取的数据点。
+
+        操作会记录到撤销栈，可通过 undo() 恢复。
+
+        Examples:
+            >>> picker = DataPicker(ax)
+            >>> picker.add_points([1, 2], [3, 4])
+            >>> picker.clear()
+            >>> x, y = picker.get_xy()
+            >>> len(x)  # 0
+        """
+        if not self.points_and_text:
+            return
+        self._set_active()
+        saved = list(self.points_and_text.items())
+        self.undo_stack.append(('clear', saved))
+        self.redo_stack.clear()
+        for _point, text in saved:
+            text.remove()
+        self.points_and_text.clear()
+        self._redraw_points()
+        self._trigger_changed()
+
+    def _redraw_points(self):
+        """根据当前 points_and_text 刷新图表上的数据点显示。"""
+        if self.points_and_text:
+            x, y = self.get_xy()
+            if self.points is None:
+                self.points, = self.ax.plot(x, y, 'ro')
+            else:
+                self.points.set_data(x, y)
+        else:
+            if self.points is not None:
+                self.points.remove()
+                self.points = None
+        self.ax.figure.canvas.draw()
 
     def set_fitter(
         self,
@@ -716,6 +860,7 @@ class DataPicker:  # pylint: disable=too-many-instance-attributes
 
         # 设置 on_changed 回调
         self.on_changed = self._on_changed_with_fit
+        self._do_fit(force=False)
 
     def _do_fit(self, force: bool = False) -> bool:
         """执行拟合并更新图表。

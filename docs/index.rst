@@ -14,6 +14,7 @@ Welcome to QuLab's documentation!
    source/modules
    auto/cli
    auto/design
+   visualization/index
 
 
 
